@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit CRM</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="page-login" class="page">
+  <div class="login-box">
+    <div class="login-logo">AC</div>
+    <h1>Audit CRM</h1>
+    <p>LogisticFit — system planowania audytów</p>
+    <button id="btn-login" class="btn-primary">Zaloguj się przez Microsoft</button>
+  </div>
+</div>
+
+<!-- GŁÓWNA APLIKACJA -->
+<div id="page-app" class="page hidden">
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="nav-left">
+      <span class="nav-logo">AC</span>
+      <span class="nav-title">Audit CRM</span>
+    </div>
+    <div class="nav-links">
+      <button class="nav-btn active" data-view="audits">📋 Audyty</button>
+      <button class="nav-btn" data-view="auditors">👥 Audytorzy</button>
+    </div>
+    <div class="nav-right">
+      <span id="nav-user"></span>
+      <button id="btn-logout" class="btn-ghost">Wyloguj</button>
+    </div>
+  </nav>
+
+  <!-- WIDOK: AUDYTY -->
+  <div id="view-audits" class="view">
+
+    <!-- FILTRY -->
+    <div class="filters-bar">
+      <input id="search" type="text" placeholder="🔍 Szukaj firmy..." class="search-input">
+
+      <select id="filter-quarter" class="filter-select">
+        <option value="">Kwartał</option>
+        <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+      </select>
+
+      <select id="filter-year" class="filter-select">
+        <option value="">Rok</option>
+        <option>2024</option><option>2025</option><option>2026</option>
+      </select>
+
+      <select id="filter-program" class="filter-select">
+        <option value="">Program</option>
+        <option>FSC</option><option>PEFC</option><option>KZR INiG</option>
+        <option>SURE</option><option>EUDR</option>
+      </select>
+
+      <select id="filter-status" class="filter-select">
+        <option value="">Status</option>
+        <option>PLANNED</option><option>DONE</option>
+        <option>REJECTED</option><option>CHANGE</option><option>Invoice</option>
+      </select>
+
+      <select id="filter-auditor" class="filter-select">
+        <option value="">Audytor</option>
+        <option>Rzeźnik Michał</option>
+      </select>
+
+      <button id="btn-clear-filters" class="btn-ghost">✕ Wyczyść</button>
+    </div>
+
+    <!-- STATYSTYKI -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <span class="stat-num" id="stat-total">—</span>
+        <span class="stat-label">Łącznie</span>
+      </div>
+      <div class="stat-card planned">
+        <span class="stat-num" id="stat-planned">—</span>
+        <span class="stat-label">Zaplanowane</span>
+      </div>
+      <div class="stat-card done">
+        <span class="stat-num" id="stat-done">—</span>
+        <span class="stat-label">Wykonane</span>
+      </div>
+      <div class="stat-card proforma">
+        <span class="stat-num" id="stat-proforma">—</span>
+        <span class="stat-label">Do proformy</span>
+      </div>
+    </div>
+
+    <!-- TABELA -->
+    <div class="table-wrapper">
+      <table id="audits-table">
+        <thead>
+          <tr>
+            <th>Firma</th>
+            <th>Program</th>
+            <th>Typ</th>
+            <th>Data</th>
+            <th>Miasto</th>
+            <th>Tryb</th>
+            <th>Status</th>
+            <th>Proforma</th>
+            <th>Audytor</th>
+          </tr>
+        </thead>
+        <tbody id="audits-tbody">
+          <tr><td colspan="9" class="loading">Ładowanie...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- WIDOK: AUDYTORZY -->
+  <div id="view-auditors" class="view hidden">
+    <div class="view-header">
+      <h2>Rozkład audytów wg audytora</h2>
+      <div class="header-filters">
+        <select id="auditors-quarter" class="filter-select">
+          <option value="">Wszystkie kwartały</option>
+          <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+        </select>
+        <select id="auditors-year" class="filter-select">
+          <option value="">Wszystkie lata</option>
+          <option>2024</option><option>2025</option><option>2026</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table id="auditors-table">
+        <thead>
+          <tr>
+            <th>Audytor</th>
+            <th>FSC</th>
+            <th>PEFC</th>
+            <th>KZR INiG</th>
+            <th>SURE</th>
+            <th>EUDR</th>
+            <th>Łącznie</th>
+          </tr>
+        </thead>
+        <tbody id="auditors-tbody">
+          <tr><td colspan="7" class="loading">Ładowanie...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL: SZCZEGÓŁY AUDYTU -->
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">—</h2>
+      <button id="modal-close" class="btn-ghost">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid">
+        <div class="modal-section">
+          <h3>Dane firmy</h3>
+          <div class="field-row"><label>PRJ</label><span id="m-prj">—</span></div>
+          <div class="field-row"><label>Program</label><span id="m-program">—</span></div>
+          <div class="field-row"><label>Typ audytu</label><span id="m-type">—</span></div>
+          <div class="field-row"><label>Standard</label><span id="m-standard">—</span></div>
+          <div class="field-row"><label>Adres</label><span id="m-address">—</span></div>
+          <div class="field-row"><label>Miasto</label><span id="m-city">—</span></div>
+          <div class="field-row"><label>Email</label><span id="m-email">—</span></div>
+          <div class="field-row"><label>Telefon</label><span id="m-phone">—</span></div>
+          <div class="field-row"><label>Komórka</label><span id="m-mobile">—</span></div>
+        </div>
+        <div class="modal-section">
+          <h3>Planowanie</h3>
+          <div class="field-row"><label>Data audytu</label><span id="m-date">—</span></div>
+          <div class="field-row"><label>Liczba dni</label><span id="m-days">—</span></div>
+          <div class="field-row"><label>Tryb</label><span id="m-mode">—</span></div>
+          <div class="field-row"><label>Kwartał</label><span id="m-quarter">—</span></div>
+          <div class="field-row"><label>Rok</label><span id="m-year">—</span></div>
+          <div class="field-row"><label>Audytor</label><span id="m-auditor">—</span></div>
+          <div class="field-row"><label>Planned CU</label><span id="m-cu">—</span></div>
+          <div class="field-row"><label>Cert. ważny do</label><span id="m-certvalid">—</span></div>
+        </div>
+      </div>
+
+      <div class="modal-section full">
+        <h3>Notatki</h3>
+        <p id="m-notes" class="notes-text">—</p>
+      </div>
+
+      <div class="modal-actions">
+        <div class="action-group">
+          <label>Status</label>
+          <div class="btn-group" id="status-buttons">
+            <button class="status-btn" data-val="PLANNED">PLANNED</button>
+            <button class="status-btn" data-val="DONE">DONE</button>
+            <button class="status-btn" data-val="REJECTED">REJECTED</button>
+            <button class="status-btn" data-val="CHANGE">CHANGE</button>
+            <button class="status-btn" data-val="Invoice">Invoice</button>
+          </div>
+        </div>
+        <div class="action-group">
+          <label>Proforma</label>
+          <div class="btn-group" id="proforma-buttons">
+            <button class="proforma-btn" data-val="Brak">Brak</button>
+            <button class="proforma-btn" data-val="Wysłana">Wysłana</button>
+            <button class="proforma-btn" data-val="Zapłacona">Zapłacona</button>
+          </div>
+        </div>
+        <button id="btn-save" class="btn-primary">💾 Zapisz zmiany</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="auth.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
