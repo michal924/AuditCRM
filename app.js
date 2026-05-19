@@ -599,7 +599,7 @@ async function startImport() {
     `;
 
     renderTable();
-    renderAuditors();
+    renderAuditorsTable();
     showToast(`Import zakończony: +${imported} audytów`, imported > 0 ? "success" : "info");
 
   } catch(e) {
