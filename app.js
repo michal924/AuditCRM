@@ -887,6 +887,11 @@ function setupChanges() {
     [...e.dataTransfer.files].forEach(handleHistoryFile);
   });
 
+  document.getElementById("btn-changes-pick").addEventListener("click", e => {
+    e.stopPropagation();
+    document.getElementById("changes-file").click();
+  });
+
   document.getElementById("changes-file").addEventListener("change", e => {
     [...e.target.files].forEach(handleHistoryFile);
     e.target.value = "";

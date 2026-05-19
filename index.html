@@ -39,7 +39,7 @@
       <button class="nav-btn" data-view="changes">🔄 Zmiany Audytora</button>
     </div>
     <div class="nav-right">
-      <button id="btn-import" class="btn-action" title="Importuj plan z CUC">⬆ Import</button>
+      <button id="btn-import" class="btn-action" title="Importuj kwartalny plan z CUC">⬆ Import CUC</button>
       <button id="btn-add-audit" class="btn-action btn-action-green" title="Dodaj nieplanowany audyt">＋ Dodaj audyt</button>
       <span id="nav-user"></span>
       <button id="btn-logout" class="btn-ghost">Wyloguj</button>
@@ -163,8 +163,7 @@
         <p>Wgraj pliki <strong>Auditsoverview2XL</strong> (2024, 2025, 2026…)<br>
            Można wgrać wiele plików naraz</p>
         <input type="file" id="changes-file" accept=".xlsx,.xls" multiple style="display:none">
-        <button class="btn-primary" style="width:auto;margin-top:12px"
-          onclick="document.getElementById('changes-file').click()">Wybierz pliki .xlsx</button>
+        <button id="btn-changes-pick" class="btn-primary" style="width:auto;margin-top:12px">Wybierz pliki .xlsx</button>
       </div>
       <div id="changes-loaded-files" class="loaded-files-row"></div>
     </div>
