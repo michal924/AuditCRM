@@ -132,6 +132,7 @@ async function init() {
   setupModal();
   setupImport();
   setupAddAudit();
+  setupChanges();
 
   await loadAudits();
 }
@@ -148,6 +149,7 @@ function setupNav() {
       document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
       document.getElementById(`view-${view}`).classList.remove("hidden");
       if (view === "checkaudit") renderAuditorsTable();
+      if (view === "changes") renderChangesTable();
     };
   });
 }
@@ -858,3 +860,354 @@ function showToast(msg, type = "success") {
 // START
 // ============================================================
 init();
+
+// ============================================================
+// ZMIANY AUDYTORA
+// ============================================================
+let auditHistory = {};  // { year: { "prj_program": { prj, title, program, auditor } } }
+let logoBase64 = null;
+
+function initLogoBase64() {
+  fetch("logo.png").then(r => r.blob()).then(blob => {
+    const reader = new FileReader();
+    reader.onloadend = () => { logoBase64 = reader.result; };
+    reader.readAsDataURL(blob);
+  }).catch(() => {});
+}
+
+function setupChanges() {
+  initLogoBase64();
+
+  const dropZone = document.getElementById("changes-drop-zone");
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    [...e.dataTransfer.files].forEach(handleHistoryFile);
+  });
+
+  document.getElementById("changes-file").addEventListener("change", e => {
+    [...e.target.files].forEach(handleHistoryFile);
+    e.target.value = "";
+  });
+
+  document.getElementById("changes-auditor-filter").addEventListener("change", renderChangesTable);
+  document.getElementById("changes-program-filter").addEventListener("change", renderChangesTable);
+  document.getElementById("changes-only-filter").addEventListener("change", renderChangesTable);
+  document.getElementById("btn-pdf-rzeznik").addEventListener("click", generatePdfRzeznik);
+}
+
+function handleHistoryFile(file) {
+  if (!file.name.match(/\.xlsx?$/i)) return;
+
+  const yearMatch = file.name.match(/(\d{4})/);
+  const year = yearMatch ? parseInt(yearMatch[1]) : null;
+  if (!year || year < 2020 || year > 2035) {
+    showToast(`Nie można wykryć roku z nazwy: ${file.name}`, "error");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+      if (!auditHistory[year]) auditHistory[year] = {};
+      let count = 0;
+
+      for (let i = 3; i < rows.length; i++) {
+        const row = rows[i];
+        const prjStr = String(row[0] || "");
+        if (!prjStr.includes("PRJ")) continue;
+
+        const prj = parseInt(prjStr.replace(/\D/g, ""));
+        if (!prj) continue;
+
+        const title   = String(row[1] || "").trim();
+        const program = normProgram(String(row[8] || "").trim()) || String(row[8] || "").trim();
+        const auditor = normAuditor(String(row[13] || "").trim());
+        if (!title || !auditor) continue;
+
+        const key = `${prj}_${program}`;
+        auditHistory[year][key] = { prj, title, program, auditor };
+        count++;
+      }
+
+      showToast(`✓ ${file.name} — ${count} rekordów (${year})`, "success");
+      updateChangesLoadedUI(file.name, year, count);
+      renderChangesTable();
+    } catch(err) {
+      showToast(`Błąd ${file.name}: ${err.message}`, "error");
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function updateChangesLoadedUI(filename, year, count) {
+  const container = document.getElementById("changes-loaded-files");
+  const existing = container.querySelector(`[data-year="${year}"]`);
+  if (existing) existing.remove();
+
+  const chip = document.createElement("div");
+  chip.className = "loaded-file-chip";
+  chip.dataset.year = year;
+  chip.innerHTML = `📄 <strong>${year}</strong> — ${filename} <span class="chip-count">${count} rek.</span>`;
+  container.appendChild(chip);
+  document.getElementById("changes-table-wrapper").style.display = "";
+}
+
+function buildHistoryMap() {
+  const map = {};
+  Object.entries(auditHistory).forEach(([year, records]) => {
+    Object.entries(records).forEach(([key, rec]) => {
+      if (!map[key]) map[key] = { prj: rec.prj, title: rec.title, program: rec.program, years: {} };
+      map[key].years[year] = rec.auditor;
+    });
+  });
+  return map;
+}
+
+function renderChangesTable() {
+  const years = Object.keys(auditHistory).map(Number).sort();
+  if (!years.length) return;
+
+  // Dynamic headers
+  document.getElementById("changes-thead").innerHTML = `<tr>
+    <th>PRJ</th><th>Firma</th><th>Program</th>
+    ${years.map(y => `<th>${y}</th>`).join("")}
+    <th>Zmiana</th>
+  </tr>`;
+
+  const map = buildHistoryMap();
+  const auditorFilter = document.getElementById("changes-auditor-filter").value;
+  const programFilter = document.getElementById("changes-program-filter").value;
+  const onlyChanges   = document.getElementById("changes-only-filter").checked;
+
+  let rows = Object.values(map).map(r => {
+    const vals = years.map(y => r.years[String(y)] || null);
+    const filled = vals.filter(Boolean);
+    const unique = new Set(filled);
+    const hasChange = unique.size > 1;
+    const hasRzeznik = filled.includes(MY_AUDITOR);
+    return { ...r, hasChange, hasRzeznik };
+  });
+
+  if (programFilter) rows = rows.filter(r => r.program === programFilter);
+  if (auditorFilter) rows = rows.filter(r => Object.values(r.years).includes(auditorFilter));
+  if (onlyChanges)   rows = rows.filter(r => r.hasChange);
+
+  rows.sort((a, b) => {
+    const aTop = a.hasChange && a.hasRzeznik;
+    const bTop = b.hasChange && b.hasRzeznik;
+    if (aTop && !bTop) return -1;
+    if (!aTop && bTop) return 1;
+    if (a.hasChange && !b.hasChange) return -1;
+    if (!a.hasChange && b.hasChange) return 1;
+    return a.title.localeCompare(b.title, "pl");
+  });
+
+  // Update auditor dropdown
+  const allNames = [...new Set(Object.values(map).flatMap(r => Object.values(r.years)))].filter(Boolean)
+    .sort((a, b) => a === MY_AUDITOR ? -1 : b === MY_AUDITOR ? 1 : a.localeCompare(b, "pl"));
+  const sel = document.getElementById("changes-auditor-filter");
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">Wszyscy audytorzy</option>` +
+    allNames.map(n => `<option value="${n}"${n === cur ? " selected" : ""}>${n}</option>`).join("");
+
+  const tbody = document.getElementById("changes-tbody");
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${3 + years.length + 1}" class="loading">Brak wyników</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const rowCls = r.hasChange && r.hasRzeznik ? "change-row-rzeznik"
+                 : r.hasChange ? "change-row" : "";
+
+    const yearCells = years.map(y => {
+      const aud = r.years[String(y)];
+      if (!aud) return `<td class="ch-cell ch-empty">—</td>`;
+      const cls = aud === MY_AUDITOR ? "ch-cell ch-rzeznik" : "ch-cell";
+      return `<td class="${cls}" title="${aud}">${shortAuditor(aud)}</td>`;
+    }).join("");
+
+    const indicator = r.hasChange && r.hasRzeznik ? `<td class="ch-ind ch-ind-rzeznik">⚡ Rzeźnik</td>`
+                    : r.hasChange                 ? `<td class="ch-ind ch-ind-change">🔄 Zmiana</td>`
+                    :                               `<td class="ch-ind">—</td>`;
+    return `<tr class="${rowCls}">
+      <td class="prj-col">${r.prj}</td>
+      <td class="firm-col" title="${r.title}">${r.title.length > 42 ? r.title.slice(0, 40) + "…" : r.title}</td>
+      <td>${programBadge(r.program)}</td>
+      ${yearCells}${indicator}
+    </tr>`;
+  }).join("");
+}
+
+function shortAuditor(name) {
+  if (!name) return "—";
+  const p = name.trim().split(" ");
+  return p.length >= 2 ? `${p[0]} ${p[1][0]}.` : name;
+}
+
+// ============================================================
+// PDF — RZEŹNIK MICHAŁ
+// ============================================================
+function generatePdfRzeznik() {
+  const years = Object.keys(auditHistory).map(Number).sort();
+  if (!years.length) { showToast("Najpierw wgraj pliki Auditsoverview", "error"); return; }
+
+  const map = buildHistoryMap();
+  const cameToRzeznik = [], leftRzeznik = [], stayedRzeznik = [];
+
+  Object.values(map).forEach(r => {
+    const vals = years.map(y => r.years[String(y)] || null);
+    const hasRzeznik = vals.includes(MY_AUDITOR);
+    if (!hasRzeznik) return;
+    const hasOther = vals.some(v => v && v !== MY_AUDITOR);
+    if (!hasOther) { stayedRzeznik.push(r); return; }
+
+    for (let i = 0; i < years.length - 1; i++) {
+      const prev = r.years[String(years[i])];
+      const next = r.years[String(years[i + 1])];
+      if (prev && next && prev !== next) {
+        if (next === MY_AUDITOR)  cameToRzeznik.push({ ...r, from: prev, year: years[i + 1] });
+        if (prev === MY_AUDITOR)  leftRzeznik.push({ ...r, to: next, year: years[i + 1] });
+      }
+    }
+  });
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+  const NAVY  = [58, 77, 152];
+  const GREEN = [35, 157, 70];
+  const RED   = [192, 57, 43];
+  const WHITE = [255, 255, 255];
+  const LGRAY = [245, 247, 252];
+  const DARK  = [26, 37, 64];
+
+  // --- HEADER ---
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, 210, 42, "F");
+
+  if (logoBase64) {
+    try { doc.addImage(logoBase64, "PNG", 12, 7, 52, 20); } catch(e) {
+      doc.setTextColor(...WHITE); doc.setFontSize(15); doc.setFont("helvetica","bold");
+      doc.text("LOGISTICFIT", 14, 20);
+    }
+  } else {
+    doc.setTextColor(...WHITE); doc.setFontSize(15); doc.setFont("helvetica","bold");
+    doc.text("LOGISTICFIT", 14, 20);
+  }
+
+  doc.setTextColor(...WHITE);
+  doc.setFontSize(13); doc.setFont("helvetica","bold");
+  doc.text("Raport zmian audytora", 196, 17, { align: "right" });
+  doc.setFontSize(10); doc.setFont("helvetica","normal");
+  doc.text("Michał Rzeźnik", 196, 25, { align: "right" });
+
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2,"0");
+  const mm = String(now.getMonth()+1).padStart(2,"0");
+  const yyyy = now.getFullYear();
+  const dateStr = `${dd}.${mm}.${yyyy}`;
+  doc.setFontSize(8);
+  doc.text(`Wygenerowano: ${dateStr}`, 196, 33, { align: "right" });
+
+  let y = 52;
+
+  // --- INFO ---
+  doc.setTextColor(...DARK);
+  doc.setFontSize(9); doc.setFont("helvetica","normal");
+  doc.text(`Analizowane lata: ${years.join(", ")}`, 14, y);
+  y += 10;
+
+  // --- STAT BOXES ---
+  const boxes = [
+    { label: "Klientów Rzeźnika łącznie", val: stayedRzeznik.length + cameToRzeznik.length + leftRzeznik.length, color: NAVY },
+    { label: "Nowi klienci",              val: cameToRzeznik.length, color: GREEN },
+    { label: "Odeszli klienci",           val: leftRzeznik.length,   color: RED },
+  ];
+  boxes.forEach((box, i) => {
+    const bx = 14 + i * 63;
+    doc.setFillColor(...box.color);
+    doc.roundedRect(bx, y, 58, 24, 3, 3, "F");
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(20); doc.setFont("helvetica","bold");
+    doc.text(String(box.val), bx + 29, y + 14, { align: "center" });
+    doc.setFontSize(8); doc.setFont("helvetica","normal");
+    doc.text(box.label, bx + 29, y + 21, { align: "center" });
+  });
+  y += 34;
+
+  const tblCols = { 0: { cellWidth: 18 }, 1: { cellWidth: 75 }, 2: { cellWidth: 22 }, 3: { cellWidth: 46 }, 4: { cellWidth: 18 } };
+  const tblStyles = { fontSize: 8, cellPadding: 2.5, textColor: DARK };
+
+  // --- NOWI KLIENCI ---
+  if (cameToRzeznik.length) {
+    doc.setTextColor(...GREEN); doc.setFontSize(11); doc.setFont("helvetica","bold");
+    doc.text(`✚  Nowi klienci Rzeźnika Michała  (${cameToRzeznik.length})`, 14, y);
+    doc.autoTable({
+      startY: y + 3,
+      head: [["PRJ","Firma","Program","Poprzedni audytor","Rok"]],
+      body: cameToRzeznik.map(r => [r.prj, r.title.length>45?r.title.slice(0,43)+"…":r.title, r.program, r.from, r.year]),
+      styles: tblStyles,
+      headStyles: { fillColor: GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+      alternateRowStyles: { fillColor: LGRAY },
+      columnStyles: tblCols,
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  }
+
+  // --- ODESZLI KLIENCI ---
+  if (leftRzeznik.length) {
+    if (y > 230) { doc.addPage(); y = 20; }
+    doc.setTextColor(...RED); doc.setFontSize(11); doc.setFont("helvetica","bold");
+    doc.text(`✖  Klienci którzy odeszli od Rzeźnika  (${leftRzeznik.length})`, 14, y);
+    doc.autoTable({
+      startY: y + 3,
+      head: [["PRJ","Firma","Program","Nowy audytor","Rok"]],
+      body: leftRzeznik.map(r => [r.prj, r.title.length>45?r.title.slice(0,43)+"…":r.title, r.program, r.to, r.year]),
+      styles: tblStyles,
+      headStyles: { fillColor: RED, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+      alternateRowStyles: { fillColor: LGRAY },
+      columnStyles: tblCols,
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  }
+
+  // --- STALI KLIENCI ---
+  if (stayedRzeznik.length) {
+    if (y > 210) { doc.addPage(); y = 20; }
+    doc.setTextColor(...NAVY); doc.setFontSize(11); doc.setFont("helvetica","bold");
+    doc.text(`✔  Stali klienci Rzeźnika Michała  (${stayedRzeznik.length})`, 14, y);
+    doc.autoTable({
+      startY: y + 3,
+      head: [["PRJ","Firma","Program",...years.map(String)]],
+      body: stayedRzeznik.map(r => [r.prj, r.title.length>45?r.title.slice(0,43)+"…":r.title, r.program, ...years.map(yr => r.years[String(yr)] ? "✓" : "—")]),
+      styles: tblStyles,
+      headStyles: { fillColor: NAVY, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+      alternateRowStyles: { fillColor: LGRAY },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  // --- FOOTER ---
+  const pages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFillColor(...NAVY);
+    doc.rect(0, 287, 210, 10, "F");
+    doc.setTextColor(...WHITE); doc.setFontSize(7);
+    doc.text("LogisticFit — Audit CRM — Dokument poufny", 14, 293);
+    doc.text(`Strona ${i} / ${pages}`, 196, 293, { align: "right" });
+  }
+
+  doc.save(`Raport_Rzeznik_${yyyy}-${mm}-${dd}.pdf`);
+  showToast("📄 Raport PDF wygenerowany!", "success");
+}

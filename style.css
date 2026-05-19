@@ -637,3 +637,105 @@ tbody td {
 }
 .toast.success { border-color: var(--green); color: var(--green); }
 .toast.error   { border-color: var(--red);   color: var(--red); }
+
+/* ============================================================
+   ZMIANY AUDYTORA
+   ============================================================ */
+.changes-upload-section {
+  padding: 0 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.loaded-files-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loaded-file-chip {
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.loaded-file-chip .chip-count {
+  color: var(--accent);
+  font-weight: 700;
+  margin-left: 6px;
+}
+
+.filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filter-checkbox input { cursor: pointer; accent-color: var(--accent); }
+
+.btn-action-pdf {
+  background: #6d3fc0;
+  color: #fff;
+  border: none;
+}
+.btn-action-pdf:hover { background: #5a32a3; }
+
+/* Tabela zmian */
+.ch-cell {
+  font-size: 12.5px;
+  white-space: nowrap;
+  padding: 8px 10px !important;
+}
+
+.ch-cell.ch-rzeznik {
+  background: rgba(35,157,70,.12);
+  color: #1a6b30;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+.ch-cell.ch-empty { color: var(--text2); }
+
+.ch-ind {
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--text2);
+}
+
+.ch-ind-rzeznik {
+  color: #239d46;
+  font-weight: 700;
+}
+
+.ch-ind-change {
+  color: #c07000;
+  font-weight: 600;
+}
+
+tr.change-row {
+  background: #fffbf0;
+}
+
+tr.change-row:hover { background: #fff3cc; }
+
+tr.change-row-rzeznik {
+  background: #f0faf3;
+  border-left: 3px solid var(--green);
+}
+
+tr.change-row-rzeznik:hover { background: #e0f5e8; }
+
+.firm-col {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

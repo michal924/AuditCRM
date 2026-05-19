@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="style.css">
   <script src="msal-browser.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
@@ -34,6 +36,7 @@
     <div class="nav-links">
       <button class="nav-btn active" data-view="myaudits">📋 Audyty LogisticFit</button>
       <button class="nav-btn" data-view="checkaudit">✅ Check Audyt</button>
+      <button class="nav-btn" data-view="changes">🔄 Zmiany Audytora</button>
     </div>
     <div class="nav-right">
       <button id="btn-import" class="btn-action" title="Importuj plan z CUC">⬆ Import</button>
@@ -128,6 +131,52 @@
         </thead>
         <tbody id="auditors-tbody">
           <tr><td colspan="7" class="loading">Ładowanie...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- WIDOK: ZMIANY AUDYTORA -->
+  <div id="view-changes" class="view hidden">
+    <div class="view-header">
+      <h2>Zmiany Audytora — analiza historyczna</h2>
+      <div class="header-filters">
+        <select id="changes-auditor-filter" class="filter-select">
+          <option value="">Wszyscy audytorzy</option>
+        </select>
+        <select id="changes-program-filter" class="filter-select">
+          <option value="">Wszystkie programy</option>
+          <option>FSC</option><option>PEFC</option><option>KZR INiG</option>
+          <option>SURE</option><option>EUDR</option>
+        </select>
+        <label class="filter-checkbox">
+          <input type="checkbox" id="changes-only-filter"> Tylko zmiany
+        </label>
+      </div>
+      <button id="btn-pdf-rzeznik" class="btn-action btn-action-pdf" title="Generuj raport PDF dla Rzeźnik Michał">📄 Raport PDF — Rzeźnik</button>
+    </div>
+
+    <!-- Upload zone -->
+    <div class="changes-upload-section">
+      <div class="drop-zone" id="changes-drop-zone">
+        <div class="drop-icon">📂</div>
+        <p>Wgraj pliki <strong>Auditsoverview2XL</strong> (2024, 2025, 2026…)<br>
+           Można wgrać wiele plików naraz</p>
+        <input type="file" id="changes-file" accept=".xlsx,.xls" multiple style="display:none">
+        <button class="btn-primary" style="width:auto;margin-top:12px"
+          onclick="document.getElementById('changes-file').click()">Wybierz pliki .xlsx</button>
+      </div>
+      <div id="changes-loaded-files" class="loaded-files-row"></div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="table-wrapper" id="changes-table-wrapper" style="display:none">
+      <table id="changes-table">
+        <thead id="changes-thead"><tr>
+          <th>PRJ</th><th>Firma</th><th>Program</th><th>Zmiana</th>
+        </tr></thead>
+        <tbody id="changes-tbody">
+          <tr><td colspan="4" class="loading">Wgraj pliki aby zobaczyć dane</td></tr>
         </tbody>
       </table>
     </div>
