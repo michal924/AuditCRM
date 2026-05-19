@@ -1209,209 +1209,196 @@ async function generatePdfRzeznik() {
   const programFilter = document.getElementById("changes-program-filter").value.trim();
   const auditorFilter = document.getElementById("changes-auditor-filter").value.trim();
 
-  showToast(`Generuję PDF: ${programFilter || "wszystkie systemy"}`, "info");
-
   // Upewnij się że fonty są załadowane
   await loadPdfFonts();
 
-  const map = buildHistoryMap();
-  const cameToRzeznik = [], leftRzeznik = [], stayedRzeznik = [];
+  try {
+    const map = buildHistoryMap();
+    const cameToRzeznik = [], leftRzeznik = [], stayedRzeznik = [];
+    const programLabel = programFilter || "Wszystkie systemy";
 
-  // Stosuj filtr programu i audytora do danych
-  let records = Object.values(map);
-  if (programFilter) records = records.filter(r => r.program === programFilter);
-  if (auditorFilter) records = records.filter(r => Object.values(r.years).includes(auditorFilter));
+    // Stosuj filtry
+    let records = Object.values(map);
+    if (programFilter) records = records.filter(r => r.program === programFilter);
+    if (auditorFilter) records = records.filter(r => Object.values(r.years).includes(auditorFilter));
 
-  records.forEach(r => {
-    const vals = years.map(y => r.years[String(y)] || null);
-    const hasRzeznik = vals.includes(MY_AUDITOR);
-    if (!hasRzeznik) return;
-    const hasOther = vals.some(v => v && v !== MY_AUDITOR);
-    if (!hasOther) { stayedRzeznik.push(r); return; }
-
-    for (let i = 0; i < years.length - 1; i++) {
-      const prev = r.years[String(years[i])];
-      const next = r.years[String(years[i + 1])];
-      if (prev && next && prev !== next) {
-        if (next === MY_AUDITOR)  cameToRzeznik.push({ ...r, from: prev, year: years[i + 1] });
-        if (prev === MY_AUDITOR)  leftRzeznik.push({ ...r, to: next, year: years[i + 1] });
+    records.forEach(r => {
+      const vals = years.map(y => r.years[String(y)] || null);
+      const hasRzeznik = vals.includes(MY_AUDITOR);
+      if (!hasRzeznik) return;
+      const hasOther = vals.some(v => v && v !== MY_AUDITOR);
+      if (!hasOther) { stayedRzeznik.push(r); return; }
+      for (let i = 0; i < years.length - 1; i++) {
+        const prev = r.years[String(years[i])];
+        const next = r.years[String(years[i + 1])];
+        if (prev && next && prev !== next) {
+          if (next === MY_AUDITOR) cameToRzeznik.push({ ...r, from: prev, year: years[i + 1] });
+          if (prev === MY_AUDITOR) leftRzeznik.push({ ...r, to: next,   year: years[i + 1] });
+        }
       }
-    }
-  });
+    });
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    registerPdfFonts(doc);
+    const F = pdfFontRegular ? "NotoSans" : "helvetica";
 
-  // Zarejestruj fonty z polskimi znakami
-  registerPdfFonts(doc);
-  const F = pdfFontRegular ? "NotoSans" : "helvetica";
+    const NAVY  = [58, 77, 152];
+    const GREEN = [35, 157, 70];
+    const RED   = [192, 57, 43];
+    const WHITE = [255, 255, 255];
+    const LGRAY = [245, 247, 252];
+    const DARK  = [26, 37, 64];
+    const GRAY  = [120, 120, 120];
 
-  const NAVY  = [58, 77, 152];
-  const GREEN = [35, 157, 70];
-  const RED   = [192, 57, 43];
-  const WHITE = [255, 255, 255];
-  const LGRAY = [245, 247, 252];
-  const DARK  = [26, 37, 64];
+    const now  = new Date();
+    const dd   = String(now.getDate()).padStart(2,"0");
+    const mm   = String(now.getMonth()+1).padStart(2,"0");
+    const yyyy = now.getFullYear();
+    const dateStr = `${dd}.${mm}.${yyyy}`;
 
-  const now = new Date();
-  const dd   = String(now.getDate()).padStart(2,"0");
-  const mm   = String(now.getMonth()+1).padStart(2,"0");
-  const yyyy = now.getFullYear();
-  const dateStr = `${dd}.${mm}.${yyyy}`;
+    // ── HEADER ──────────────────────────────────────────────────
+    doc.setFillColor(...NAVY);
+    doc.rect(0, 0, 210, 44, "F");
 
-  // ── HEADER ──────────────────────────────────────────────────
-  doc.setFillColor(...NAVY);
-  doc.rect(0, 0, 210, 44, "F");
-
-  // Logo na białym zaokrąglonym tle (logo ma ciemne litery — widoczne tylko na jasnym tle)
-  if (logoBase64) {
-    try {
-      const img = new Image();
-      img.src = logoBase64;
-      const logoW = 52;
-      const ratio = img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 0.28;
-      const logoH = Math.max(Math.min(logoW * ratio, 20), 10);
-      const logoX = 10;
-      const logoY = (44 - logoH) / 2;
-      // Białe tło pod logo
-      doc.setFillColor(...WHITE);
-      doc.roundedRect(logoX - 2, logoY - 2, logoW + 4, logoH + 4, 2, 2, "F");
-      doc.addImage(logoBase64, "PNG", logoX, logoY, logoW, logoH);
-    } catch(e) {
+    if (logoBase64) {
+      try {
+        const img = new Image();
+        img.src = logoBase64;
+        const logoW = 52;
+        const ratio = img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 0.28;
+        const logoH = Math.max(Math.min(logoW * ratio, 20), 10);
+        const logoX = 10;
+        const logoY = (44 - logoH) / 2;
+        doc.setFillColor(...WHITE);
+        doc.roundedRect(logoX - 2, logoY - 2, logoW + 4, logoH + 4, 2, 2, "F");
+        doc.addImage(logoBase64, "PNG", logoX, logoY, logoW, logoH);
+      } catch(e) {
+        doc.setTextColor(...WHITE); doc.setFontSize(14); doc.setFont(F,"bold");
+        doc.text("LOGISTICFIT", 14, 24);
+      }
+    } else {
       doc.setTextColor(...WHITE); doc.setFontSize(14); doc.setFont(F,"bold");
       doc.text("LOGISTICFIT", 14, 24);
     }
-  } else {
-    doc.setTextColor(...WHITE); doc.setFontSize(14); doc.setFont(F,"bold");
-    doc.text("LOGISTICFIT", 14, 24);
-  }
 
-  const programLabel = programFilter || "Wszystkie systemy";
-
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(13); doc.setFont(F,"bold");
-  doc.text("Raport zmian audytora", 198, 15, { align: "right" });
-  doc.setFontSize(10); doc.setFont(F,"normal");
-  doc.text("Michał Rzeźnik", 198, 23, { align: "right" });
-  doc.setFontSize(9); doc.setFont(F,"bold");
-  doc.setTextColor(...GREEN);
-  doc.text(programLabel, 198, 31, { align: "right" });
-  doc.setFontSize(7.5); doc.setFont(F,"normal");
-  doc.setTextColor(...WHITE);
-  doc.text(`Wygenerowano: ${dateStr}`, 198, 38, { align: "right" });
-
-  // Zielona linia pod headerem
-  doc.setFillColor(...GREEN);
-  doc.rect(0, 44, 210, 2, "F");
-
-  let y = 54;
-
-  // ── INFO ────────────────────────────────────────────────────
-  doc.setTextColor(...DARK);
-  doc.setFontSize(9); doc.setFont(F,"normal");
-  doc.text(`Analizowane lata: ${years.join(", ")}`, 14, y);
-  doc.setTextColor(programFilter ? [35,157,70] : [120,120,120]);
-  doc.setFont(F, programFilter ? "bold" : "normal");
-  doc.text(`System certyfikacji: ${programLabel}`, 14, y + 6);
-  doc.setTextColor(...DARK); doc.setFont(F,"normal");
-  y += 16;
-
-  // ── STAT BOXES ──────────────────────────────────────────────
-  const total = stayedRzeznik.length + cameToRzeznik.length + leftRzeznik.length;
-  const boxes = [
-    { label: "Klientów łącznie",   val: total,                color: NAVY  },
-    { label: "Nowi klienci",      val: cameToRzeznik.length, color: GREEN },
-    { label: "Odeszli klienci",   val: leftRzeznik.length,   color: RED   },
-  ];
-  boxes.forEach((box, i) => {
-    const bx = 14 + i * 63;
-    doc.setFillColor(...box.color);
-    doc.roundedRect(bx, y, 58, 26, 3, 3, "F");
     doc.setTextColor(...WHITE);
-    doc.setFontSize(22); doc.setFont(F,"bold");
-    doc.text(String(box.val), bx + 29, y + 15, { align: "center" });
-    doc.setFontSize(8); doc.setFont(F,"normal");
-    doc.text(box.label, bx + 29, y + 22, { align: "center" });
-  });
-  y += 36;
+    doc.setFontSize(13); doc.setFont(F,"bold");
+    doc.text("Raport zmian audytora", 198, 15, { align: "right" });
+    doc.setFontSize(10); doc.setFont(F,"normal");
+    doc.text("Michal Rzeznik", 198, 23, { align: "right" });
+    doc.setFontSize(9); doc.setFont(F,"bold");
+    doc.setTextColor(...GREEN);
+    doc.text(programLabel, 198, 31, { align: "right" });
+    doc.setFontSize(7.5); doc.setFont(F,"normal");
+    doc.setTextColor(...WHITE);
+    doc.text(`Wygenerowano: ${dateStr}`, 198, 38, { align: "right" });
 
-  const tblFont   = { font: F, fontSize: 8, cellPadding: 2.5, textColor: DARK };
-  const tblHead   = (color) => ({ fillColor: color, textColor: WHITE, fontStyle: "bold", fontSize: 8, font: F });
-  const tblCols4  = { 0: { cellWidth: 18 }, 1: { cellWidth: 75 }, 2: { cellWidth: 22 }, 3: { cellWidth: 46 }, 4: { cellWidth: 16 } };
+    doc.setFillColor(...GREEN);
+    doc.rect(0, 44, 210, 2, "F");
 
-  // ── NOWI KLIENCI ────────────────────────────────────────────
-  if (cameToRzeznik.length) {
-    doc.setTextColor(...GREEN); doc.setFontSize(11); doc.setFont(F,"bold");
-    doc.text(`Nowi klienci Rzeźnika Michała  (${cameToRzeznik.length})`, 14, y);
-    y += 1;
-    doc.autoTable({
-      startY: y + 3,
-      head: [["PRJ","Firma","Program","Poprzedni audytor","Rok"]],
-      body: cameToRzeznik.map(r => [r.prj, r.title.length>45?r.title.slice(0,43)+"…":r.title, r.program, r.from, r.year]),
-      styles: tblFont,
-      headStyles: tblHead(GREEN),
-      alternateRowStyles: { fillColor: LGRAY },
-      columnStyles: tblCols4,
-      margin: { left: 14, right: 14 },
+    let y = 54;
+
+    // ── INFO ─────────────────────────────────────────────────────
+    doc.setTextColor(...DARK);
+    doc.setFontSize(9); doc.setFont(F,"normal");
+    doc.text(`Analizowane lata: ${years.join(", ")}`, 14, y);
+    doc.setTextColor(...(programFilter ? GREEN : GRAY));
+    doc.setFont(F, programFilter ? "bold" : "normal");
+    doc.text(`System certyfikacji: ${programLabel}`, 14, y + 6);
+    doc.setTextColor(...DARK); doc.setFont(F,"normal");
+    y += 16;
+
+    // ── STAT BOXES ───────────────────────────────────────────────
+    const total = stayedRzeznik.length + cameToRzeznik.length + leftRzeznik.length;
+    const boxes = [
+      { label: "Klientow lacznie", val: total,                color: NAVY  },
+      { label: "Nowi klienci",     val: cameToRzeznik.length, color: GREEN },
+      { label: "Odeszli klienci",  val: leftRzeznik.length,   color: RED   },
+    ];
+    boxes.forEach((box, i) => {
+      const bx = 14 + i * 63;
+      doc.setFillColor(...box.color);
+      doc.roundedRect(bx, y, 58, 26, 3, 3, "F");
+      doc.setTextColor(...WHITE);
+      doc.setFontSize(22); doc.setFont(F,"bold");
+      doc.text(String(box.val), bx + 29, y + 15, { align: "center" });
+      doc.setFontSize(8); doc.setFont(F,"normal");
+      doc.text(box.label, bx + 29, y + 22, { align: "center" });
     });
-    y = doc.lastAutoTable.finalY + 10;
-  }
+    y += 36;
 
-  // ── ODESZLI KLIENCI ─────────────────────────────────────────
-  if (leftRzeznik.length) {
-    if (y > 230) { doc.addPage(); y = 20; }
-    doc.setTextColor(...RED); doc.setFontSize(11); doc.setFont(F,"bold");
-    doc.text(`Klienci, którzy odeszli od Rzeźnika  (${leftRzeznik.length})`, 14, y);
-    y += 1;
-    doc.autoTable({
-      startY: y + 3,
-      head: [["PRJ","Firma","Program","Nowy audytor","Rok"]],
-      body: leftRzeznik.map(r => [r.prj, r.title.length>45?r.title.slice(0,43)+"…":r.title, r.program, r.to, r.year]),
-      styles: tblFont,
-      headStyles: tblHead(RED),
-      alternateRowStyles: { fillColor: LGRAY },
-      columnStyles: tblCols4,
-      margin: { left: 14, right: 14 },
-    });
-    y = doc.lastAutoTable.finalY + 10;
-  }
+    const tblFont  = { font: F, fontSize: 8, cellPadding: 2.5, textColor: DARK };
+    const tblHead  = (color) => ({ fillColor: color, textColor: WHITE, fontStyle: "bold", fontSize: 8, font: F });
+    const tblCols4 = { 0: { cellWidth: 18 }, 1: { cellWidth: 75 }, 2: { cellWidth: 22 }, 3: { cellWidth: 46 }, 4: { cellWidth: 16 } };
 
-  // ── STALI KLIENCI ───────────────────────────────────────────
-  if (stayedRzeznik.length) {
-    if (y > 210) { doc.addPage(); y = 20; }
-    doc.setTextColor(...NAVY); doc.setFontSize(11); doc.setFont(F,"bold");
-    doc.text(`Stali klienci Rzeźnika Michała  (${stayedRzeznik.length})`, 14, y);
-    y += 1;
-    const stayColStyles = { 0: { cellWidth: 18 }, 1: { cellWidth: 75 }, 2: { cellWidth: 22 } };
-    years.forEach((yr, idx) => { stayColStyles[3 + idx] = { cellWidth: 16, halign: "center" }; });
-    doc.autoTable({
-      startY: y + 3,
-      head: [["PRJ","Firma","Program",...years.map(String)]],
-      body: stayedRzeznik.map(r => [
-        r.prj,
-        r.title.length>45 ? r.title.slice(0,43)+"…" : r.title,
-        r.program,
-        ...years.map(yr => r.years[String(yr)] ? "tak" : "-")
-      ]),
-      styles: tblFont,
-      headStyles: tblHead(NAVY),
-      alternateRowStyles: { fillColor: LGRAY },
-      columnStyles: stayColStyles,
-      margin: { left: 14, right: 14 },
-    });
-  }
+    // ── NOWI KLIENCI ─────────────────────────────────────────────
+    if (cameToRzeznik.length) {
+      doc.setTextColor(...GREEN); doc.setFontSize(11); doc.setFont(F,"bold");
+      doc.text(`Nowi klienci Rzeznika Michala  (${cameToRzeznik.length})`, 14, y);
+      doc.autoTable({
+        startY: y + 4,
+        head: [["PRJ","Firma","Program","Poprzedni audytor","Rok"]],
+        body: cameToRzeznik.map(r => [r.prj, r.title.length>45?r.title.slice(0,43)+"…":r.title, r.program, r.from, r.year]),
+        styles: tblFont, headStyles: tblHead(GREEN),
+        alternateRowStyles: { fillColor: LGRAY }, columnStyles: tblCols4,
+        margin: { left: 14, right: 14 },
+      });
+      y = doc.lastAutoTable.finalY + 10;
+    }
 
-  // ── FOOTER (każda strona) ────────────────────────────────────
-  const pages = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pages; i++) {
-    doc.setPage(i);
-    doc.setFillColor(...NAVY);
-    doc.rect(0, 287, 210, 10, "F");
-    doc.setTextColor(...WHITE); doc.setFontSize(7); doc.setFont(F,"normal");
-    doc.text("LogisticFit - Audit CRM - Dokument poufny", 14, 293);
-    doc.text(`Strona ${i} / ${pages}`, 196, 293, { align: "right" });
-  }
+    // ── ODESZLI KLIENCI ──────────────────────────────────────────
+    if (leftRzeznik.length) {
+      if (y > 230) { doc.addPage(); y = 20; }
+      doc.setTextColor(...RED); doc.setFontSize(11); doc.setFont(F,"bold");
+      doc.text(`Klienci, ktorzy odeszli od Rzeznika  (${leftRzeznik.length})`, 14, y);
+      doc.autoTable({
+        startY: y + 4,
+        head: [["PRJ","Firma","Program","Nowy audytor","Rok"]],
+        body: leftRzeznik.map(r => [r.prj, r.title.length>45?r.title.slice(0,43)+"…":r.title, r.program, r.to, r.year]),
+        styles: tblFont, headStyles: tblHead(RED),
+        alternateRowStyles: { fillColor: LGRAY }, columnStyles: tblCols4,
+        margin: { left: 14, right: 14 },
+      });
+      y = doc.lastAutoTable.finalY + 10;
+    }
 
-  doc.save(`Raport_Rzeznik_${yyyy}-${mm}-${dd}.pdf`);
-  showToast("Raport PDF wygenerowany!", "success");
+    // ── STALI KLIENCI ────────────────────────────────────────────
+    if (stayedRzeznik.length) {
+      if (y > 210) { doc.addPage(); y = 20; }
+      doc.setTextColor(...NAVY); doc.setFontSize(11); doc.setFont(F,"bold");
+      doc.text(`Stali klienci Rzeznika Michala  (${stayedRzeznik.length})`, 14, y);
+      const stayColStyles = { 0: { cellWidth: 18 }, 1: { cellWidth: 75 }, 2: { cellWidth: 22 } };
+      years.forEach((yr, idx) => { stayColStyles[3 + idx] = { cellWidth: 16, halign: "center" }; });
+      doc.autoTable({
+        startY: y + 4,
+        head: [["PRJ","Firma","Program",...years.map(String)]],
+        body: stayedRzeznik.map(r => [
+          r.prj, r.title.length>45?r.title.slice(0,43)+"…":r.title, r.program,
+          ...years.map(yr => r.years[String(yr)] ? "tak" : "-")
+        ]),
+        styles: tblFont, headStyles: tblHead(NAVY),
+        alternateRowStyles: { fillColor: LGRAY }, columnStyles: stayColStyles,
+        margin: { left: 14, right: 14 },
+      });
+    }
+
+    // ── FOOTER ────────────────────────────────────────────────────
+    const pages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFillColor(...NAVY);
+      doc.rect(0, 287, 210, 10, "F");
+      doc.setTextColor(...WHITE); doc.setFontSize(7); doc.setFont(F,"normal");
+      doc.text("LogisticFit - Audit CRM - Dokument poufny", 14, 293);
+      doc.text(`Strona ${i} / ${pages}`, 196, 293, { align: "right" });
+    }
+
+    doc.save(`Raport_Rzeznik_${yyyy}-${mm}-${dd}.pdf`);
+    showToast(`PDF wygenerowany (${programLabel})`, "success");
+
+  } catch(err) {
+    showToast(`Błąd generowania PDF: ${err.message}`, "error");
+    console.error("PDF error:", err);
+  }
 }
