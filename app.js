@@ -916,43 +916,52 @@ function handleHistoryFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const wb = XLSX.read(e.target.result, { type: "array" });
+      const wb = XLSX.read(e.target.result, { type: "array", cellText: false, cellNF: false });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      const range = XLSX.utils.decode_range(ws["!ref"] || "A1:A1");
 
-      // Znajdź wiersz z nagłówkami dynamicznie
-      let headerIdx = -1;
-      for (let i = 0; i < Math.min(15, rows.length); i++) {
-        const cell = String(rows[i][0] || "").toLowerCase();
-        if (cell.includes("project ref")) { headerIdx = i; break; }
+      // Pomocnik: pobierz wartość komórki jako string
+      const getVal = (row, col) => {
+        const cell = ws[XLSX.utils.encode_cell({ r: row, c: col })];
+        if (!cell) return "";
+        // inlineStr, shared string i formula — wszystkie zwracają v lub w
+        const v = cell.w !== undefined ? cell.w : (cell.v !== undefined ? cell.v : "");
+        return String(v).trim();
+      };
+
+      // Znajdź wiersz nagłówkowy (szukaj "project ref" w kolumnie A)
+      let headerRow = -1;
+      for (let r = range.s.r; r <= Math.min(range.s.r + 15, range.e.r); r++) {
+        if (getVal(r, 0).toLowerCase().includes("project ref")) {
+          headerRow = r; break;
+        }
       }
-      if (headerIdx === -1) {
-        showToast(`Nie znaleziono nagłówków w: ${file.name}`, "error");
-        return;
+      if (headerRow === -1) {
+        showToast(`Brak nagłówków w: ${file.name}`, "error"); return;
       }
 
-      // Mapuj kolumny po nazwach
-      const hdrs = rows[headerIdx].map(h => String(h).toLowerCase().trim());
-      const cPrj  = hdrs.findIndex(h => h.includes("project ref"));
-      const cName = hdrs.findIndex(h => h.includes("project name"));
-      const cProg = hdrs.findIndex(h => h.includes("subprogram"));
-      const cAud  = hdrs.findIndex(h => h.includes("inspector"));
+      // Znajdź indeksy kolumn po nazwie
+      let cPrj = -1, cName = -1, cProg = -1, cAud = -1;
+      for (let c = range.s.c; c <= range.e.c; c++) {
+        const h = getVal(headerRow, c).toLowerCase();
+        if (h.includes("project ref"))  cPrj  = c;
+        if (h.includes("project name")) cName = c;
+        if (h.includes("subprogram"))   cProg = c;
+        if (h.includes("inspector"))    cAud  = c;
+      }
 
       if (!auditHistory[year]) auditHistory[year] = {};
       let count = 0;
 
-      for (let i = headerIdx + 1; i < rows.length; i++) {
-        const row = rows[i];
-        const prjRaw = row[cPrj];
+      for (let r = headerRow + 1; r <= range.e.r; r++) {
+        const prjRaw = getVal(r, cPrj);
         if (!prjRaw) continue;
-
-        // Obsłuż zarówno "PRJ  840104" jak i liczbę 840104
-        const prj = parseInt(String(prjRaw).replace(/\D/g, ""));
+        const prj = parseInt(prjRaw.replace(/\D/g, ""));
         if (!prj) continue;
 
-        const title   = String(row[cName] || "").trim();
-        const program = normProgram(String(row[cProg] || "").trim()) || String(row[cProg] || "").trim();
-        const auditor = normAuditor(String(row[cAud] || "").trim());
+        const title   = getVal(r, cName);
+        const program = normProgram(getVal(r, cProg)) || getVal(r, cProg);
+        const auditor = normAuditor(getVal(r, cAud));
         if (!title || !auditor) continue;
 
         const key = `${prj}_${program}`;
@@ -965,6 +974,7 @@ function handleHistoryFile(file) {
       renderChangesTable();
     } catch(err) {
       showToast(`Błąd ${file.name}: ${err.message}`, "error");
+      console.error(err);
     }
   };
   reader.readAsArrayBuffer(file);
