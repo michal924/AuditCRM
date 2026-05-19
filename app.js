@@ -867,6 +867,8 @@ init();
 let auditHistory = {};      // { year: { "prj_program": { prj, title, program, auditor } } }
 let changesFilesByYear = {}; // { year: [{filename, count}] }
 let logoBase64 = null;
+let pdfFontRegular = null;  // base64 NotoSans-Regular
+let pdfFontBold    = null;  // base64 NotoSans-Bold
 
 function initLogoBase64() {
   fetch("logo.png").then(r => r.blob()).then(blob => {
@@ -876,8 +878,35 @@ function initLogoBase64() {
   }).catch(() => {});
 }
 
+async function loadPdfFonts() {
+  async function ttfToBase64(url) {
+    const r = await fetch(url);
+    const buf = await r.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let bin = "";
+    for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  try {
+    if (!pdfFontRegular) pdfFontRegular = await ttfToBase64("NotoSans-Regular.ttf");
+    if (!pdfFontBold)    pdfFontBold    = await ttfToBase64("NotoSans-Bold.ttf");
+  } catch(e) { console.warn("Nie udało się załadować fontów PDF:", e); }
+}
+
+function registerPdfFonts(doc) {
+  if (pdfFontRegular) {
+    doc.addFileToVFS("NotoSans-Regular.ttf", pdfFontRegular);
+    doc.addFont("NotoSans-Regular.ttf", "NotoSans", "normal");
+  }
+  if (pdfFontBold) {
+    doc.addFileToVFS("NotoSans-Bold.ttf", pdfFontBold);
+    doc.addFont("NotoSans-Bold.ttf", "NotoSans", "bold");
+  }
+}
+
 function setupChanges() {
   initLogoBase64();
+  loadPdfFonts();
 
   const dropZone = document.getElementById("changes-drop-zone");
   dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
@@ -1113,9 +1142,12 @@ function shortAuditor(name) {
 // ============================================================
 // PDF — RZEŹNIK MICHAŁ
 // ============================================================
-function generatePdfRzeznik() {
+async function generatePdfRzeznik() {
   const years = Object.keys(auditHistory).map(Number).sort();
   if (!years.length) { showToast("Najpierw wgraj pliki Auditsoverview", "error"); return; }
+
+  // Upewnij się że fonty są załadowane
+  await loadPdfFonts();
 
   const map = buildHistoryMap();
   const cameToRzeznik = [], leftRzeznik = [], stayedRzeznik = [];
@@ -1140,6 +1172,10 @@ function generatePdfRzeznik() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
+  // Zarejestruj fonty z polskimi znakami
+  registerPdfFonts(doc);
+  const F = pdfFontRegular ? "NotoSans" : "helvetica";
+
   const NAVY  = [58, 77, 152];
   const GREEN = [35, 157, 70];
   const RED   = [192, 57, 43];
@@ -1147,125 +1183,152 @@ function generatePdfRzeznik() {
   const LGRAY = [245, 247, 252];
   const DARK  = [26, 37, 64];
 
-  // --- HEADER ---
-  doc.setFillColor(...NAVY);
-  doc.rect(0, 0, 210, 42, "F");
+  const now = new Date();
+  const dd   = String(now.getDate()).padStart(2,"0");
+  const mm   = String(now.getMonth()+1).padStart(2,"0");
+  const yyyy = now.getFullYear();
+  const dateStr = `${dd}.${mm}.${yyyy}`;
 
+  // ── HEADER ──────────────────────────────────────────────────
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, 210, 40, "F");
+
+  // Logo — wyśrodkowane pionowo w headerze
   if (logoBase64) {
-    try { doc.addImage(logoBase64, "PNG", 12, 7, 52, 20); } catch(e) {
-      doc.setTextColor(...WHITE); doc.setFontSize(15); doc.setFont("helvetica","bold");
-      doc.text("LOGISTICFIT", 14, 20);
+    try {
+      // Pobierz wymiary PNG aby zachować proporcje
+      const img = new Image();
+      img.src = logoBase64;
+      const ratio = img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 0.3;
+      const logoW = 48;
+      const logoH = Math.min(logoW * ratio, 26);
+      const logoY = (40 - logoH) / 2;
+      doc.addImage(logoBase64, "PNG", 12, logoY, logoW, logoH);
+    } catch(e) {
+      doc.setTextColor(...WHITE); doc.setFontSize(14); doc.setFont(F,"bold");
+      doc.text("LOGISTICFIT", 14, 22);
     }
   } else {
-    doc.setTextColor(...WHITE); doc.setFontSize(15); doc.setFont("helvetica","bold");
-    doc.text("LOGISTICFIT", 14, 20);
+    doc.setTextColor(...WHITE); doc.setFontSize(14); doc.setFont(F,"bold");
+    doc.text("LOGISTICFIT", 14, 22);
   }
 
   doc.setTextColor(...WHITE);
-  doc.setFontSize(13); doc.setFont("helvetica","bold");
-  doc.text("Raport zmian audytora", 196, 17, { align: "right" });
-  doc.setFontSize(10); doc.setFont("helvetica","normal");
-  doc.text("Michał Rzeźnik", 196, 25, { align: "right" });
+  doc.setFontSize(13); doc.setFont(F,"bold");
+  doc.text("Raport zmian audytora", 196, 16, { align: "right" });
+  doc.setFontSize(10); doc.setFont(F,"normal");
+  doc.text("Michal Rzeznik", 196, 24, { align: "right" });
+  doc.setFontSize(8); doc.setFont(F,"normal");
+  doc.text(`Wygenerowano: ${dateStr}`, 196, 32, { align: "right" });
 
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2,"0");
-  const mm = String(now.getMonth()+1).padStart(2,"0");
-  const yyyy = now.getFullYear();
-  const dateStr = `${dd}.${mm}.${yyyy}`;
-  doc.setFontSize(8);
-  doc.text(`Wygenerowano: ${dateStr}`, 196, 33, { align: "right" });
+  // Zielona linia pod headerem
+  doc.setFillColor(...GREEN);
+  doc.rect(0, 40, 210, 2, "F");
 
   let y = 52;
 
-  // --- INFO ---
+  // ── INFO ────────────────────────────────────────────────────
   doc.setTextColor(...DARK);
-  doc.setFontSize(9); doc.setFont("helvetica","normal");
+  doc.setFontSize(9); doc.setFont(F,"normal");
   doc.text(`Analizowane lata: ${years.join(", ")}`, 14, y);
   y += 10;
 
-  // --- STAT BOXES ---
+  // ── STAT BOXES ──────────────────────────────────────────────
+  const total = stayedRzeznik.length + cameToRzeznik.length + leftRzeznik.length;
   const boxes = [
-    { label: "Klientów Rzeźnika łącznie", val: stayedRzeznik.length + cameToRzeznik.length + leftRzeznik.length, color: NAVY },
-    { label: "Nowi klienci",              val: cameToRzeznik.length, color: GREEN },
-    { label: "Odeszli klienci",           val: leftRzeznik.length,   color: RED },
+    { label: "Klientow lacznie",  val: total,                color: NAVY  },
+    { label: "Nowi klienci",      val: cameToRzeznik.length, color: GREEN },
+    { label: "Odeszli klienci",   val: leftRzeznik.length,   color: RED   },
   ];
   boxes.forEach((box, i) => {
     const bx = 14 + i * 63;
     doc.setFillColor(...box.color);
-    doc.roundedRect(bx, y, 58, 24, 3, 3, "F");
+    doc.roundedRect(bx, y, 58, 26, 3, 3, "F");
     doc.setTextColor(...WHITE);
-    doc.setFontSize(20); doc.setFont("helvetica","bold");
-    doc.text(String(box.val), bx + 29, y + 14, { align: "center" });
-    doc.setFontSize(8); doc.setFont("helvetica","normal");
-    doc.text(box.label, bx + 29, y + 21, { align: "center" });
+    doc.setFontSize(22); doc.setFont(F,"bold");
+    doc.text(String(box.val), bx + 29, y + 15, { align: "center" });
+    doc.setFontSize(8); doc.setFont(F,"normal");
+    doc.text(box.label, bx + 29, y + 22, { align: "center" });
   });
-  y += 34;
+  y += 36;
 
-  const tblCols = { 0: { cellWidth: 18 }, 1: { cellWidth: 75 }, 2: { cellWidth: 22 }, 3: { cellWidth: 46 }, 4: { cellWidth: 18 } };
-  const tblStyles = { fontSize: 8, cellPadding: 2.5, textColor: DARK };
+  const tblFont   = { font: F, fontSize: 8, cellPadding: 2.5, textColor: DARK };
+  const tblHead   = (color) => ({ fillColor: color, textColor: WHITE, fontStyle: "bold", fontSize: 8, font: F });
+  const tblCols4  = { 0: { cellWidth: 18 }, 1: { cellWidth: 75 }, 2: { cellWidth: 22 }, 3: { cellWidth: 46 }, 4: { cellWidth: 16 } };
 
-  // --- NOWI KLIENCI ---
+  // ── NOWI KLIENCI ────────────────────────────────────────────
   if (cameToRzeznik.length) {
-    doc.setTextColor(...GREEN); doc.setFontSize(11); doc.setFont("helvetica","bold");
-    doc.text(`✚  Nowi klienci Rzeźnika Michała  (${cameToRzeznik.length})`, 14, y);
+    doc.setTextColor(...GREEN); doc.setFontSize(11); doc.setFont(F,"bold");
+    doc.text(`Nowi klienci Rzeznika Michala  (${cameToRzeznik.length})`, 14, y);
+    y += 1;
     doc.autoTable({
       startY: y + 3,
       head: [["PRJ","Firma","Program","Poprzedni audytor","Rok"]],
       body: cameToRzeznik.map(r => [r.prj, r.title.length>45?r.title.slice(0,43)+"…":r.title, r.program, r.from, r.year]),
-      styles: tblStyles,
-      headStyles: { fillColor: GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+      styles: tblFont,
+      headStyles: tblHead(GREEN),
       alternateRowStyles: { fillColor: LGRAY },
-      columnStyles: tblCols,
+      columnStyles: tblCols4,
       margin: { left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 10;
   }
 
-  // --- ODESZLI KLIENCI ---
+  // ── ODESZLI KLIENCI ─────────────────────────────────────────
   if (leftRzeznik.length) {
     if (y > 230) { doc.addPage(); y = 20; }
-    doc.setTextColor(...RED); doc.setFontSize(11); doc.setFont("helvetica","bold");
-    doc.text(`✖  Klienci którzy odeszli od Rzeźnika  (${leftRzeznik.length})`, 14, y);
+    doc.setTextColor(...RED); doc.setFontSize(11); doc.setFont(F,"bold");
+    doc.text(`Klienci, ktorzy odeszli od Rzeznika  (${leftRzeznik.length})`, 14, y);
+    y += 1;
     doc.autoTable({
       startY: y + 3,
       head: [["PRJ","Firma","Program","Nowy audytor","Rok"]],
       body: leftRzeznik.map(r => [r.prj, r.title.length>45?r.title.slice(0,43)+"…":r.title, r.program, r.to, r.year]),
-      styles: tblStyles,
-      headStyles: { fillColor: RED, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+      styles: tblFont,
+      headStyles: tblHead(RED),
       alternateRowStyles: { fillColor: LGRAY },
-      columnStyles: tblCols,
+      columnStyles: tblCols4,
       margin: { left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 10;
   }
 
-  // --- STALI KLIENCI ---
+  // ── STALI KLIENCI ───────────────────────────────────────────
   if (stayedRzeznik.length) {
     if (y > 210) { doc.addPage(); y = 20; }
-    doc.setTextColor(...NAVY); doc.setFontSize(11); doc.setFont("helvetica","bold");
-    doc.text(`✔  Stali klienci Rzeźnika Michała  (${stayedRzeznik.length})`, 14, y);
+    doc.setTextColor(...NAVY); doc.setFontSize(11); doc.setFont(F,"bold");
+    doc.text(`Stali klienci Rzeznika Michala  (${stayedRzeznik.length})`, 14, y);
+    y += 1;
+    const stayColStyles = { 0: { cellWidth: 18 }, 1: { cellWidth: 75 }, 2: { cellWidth: 22 } };
+    years.forEach((yr, idx) => { stayColStyles[3 + idx] = { cellWidth: 16, halign: "center" }; });
     doc.autoTable({
       startY: y + 3,
       head: [["PRJ","Firma","Program",...years.map(String)]],
-      body: stayedRzeznik.map(r => [r.prj, r.title.length>45?r.title.slice(0,43)+"…":r.title, r.program, ...years.map(yr => r.years[String(yr)] ? "✓" : "—")]),
-      styles: tblStyles,
-      headStyles: { fillColor: NAVY, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+      body: stayedRzeznik.map(r => [
+        r.prj,
+        r.title.length>45 ? r.title.slice(0,43)+"…" : r.title,
+        r.program,
+        ...years.map(yr => r.years[String(yr)] ? "tak" : "-")
+      ]),
+      styles: tblFont,
+      headStyles: tblHead(NAVY),
       alternateRowStyles: { fillColor: LGRAY },
+      columnStyles: stayColStyles,
       margin: { left: 14, right: 14 },
     });
   }
 
-  // --- FOOTER ---
+  // ── FOOTER (każda strona) ────────────────────────────────────
   const pages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
     doc.setFillColor(...NAVY);
     doc.rect(0, 287, 210, 10, "F");
-    doc.setTextColor(...WHITE); doc.setFontSize(7);
-    doc.text("LogisticFit — Audit CRM — Dokument poufny", 14, 293);
+    doc.setTextColor(...WHITE); doc.setFontSize(7); doc.setFont(F,"normal");
+    doc.text("LogisticFit - Audit CRM - Dokument poufny", 14, 293);
     doc.text(`Strona ${i} / ${pages}`, 196, 293, { align: "right" });
   }
 
   doc.save(`Raport_Rzeznik_${yyyy}-${mm}-${dd}.pdf`);
-  showToast("📄 Raport PDF wygenerowany!", "success");
+  showToast("Raport PDF wygenerowany!", "success");
 }
