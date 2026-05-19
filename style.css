@@ -260,6 +260,7 @@ tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: var(--bg3); }
 tbody tr.row-manual { background: #f5f0ff; }
 tbody tr.row-manual:hover { background: #ede5ff; }
+td.prj-col { color: var(--text2); font-size: 12px; white-space: nowrap; width: 60px; }
 
 tbody td {
   padding: 10px 14px;

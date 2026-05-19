@@ -221,12 +221,13 @@ function renderTable() {
 
   const tbody = document.getElementById("audits-tbody");
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="loading">Brak wyników</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">Brak wyników</td></tr>';
     return;
   }
 
   tbody.innerHTML = filtered.map(a => `
     <tr onclick="openModal(${a.Id})" ${!a.ImportFile ? 'class="row-manual"' : ""}>
+      <td class="prj-col">${a.ProjectID || "—"}</td>
       <td title="${a.Title || ""}">${a.Title || "—"}</td>
       <td>${programBadge(a.Program)}</td>
       <td>${a.AuditType ? shortType(a.AuditType) : "—"}</td>
