@@ -533,6 +533,7 @@ async function startImport() {
   try {
     const existingIds = await fetchExistingProjectIds();
     let imported = 0, skipped = 0, errors = 0;
+    let firstError = "";
     const total = importParsed.length;
 
     for (let i = 0; i < total; i++) {
@@ -545,13 +546,45 @@ async function startImport() {
       const dupKey = `${rec.ProjectID}_${rec.Year || ""}`;
       if (existingIds.has(dupKey)) { skipped++; continue; }
 
+      // Wyślij tylko pola istniejące w SharePoint
+      const spFields = {
+        Title:          rec.Title,
+        ProjectID:      rec.ProjectID,
+        Program:        rec.Program,
+        AuditType:      rec.AuditType,
+        Standard:       rec.Standard,
+        AuditDateStart: rec.AuditDateStart,
+        AuditDateEnd:   rec.AuditDateEnd,
+        AuditDays:      rec.AuditDays,
+        AuditMode:      rec.AuditMode,
+        AuditStatus:    rec.AuditStatus,
+        Proforma:       rec.Proforma,
+        City:           rec.City,
+        PostalCode:     rec.PostalCode,
+        Address:        rec.Address,
+        Phone:          rec.Phone,
+        Mobile:         rec.Mobile,
+        ClientEmail:    rec.ClientEmail,
+        Notes:          rec.Notes,
+        Quarter:        rec.Quarter,
+        Year:           rec.Year,
+        AuditorName:    rec.AuditorName,
+        ImportFile:     rec.ImportFile,
+      };
+
       try {
-        const newItem = await addAudit(rec);
+        const newItem = await addAudit(spFields);
         existingIds.add(dupKey);
-        allAudits.push({ ...rec, Id: newItem?.Id || Date.now() + i });
         imported++;
-      } catch { errors++; }
+      } catch(err) {
+        errors++;
+        if (!firstError) firstError = err.message;
+        console.error("Import error for", rec.Title, err.message);
+      }
     }
+
+    // Przeładuj dane z SharePoint
+    allAudits = await fetchAllAudits();
 
     hide("import-stage-3");
     show("import-stage-4");
@@ -560,12 +593,13 @@ async function startImport() {
       <div class="import-result-box">
         <div class="result-item success">✅ Zaimportowano: <strong>${imported}</strong></div>
         <div class="result-item skip">⏭ Pominięto (duplikaty): <strong>${skipped}</strong></div>
-        ${errors ? `<div class="result-item error">❌ Błędy: <strong>${errors}</strong></div>` : ""}
+        ${errors ? `<div class="result-item error">❌ Błędy: <strong>${errors}</strong>${firstError ? `<br><small style="font-size:11px;opacity:.8">${firstError}</small>` : ""}</div>` : ""}
       </div>
     `;
 
     renderTable();
-    showToast(`Import zakończony: +${imported} audytów`, "success");
+    renderAuditors();
+    showToast(`Import zakończony: +${imported} audytów`, imported > 0 ? "success" : "info");
 
   } catch(e) {
     showToast(`Błąd importu: ${e.message}`, "error");
