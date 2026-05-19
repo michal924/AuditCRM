@@ -937,8 +937,8 @@ async function loadPdfFonts() {
     return btoa(bin);
   }
   try {
-    if (!pdfFontRegular) pdfFontRegular = await ttfToBase64("NotoSans-Regular.ttf");
-    if (!pdfFontBold)    pdfFontBold    = await ttfToBase64("NotoSans-Bold.ttf");
+    if (!pdfFontRegular) pdfFontRegular = await ttfToBase64("fonts/NotoSans-Regular.ttf");
+    if (!pdfFontBold)    pdfFontBold    = await ttfToBase64("fonts/NotoSans-Bold.ttf");
   } catch(e) { console.warn("Nie udało się załadować fontów PDF:", e); }
 }
 
