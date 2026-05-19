@@ -226,7 +226,7 @@ function renderTable() {
   }
 
   tbody.innerHTML = filtered.map(a => `
-    <tr onclick="openModal(${a.Id})">
+    <tr onclick="openModal(${a.Id})" ${!a.ImportFile ? 'class="row-manual"' : ""}>
       <td title="${a.Title || ""}">${a.Title || "—"}</td>
       <td>${programBadge(a.Program)}</td>
       <td>${a.AuditType ? shortType(a.AuditType) : "—"}</td>
