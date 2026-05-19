@@ -542,11 +542,12 @@ async function startImport() {
       document.getElementById("import-progress-text").textContent =
         `Importowanie ${i+1}/${total} — ${rec.Title || ""}`;
 
-      if (existingIds.has(rec.ProjectID)) { skipped++; continue; }
+      const dupKey = `${rec.ProjectID}_${rec.Year || ""}`;
+      if (existingIds.has(dupKey)) { skipped++; continue; }
 
       try {
         const newItem = await addAudit(rec);
-        existingIds.add(rec.ProjectID);
+        existingIds.add(dupKey);
         allAudits.push({ ...rec, Id: newItem?.Id || Date.now() + i });
         imported++;
       } catch { errors++; }

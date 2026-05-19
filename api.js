@@ -104,14 +104,18 @@ async function addAudit(fields) {
   return r.json();
 }
 
-// Pobierz istniejące ProjectID (do wykrycia duplikatów przy imporcie)
+// Pobierz istniejące klucze ProjectID+Year (do wykrycia duplikatów przy imporcie)
+// Klucz: "ProjectID_Year" np. "12345_2025"
 async function fetchExistingProjectIds() {
   const ids = new Set();
-  let url = `/_api/lists/getbytitle('Audits')/items?$select=ProjectID&$top=500`;
+  let url = `/_api/lists/getbytitle('Audits')/items?$select=ProjectID,Year&$top=500`;
   while (url) {
     const data = await spGet(url);
     (data.value || []).forEach(item => {
-      if (item.ProjectID) ids.add(parseInt(item.ProjectID));
+      if (item.ProjectID) {
+        const key = `${parseInt(item.ProjectID)}_${item.Year || ""}`;
+        ids.add(key);
+      }
     });
     url = data["odata.nextLink"]
       ? data["odata.nextLink"].replace(SITE_URL, "")
