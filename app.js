@@ -1208,10 +1208,19 @@ async function generatePdfRzeznik() {
   // Upewnij się że fonty są załadowane
   await loadPdfFonts();
 
+  // ── Odczytaj aktywne filtry z UI ───────────────────────────
+  const programFilter = document.getElementById("changes-program-filter").value; // "" = wszystkie
+  const auditorFilter = document.getElementById("changes-auditor-filter").value; // "" = wszyscy
+
   const map = buildHistoryMap();
   const cameToRzeznik = [], leftRzeznik = [], stayedRzeznik = [];
 
-  Object.values(map).forEach(r => {
+  // Stosuj filtr programu i audytora do danych
+  let records = Object.values(map);
+  if (programFilter) records = records.filter(r => r.program === programFilter);
+  if (auditorFilter) records = records.filter(r => Object.values(r.years).includes(auditorFilter));
+
+  records.forEach(r => {
     const vals = years.map(y => r.years[String(y)] || null);
     const hasRzeznik = vals.includes(MY_AUDITOR);
     if (!hasRzeznik) return;
@@ -1275,13 +1284,19 @@ async function generatePdfRzeznik() {
     doc.text("LOGISTICFIT", 14, 24);
   }
 
+  const programLabel = programFilter || "Wszystkie systemy";
+
   doc.setTextColor(...WHITE);
   doc.setFontSize(13); doc.setFont(F,"bold");
-  doc.text("Raport zmian audytora", 198, 17, { align: "right" });
+  doc.text("Raport zmian audytora", 198, 15, { align: "right" });
   doc.setFontSize(10); doc.setFont(F,"normal");
-  doc.text("Michał Rzeźnik", 198, 26, { align: "right" });
-  doc.setFontSize(8); doc.setFont(F,"normal");
-  doc.text(`Wygenerowano: ${dateStr}`, 198, 34, { align: "right" });
+  doc.text("Michał Rzeźnik", 198, 23, { align: "right" });
+  doc.setFontSize(9); doc.setFont(F,"bold");
+  doc.setTextColor(...GREEN);
+  doc.text(programLabel, 198, 31, { align: "right" });
+  doc.setFontSize(7.5); doc.setFont(F,"normal");
+  doc.setTextColor(...WHITE);
+  doc.text(`Wygenerowano: ${dateStr}`, 198, 38, { align: "right" });
 
   // Zielona linia pod headerem
   doc.setFillColor(...GREEN);
@@ -1293,7 +1308,11 @@ async function generatePdfRzeznik() {
   doc.setTextColor(...DARK);
   doc.setFontSize(9); doc.setFont(F,"normal");
   doc.text(`Analizowane lata: ${years.join(", ")}`, 14, y);
-  y += 10;
+  doc.setTextColor(programFilter ? [35,157,70] : [120,120,120]);
+  doc.setFont(F, programFilter ? "bold" : "normal");
+  doc.text(`System certyfikacji: ${programLabel}`, 14, y + 6);
+  doc.setTextColor(...DARK); doc.setFont(F,"normal");
+  y += 16;
 
   // ── STAT BOXES ──────────────────────────────────────────────
   const total = stayedRzeznik.length + cameToRzeznik.length + leftRzeznik.length;
