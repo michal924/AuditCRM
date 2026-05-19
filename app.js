@@ -918,6 +918,16 @@ function handleHistoryFile(file) {
     try {
       const wb = XLSX.read(e.target.result, { type: "array", cellText: false, cellNF: false });
       const ws = wb.Sheets[wb.SheetNames[0]];
+
+      // Napraw błędny !ref (niektóre pliki CUC mają za mały zakres w metadanych)
+      const allAddrs = Object.keys(ws).filter(k => !k.startsWith("!"));
+      if (allAddrs.length > 0) {
+        const decoded = allAddrs.map(a => XLSX.utils.decode_cell(a));
+        const maxR = Math.max(...decoded.map(d => d.r));
+        const maxC = Math.max(...decoded.map(d => d.c));
+        ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+      }
+
       const range = XLSX.utils.decode_range(ws["!ref"] || "A1:A1");
 
       // Pomocnik: pobierz wartość komórki jako string
