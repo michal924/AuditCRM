@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Audit CRM</title>
+  <title>Audit CRM — LogisticFit</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script src="msal-browser.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -31,53 +32,42 @@
       <span class="nav-title">Audit CRM</span>
     </div>
     <div class="nav-links">
-      <button class="nav-btn active" data-view="audits">📋 Audyty</button>
-      <button class="nav-btn" data-view="auditors">👥 Audytorzy</button>
+      <button class="nav-btn active" data-view="myaudits">📋 Audyty LogisticFit</button>
+      <button class="nav-btn" data-view="checkaudit">✅ Check Audyt</button>
     </div>
     <div class="nav-right">
+      <button id="btn-import" class="btn-action" title="Importuj plan z CUC">⬆ Import</button>
+      <button id="btn-add-audit" class="btn-action btn-action-green" title="Dodaj nieplanowany audyt">＋ Dodaj audyt</button>
       <span id="nav-user"></span>
       <button id="btn-logout" class="btn-ghost">Wyloguj</button>
     </div>
   </nav>
 
-  <!-- WIDOK: AUDYTY -->
-  <div id="view-audits" class="view">
-
-    <!-- FILTRY -->
+  <!-- WIDOK: AUDYTY LOGISTICFIT -->
+  <div id="view-myaudits" class="view">
     <div class="filters-bar">
       <input id="search" type="text" placeholder="🔍 Szukaj firmy..." class="search-input">
-
       <select id="filter-quarter" class="filter-select">
         <option value="">Kwartał</option>
         <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
       </select>
-
       <select id="filter-year" class="filter-select">
         <option value="">Rok</option>
         <option>2024</option><option>2025</option><option>2026</option>
       </select>
-
       <select id="filter-program" class="filter-select">
         <option value="">Program</option>
         <option>FSC</option><option>PEFC</option><option>KZR INiG</option>
         <option>SURE</option><option>EUDR</option>
       </select>
-
       <select id="filter-status" class="filter-select">
         <option value="">Status</option>
         <option>PLANNED</option><option>DONE</option>
         <option>REJECTED</option><option>CHANGE</option><option>Invoice</option>
       </select>
-
-      <select id="filter-auditor" class="filter-select">
-        <option value="">Audytor</option>
-        <option>Rzeźnik Michał</option>
-      </select>
-
       <button id="btn-clear-filters" class="btn-ghost">✕ Wyczyść</button>
     </div>
 
-    <!-- STATYSTYKI -->
     <div class="stats-bar">
       <div class="stat-card">
         <span class="stat-num" id="stat-total">—</span>
@@ -97,33 +87,25 @@
       </div>
     </div>
 
-    <!-- TABELA -->
     <div class="table-wrapper">
       <table id="audits-table">
         <thead>
           <tr>
-            <th>Firma</th>
-            <th>Program</th>
-            <th>Typ</th>
-            <th>Data</th>
-            <th>Miasto</th>
-            <th>Tryb</th>
-            <th>Status</th>
-            <th>Proforma</th>
-            <th>Audytor</th>
+            <th>Firma</th><th>Program</th><th>Typ</th><th>Data</th>
+            <th>Miasto</th><th>Tryb</th><th>Status</th><th>Proforma</th>
           </tr>
         </thead>
         <tbody id="audits-tbody">
-          <tr><td colspan="9" class="loading">Ładowanie...</td></tr>
+          <tr><td colspan="8" class="loading">Ładowanie...</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- WIDOK: AUDYTORZY -->
-  <div id="view-auditors" class="view hidden">
+  <!-- WIDOK: CHECK AUDYT -->
+  <div id="view-checkaudit" class="view hidden">
     <div class="view-header">
-      <h2>Rozkład audytów wg audytora</h2>
+      <h2>Weryfikacja audytorów — rozkład audytów</h2>
       <div class="header-filters">
         <select id="auditors-quarter" class="filter-select">
           <option value="">Wszystkie kwartały</option>
@@ -140,11 +122,7 @@
         <thead>
           <tr>
             <th>Audytor</th>
-            <th>FSC</th>
-            <th>PEFC</th>
-            <th>KZR INiG</th>
-            <th>SURE</th>
-            <th>EUDR</th>
+            <th>FSC</th><th>PEFC</th><th>KZR INiG</th><th>SURE</th><th>EUDR</th>
             <th>Łącznie</th>
           </tr>
         </thead>
@@ -155,7 +133,7 @@
     </div>
   </div>
 
-</div>
+</div><!-- /page-app -->
 
 <!-- MODAL: SZCZEGÓŁY AUDYTU -->
 <div id="modal-overlay" class="modal-overlay hidden">
@@ -190,12 +168,10 @@
           <div class="field-row"><label>Cert. ważny do</label><span id="m-certvalid">—</span></div>
         </div>
       </div>
-
       <div class="modal-section full">
         <h3>Notatki</h3>
         <p id="m-notes" class="notes-text">—</p>
       </div>
-
       <div class="modal-actions">
         <div class="action-group">
           <label>Status</label>
@@ -216,6 +192,164 @@
           </div>
         </div>
         <button id="btn-save" class="btn-primary">💾 Zapisz zmiany</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: IMPORT PLIKU CUC -->
+<div id="import-overlay" class="modal-overlay hidden">
+  <div class="modal modal-import">
+    <div class="modal-header">
+      <h2>⬆ Import planu CUC</h2>
+      <button id="import-close" class="btn-ghost">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Stage 1: wybór pliku -->
+      <div id="import-stage-1">
+        <div class="drop-zone" id="drop-zone">
+          <div class="drop-icon">📂</div>
+          <p>Przeciągnij plik Excel tutaj<br>lub kliknij aby wybrać</p>
+          <input type="file" id="import-file" accept=".xlsx,.xls" style="display:none">
+          <button class="btn-primary" style="width:auto;margin-top:12px" onclick="document.getElementById('import-file').click()">Wybierz plik .xlsx</button>
+        </div>
+      </div>
+
+      <!-- Stage 2: podgląd -->
+      <div id="import-stage-2" class="hidden">
+        <div class="import-info" id="import-info"></div>
+        <div class="import-auditors" id="import-auditors"></div>
+        <div class="table-wrapper" style="max-height:300px;overflow-y:auto;margin-top:12px">
+          <table>
+            <thead>
+              <tr>
+                <th>Firma</th><th>Program</th><th>Typ</th>
+                <th>Data</th><th>Miasto</th><th>Audytor</th>
+              </tr>
+            </thead>
+            <tbody id="import-preview-tbody"></tbody>
+          </table>
+        </div>
+        <div class="modal-actions" style="margin-top:16px">
+          <button class="btn-ghost" onclick="resetImport()">← Zmień plik</button>
+          <button id="btn-do-import" class="btn-primary" style="width:auto">Importuj wszystkie (<span id="import-count">0</span>)</button>
+        </div>
+      </div>
+
+      <!-- Stage 3: postęp -->
+      <div id="import-stage-3" class="hidden">
+        <div class="import-progress">
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+          <p id="import-progress-text">Importowanie...</p>
+        </div>
+      </div>
+
+      <!-- Stage 4: wyniki -->
+      <div id="import-stage-4" class="hidden">
+        <div class="import-results" id="import-results"></div>
+        <div class="modal-actions" style="margin-top:16px">
+          <button class="btn-ghost" onclick="resetImport()">Importuj kolejny plik</button>
+          <button class="btn-primary" style="width:auto" onclick="closeImport()">Zamknij</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DODAJ AUDYT NIEPLANOWANY -->
+<div id="add-audit-overlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>＋ Nowy audyt nieplanowany</h2>
+      <button id="add-audit-close" class="btn-ghost">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid">
+        <div class="modal-section">
+          <h3>Dane firmy</h3>
+          <div class="form-row">
+            <label>Firma *</label>
+            <input type="text" id="new-title" class="form-input" placeholder="Nazwa firmy">
+          </div>
+          <div class="form-row">
+            <label>Program *</label>
+            <select id="new-program" class="form-input">
+              <option value="">— wybierz —</option>
+              <option>FSC</option><option>PEFC</option><option>KZR INiG</option>
+              <option>SURE</option><option>EUDR</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Typ audytu *</label>
+            <select id="new-type" class="form-input">
+              <option value="">— wybierz —</option>
+              <option>Surveillance announced</option>
+              <option>Re-assessment</option>
+              <option>Re-Certification Audit</option>
+              <option>Certification Audit</option>
+              <option>Extension Audit</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Standard</label>
+            <input type="text" id="new-standard" class="form-input" placeholder="np. FSC-STD-40-004">
+          </div>
+          <div class="form-row">
+            <label>Miasto</label>
+            <input type="text" id="new-city" class="form-input" placeholder="Miasto">
+          </div>
+          <div class="form-row">
+            <label>Email klienta</label>
+            <input type="email" id="new-email" class="form-input" placeholder="email@firma.pl">
+          </div>
+        </div>
+        <div class="modal-section">
+          <h3>Planowanie</h3>
+          <div class="form-row">
+            <label>Data audytu *</label>
+            <input type="date" id="new-date" class="form-input">
+          </div>
+          <div class="form-row">
+            <label>Liczba dni</label>
+            <input type="number" id="new-days" class="form-input" value="1" min="0.25" step="0.25">
+          </div>
+          <div class="form-row">
+            <label>Tryb</label>
+            <select id="new-mode" class="form-input">
+              <option value="On-site">On-site</option>
+              <option value="Online">Online</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Kwartał</label>
+            <select id="new-quarter" class="form-input">
+              <option value="">— auto —</option>
+              <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Rok</label>
+            <input type="number" id="new-year" class="form-input" value="2025">
+          </div>
+          <div class="form-row">
+            <label>Status</label>
+            <select id="new-status" class="form-input">
+              <option value="PLANNED">PLANNED</option>
+              <option value="DONE">DONE</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-section full">
+        <h3>Notatki</h3>
+        <textarea id="new-notes" class="form-input form-textarea" placeholder="Notatki do audytu..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeAddAudit()">Anuluj</button>
+        <button id="btn-save-new-audit" class="btn-primary" style="width:auto">💾 Zapisz audyt</button>
       </div>
     </div>
   </div>

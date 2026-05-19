@@ -82,3 +82,40 @@ async function fetchAuditors() {
 async function updateAudit(id, fields) {
   await spPatch(`/_api/lists/getbytitle('Audits')/items(${id})`, fields);
 }
+
+// Dodaj nowy rekord
+async function addAudit(fields) {
+  const token = await getToken();
+  const digest = await getDigest(token);
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('Audits')/items`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json;odata=nometadata",
+      "Content-Type": "application/json;odata=nometadata",
+      "X-RequestDigest": digest,
+    },
+    body: JSON.stringify(fields),
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    throw new Error(`Add error ${r.status}: ${txt.substring(0, 200)}`);
+  }
+  return r.json();
+}
+
+// Pobierz istniejące ProjectID (do wykrycia duplikatów przy imporcie)
+async function fetchExistingProjectIds() {
+  const ids = new Set();
+  let url = `/_api/lists/getbytitle('Audits')/items?$select=ProjectID&$top=500`;
+  while (url) {
+    const data = await spGet(url);
+    (data.value || []).forEach(item => {
+      if (item.ProjectID) ids.add(parseInt(item.ProjectID));
+    });
+    url = data["odata.nextLink"]
+      ? data["odata.nextLink"].replace(SITE_URL, "")
+      : null;
+  }
+  return ids;
+}
