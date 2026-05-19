@@ -1191,41 +1191,44 @@ async function generatePdfRzeznik() {
 
   // ── HEADER ──────────────────────────────────────────────────
   doc.setFillColor(...NAVY);
-  doc.rect(0, 0, 210, 40, "F");
+  doc.rect(0, 0, 210, 44, "F");
 
-  // Logo — wyśrodkowane pionowo w headerze
+  // Logo na białym zaokrąglonym tle (logo ma ciemne litery — widoczne tylko na jasnym tle)
   if (logoBase64) {
     try {
-      // Pobierz wymiary PNG aby zachować proporcje
       const img = new Image();
       img.src = logoBase64;
-      const ratio = img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 0.3;
-      const logoW = 48;
-      const logoH = Math.min(logoW * ratio, 26);
-      const logoY = (40 - logoH) / 2;
-      doc.addImage(logoBase64, "PNG", 12, logoY, logoW, logoH);
+      const logoW = 52;
+      const ratio = img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 0.28;
+      const logoH = Math.max(Math.min(logoW * ratio, 20), 10);
+      const logoX = 10;
+      const logoY = (44 - logoH) / 2;
+      // Białe tło pod logo
+      doc.setFillColor(...WHITE);
+      doc.roundedRect(logoX - 2, logoY - 2, logoW + 4, logoH + 4, 2, 2, "F");
+      doc.addImage(logoBase64, "PNG", logoX, logoY, logoW, logoH);
     } catch(e) {
       doc.setTextColor(...WHITE); doc.setFontSize(14); doc.setFont(F,"bold");
-      doc.text("LOGISTICFIT", 14, 22);
+      doc.text("LOGISTICFIT", 14, 24);
     }
   } else {
     doc.setTextColor(...WHITE); doc.setFontSize(14); doc.setFont(F,"bold");
-    doc.text("LOGISTICFIT", 14, 22);
+    doc.text("LOGISTICFIT", 14, 24);
   }
 
   doc.setTextColor(...WHITE);
   doc.setFontSize(13); doc.setFont(F,"bold");
-  doc.text("Raport zmian audytora", 196, 16, { align: "right" });
+  doc.text("Raport zmian audytora", 198, 17, { align: "right" });
   doc.setFontSize(10); doc.setFont(F,"normal");
-  doc.text("Michal Rzeznik", 196, 24, { align: "right" });
+  doc.text("Michał Rzeźnik", 198, 26, { align: "right" });
   doc.setFontSize(8); doc.setFont(F,"normal");
-  doc.text(`Wygenerowano: ${dateStr}`, 196, 32, { align: "right" });
+  doc.text(`Wygenerowano: ${dateStr}`, 198, 34, { align: "right" });
 
   // Zielona linia pod headerem
   doc.setFillColor(...GREEN);
-  doc.rect(0, 40, 210, 2, "F");
+  doc.rect(0, 44, 210, 2, "F");
 
-  let y = 52;
+  let y = 54;
 
   // ── INFO ────────────────────────────────────────────────────
   doc.setTextColor(...DARK);
@@ -1236,7 +1239,7 @@ async function generatePdfRzeznik() {
   // ── STAT BOXES ──────────────────────────────────────────────
   const total = stayedRzeznik.length + cameToRzeznik.length + leftRzeznik.length;
   const boxes = [
-    { label: "Klientow lacznie",  val: total,                color: NAVY  },
+    { label: "Klientów łącznie",   val: total,                color: NAVY  },
     { label: "Nowi klienci",      val: cameToRzeznik.length, color: GREEN },
     { label: "Odeszli klienci",   val: leftRzeznik.length,   color: RED   },
   ];
@@ -1259,7 +1262,7 @@ async function generatePdfRzeznik() {
   // ── NOWI KLIENCI ────────────────────────────────────────────
   if (cameToRzeznik.length) {
     doc.setTextColor(...GREEN); doc.setFontSize(11); doc.setFont(F,"bold");
-    doc.text(`Nowi klienci Rzeznika Michala  (${cameToRzeznik.length})`, 14, y);
+    doc.text(`Nowi klienci Rzeźnika Michała  (${cameToRzeznik.length})`, 14, y);
     y += 1;
     doc.autoTable({
       startY: y + 3,
@@ -1278,7 +1281,7 @@ async function generatePdfRzeznik() {
   if (leftRzeznik.length) {
     if (y > 230) { doc.addPage(); y = 20; }
     doc.setTextColor(...RED); doc.setFontSize(11); doc.setFont(F,"bold");
-    doc.text(`Klienci, ktorzy odeszli od Rzeznika  (${leftRzeznik.length})`, 14, y);
+    doc.text(`Klienci, którzy odeszli od Rzeźnika  (${leftRzeznik.length})`, 14, y);
     y += 1;
     doc.autoTable({
       startY: y + 3,
@@ -1297,7 +1300,7 @@ async function generatePdfRzeznik() {
   if (stayedRzeznik.length) {
     if (y > 210) { doc.addPage(); y = 20; }
     doc.setTextColor(...NAVY); doc.setFontSize(11); doc.setFont(F,"bold");
-    doc.text(`Stali klienci Rzeznika Michala  (${stayedRzeznik.length})`, 14, y);
+    doc.text(`Stali klienci Rzeźnika Michała  (${stayedRzeznik.length})`, 14, y);
     y += 1;
     const stayColStyles = { 0: { cellWidth: 18 }, 1: { cellWidth: 75 }, 2: { cellWidth: 22 } };
     years.forEach((yr, idx) => { stayColStyles[3 + idx] = { cellWidth: 16, halign: "center" }; });
