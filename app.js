@@ -980,6 +980,7 @@ function setupChanges() {
 
   document.getElementById("changes-auditor-filter").addEventListener("change", renderChangesTable);
   document.getElementById("changes-program-filter").addEventListener("change", renderChangesTable);
+  document.getElementById("changes-year-filter").addEventListener("change", renderChangesTable);
   document.getElementById("changes-only-filter").addEventListener("change", renderChangesTable);
   document.getElementById("btn-pdf-rzeznik").addEventListener("click", generatePdfRzeznik);
   document.getElementById("btn-changes-clear").addEventListener("click", clearHistory);
@@ -1130,19 +1131,31 @@ function renderChangesTable() {
   const map = buildHistoryMap();
   const auditorFilter = document.getElementById("changes-auditor-filter").value;
   const programFilter = document.getElementById("changes-program-filter").value;
+  const yearFilter    = document.getElementById("changes-year-filter").value;
   const onlyChanges   = document.getElementById("changes-only-filter").checked;
 
+  // Kolumny lat do wyświetlenia (filtrowane jeśli wybrany rok)
+  const visibleYears = yearFilter ? [Number(yearFilter)] : years;
+
+  // Nagłówki — tylko widoczne lata
+  document.getElementById("changes-thead").innerHTML = `<tr>
+    <th>PRJ</th><th>Firma</th><th>Program</th>
+    ${visibleYears.map(y => `<th>${y}</th>`).join("")}
+    <th>Zmiana</th>
+  </tr>`;
+
   let rows = Object.values(map).map(r => {
-    const vals = years.map(y => r.years[String(y)] || null);
-    const filled = vals.filter(Boolean);
-    const unique = new Set(filled);
-    const hasChange = unique.size > 1;
-    const hasRzeznik = filled.includes(MY_AUDITOR);
+    // hasChange i hasRzeznik zawsze na podstawie WSZYSTKICH lat
+    const allVals = years.map(y => r.years[String(y)] || null).filter(Boolean);
+    const hasChange  = new Set(allVals).size > 1;
+    const hasRzeznik = allVals.includes(MY_AUDITOR);
     return { ...r, hasChange, hasRzeznik };
   });
 
   if (programFilter) rows = rows.filter(r => r.program === programFilter);
   if (auditorFilter) rows = rows.filter(r => Object.values(r.years).includes(auditorFilter));
+  // Filtr roku: pokaż tylko wiersze, które mają audytora w wybranym roku
+  if (yearFilter)    rows = rows.filter(r => r.years[yearFilter]);
   if (onlyChanges)   rows = rows.filter(r => r.hasChange);
 
   rows.sort((a, b) => {
@@ -1155,7 +1168,7 @@ function renderChangesTable() {
     return a.title.localeCompare(b.title, "pl");
   });
 
-  // Update auditor dropdown
+  // Aktualizuj dropdown audytorów
   const allNames = [...new Set(Object.values(map).flatMap(r => Object.values(r.years)))].filter(Boolean)
     .sort((a, b) => a === MY_AUDITOR ? -1 : b === MY_AUDITOR ? 1 : a.localeCompare(b, "pl"));
   const sel = document.getElementById("changes-auditor-filter");
@@ -1163,9 +1176,15 @@ function renderChangesTable() {
   sel.innerHTML = `<option value="">Wszyscy audytorzy</option>` +
     allNames.map(n => `<option value="${n}"${n === cur ? " selected" : ""}>${n}</option>`).join("");
 
+  // Aktualizuj dropdown lat
+  const yrSel = document.getElementById("changes-year-filter");
+  const curYr = yrSel.value;
+  yrSel.innerHTML = `<option value="">Wszystkie lata</option>` +
+    years.map(y => `<option value="${y}"${String(y) === curYr ? " selected" : ""}>${y}</option>`).join("");
+
   const tbody = document.getElementById("changes-tbody");
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="${3 + years.length + 1}" class="loading">Brak wyników</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${3 + visibleYears.length + 1}" class="loading">Brak wyników</td></tr>`;
     return;
   }
 
@@ -1173,7 +1192,8 @@ function renderChangesTable() {
     const rowCls = r.hasChange && r.hasRzeznik ? "change-row-rzeznik"
                  : r.hasChange ? "change-row" : "";
 
-    const yearCells = years.map(y => {
+    // Komórki tylko dla widocznych lat
+    const yearCells = visibleYears.map(y => {
       const aud = r.years[String(y)];
       if (!aud) return `<td class="ch-cell ch-empty">—</td>`;
       const cls = aud === MY_AUDITOR ? "ch-cell ch-rzeznik" : "ch-cell";
