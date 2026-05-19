@@ -1205,12 +1205,14 @@ async function generatePdfRzeznik() {
   const years = Object.keys(auditHistory).map(Number).sort();
   if (!years.length) { showToast("Najpierw wgraj pliki Auditsoverview", "error"); return; }
 
+  // ── Odczytaj aktywne filtry z UI (przed await!) ──────────────
+  const programFilter = document.getElementById("changes-program-filter").value.trim();
+  const auditorFilter = document.getElementById("changes-auditor-filter").value.trim();
+
+  showToast(`Generuję PDF: ${programFilter || "wszystkie systemy"}`, "info");
+
   // Upewnij się że fonty są załadowane
   await loadPdfFonts();
-
-  // ── Odczytaj aktywne filtry z UI ───────────────────────────
-  const programFilter = document.getElementById("changes-program-filter").value; // "" = wszystkie
-  const auditorFilter = document.getElementById("changes-auditor-filter").value; // "" = wszyscy
 
   const map = buildHistoryMap();
   const cameToRzeznik = [], leftRzeznik = [], stayedRzeznik = [];
