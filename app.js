@@ -864,7 +864,8 @@ init();
 // ============================================================
 // ZMIANY AUDYTORA
 // ============================================================
-let auditHistory = {};  // { year: { "prj_program": { prj, title, program, auditor } } }
+let auditHistory = {};      // { year: { "prj_program": { prj, title, program, auditor } } }
+let changesFilesByYear = {}; // { year: [{filename, count}] }
 let logoBase64 = null;
 
 function initLogoBase64() {
@@ -991,14 +992,27 @@ function handleHistoryFile(file) {
 }
 
 function updateChangesLoadedUI(filename, year, count) {
+  // Akumuluj pliki dla danego roku
+  if (!changesFilesByYear[year]) changesFilesByYear[year] = [];
+  const existingEntry = changesFilesByYear[year].find(f => f.filename === filename);
+  if (existingEntry) existingEntry.count = count;
+  else changesFilesByYear[year].push({ filename, count });
+
   const container = document.getElementById("changes-loaded-files");
-  const existing = container.querySelector(`[data-year="${year}"]`);
-  if (existing) existing.remove();
+  const existingChip = container.querySelector(`[data-year="${year}"]`);
+  if (existingChip) existingChip.remove();
+
+  // Całkowita liczba unikalnych rekordów dla roku (z auditHistory)
+  const totalRec = Object.keys(auditHistory[year] || {}).length;
+  const files = changesFilesByYear[year];
+  const fileCount = files.length;
+  const fileNames = files.map(f => f.filename).join(", ");
 
   const chip = document.createElement("div");
   chip.className = "loaded-file-chip";
   chip.dataset.year = year;
-  chip.innerHTML = `📄 <strong>${year}</strong> — ${filename} <span class="chip-count">${count} rek.</span>`;
+  chip.title = fileNames;
+  chip.innerHTML = `📁 <strong>${year}</strong> — ${fileCount} plik${fileCount === 1 ? "" : "i"} <span class="chip-count">${totalRec} rek.</span>`;
   container.appendChild(chip);
   document.getElementById("changes-table-wrapper").style.display = "";
 }
