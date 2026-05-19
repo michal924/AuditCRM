@@ -1228,6 +1228,7 @@ async function generatePdfRzeznik() {
   // ── Odczytaj aktywne filtry z UI (przed await!) ──────────────
   const programFilter = document.getElementById("changes-program-filter").value.trim();
   const auditorFilter = document.getElementById("changes-auditor-filter").value.trim();
+  const yearFilter    = document.getElementById("changes-year-filter").value.trim();
 
   // Upewnij się że fonty są załadowane
   await loadPdfFonts();
@@ -1237,23 +1238,30 @@ async function generatePdfRzeznik() {
     const cameToRzeznik = [], leftRzeznik = [], stayedRzeznik = [];
     const programLabel = programFilter || "Wszystkie systemy";
 
+    // Lata do analizy — jeśli wybrany rok, bierzemy go i rok poprzedni (do porównania zmian)
+    const allYears = Object.keys(auditHistory).map(Number).sort();
+    const activeYears = yearFilter
+      ? allYears.filter(y => y <= Number(yearFilter)).slice(-2)  // max 2 lata: poprzedni + wybrany
+      : allYears;
+
     // Stosuj filtry
     let records = Object.values(map);
     if (programFilter) records = records.filter(r => r.program === programFilter);
     if (auditorFilter) records = records.filter(r => Object.values(r.years).includes(auditorFilter));
+    if (yearFilter)    records = records.filter(r => r.years[yearFilter]);  // tylko z audytorem w wybranym roku
 
     records.forEach(r => {
-      const vals = years.map(y => r.years[String(y)] || null);
+      const vals = activeYears.map(y => r.years[String(y)] || null);
       const hasRzeznik = vals.includes(MY_AUDITOR);
       if (!hasRzeznik) return;
       const hasOther = vals.some(v => v && v !== MY_AUDITOR);
       if (!hasOther) { stayedRzeznik.push(r); return; }
-      for (let i = 0; i < years.length - 1; i++) {
-        const prev = r.years[String(years[i])];
-        const next = r.years[String(years[i + 1])];
+      for (let i = 0; i < activeYears.length - 1; i++) {
+        const prev = r.years[String(activeYears[i])];
+        const next = r.years[String(activeYears[i + 1])];
         if (prev && next && prev !== next) {
-          if (next === MY_AUDITOR) cameToRzeznik.push({ ...r, from: prev, year: years[i + 1] });
-          if (prev === MY_AUDITOR) leftRzeznik.push({ ...r, to: next,   year: years[i + 1] });
+          if (next === MY_AUDITOR) cameToRzeznik.push({ ...r, from: prev, year: activeYears[i + 1] });
+          if (prev === MY_AUDITOR) leftRzeznik.push({ ...r, to: next,   year: activeYears[i + 1] });
         }
       }
     });
@@ -1322,10 +1330,15 @@ async function generatePdfRzeznik() {
     // ── INFO ─────────────────────────────────────────────────────
     doc.setTextColor(...DARK);
     doc.setFontSize(9); doc.setFont(F,"normal");
-    doc.text(`Analizowane lata: ${years.join(", ")}`, 14, y);
+    doc.text(`Analizowane lata: ${activeYears.join(", ")}`, 14, y);
     doc.setTextColor(...(programFilter ? GREEN : GRAY));
     doc.setFont(F, programFilter ? "bold" : "normal");
     doc.text(`System certyfikacji: ${programLabel}`, 14, y + 6);
+    if (yearFilter) {
+      doc.setTextColor(...GREEN); doc.setFont(F,"bold");
+      doc.text(`Rok: ${yearFilter}`, 14, y + 12);
+      y += 6;
+    }
     doc.setTextColor(...DARK); doc.setFont(F,"normal");
     y += 16;
 
