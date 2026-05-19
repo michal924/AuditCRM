@@ -688,6 +688,19 @@ tbody td {
 }
 .btn-action-pdf:hover { background: #5a32a3; }
 
+.btn-clear-history {
+  margin-top: 8px;
+  background: transparent;
+  border: 1.5px solid #c0392b;
+  color: #c0392b;
+  border-radius: 8px;
+  padding: 5px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.btn-clear-history:hover { background: #c0392b; color: #fff; }
+
 /* Tabela zmian */
 .ch-cell {
   font-size: 12.5px;

@@ -870,6 +870,55 @@ let logoBase64 = null;
 let pdfFontRegular = null;  // base64 NotoSans-Regular
 let pdfFontBold    = null;  // base64 NotoSans-Bold
 
+const LS_HISTORY_KEY = "auditHistory_v1";
+const LS_FILES_KEY   = "changesFilesByYear_v1";
+
+function saveHistoryToStorage() {
+  try {
+    localStorage.setItem(LS_HISTORY_KEY, JSON.stringify(auditHistory));
+    localStorage.setItem(LS_FILES_KEY,   JSON.stringify(changesFilesByYear));
+  } catch(e) { console.warn("localStorage save failed:", e); }
+}
+
+function loadHistoryFromStorage() {
+  try {
+    const h = localStorage.getItem(LS_HISTORY_KEY);
+    const f = localStorage.getItem(LS_FILES_KEY);
+    if (h) auditHistory       = JSON.parse(h);
+    if (f) changesFilesByYear = JSON.parse(f);
+  } catch(e) { console.warn("localStorage load failed:", e); }
+}
+
+function restoreChangesUI() {
+  if (!Object.keys(auditHistory).length) return;
+  const container = document.getElementById("changes-loaded-files");
+  container.innerHTML = "";
+  // Odtwórz chipy dla każdego roku
+  Object.keys(auditHistory).sort().forEach(year => {
+    const files = changesFilesByYear[year] || [];
+    const totalRec = Object.keys(auditHistory[year] || {}).length;
+    const chip = document.createElement("div");
+    chip.className = "loaded-file-chip";
+    chip.dataset.year = year;
+    chip.title = files.map(f => f.filename).join(", ");
+    chip.innerHTML = `📁 <strong>${year}</strong> — ${files.length || "?"} plik${files.length === 1 ? "" : "i"} <span class="chip-count">${totalRec} rek.</span>`;
+    container.appendChild(chip);
+  });
+  document.getElementById("changes-table-wrapper").style.display = "";
+  renderChangesTable();
+}
+
+function clearHistory() {
+  if (!confirm("Wyczyścić wszystkie wgrane dane historyczne?")) return;
+  auditHistory = {};
+  changesFilesByYear = {};
+  localStorage.removeItem(LS_HISTORY_KEY);
+  localStorage.removeItem(LS_FILES_KEY);
+  document.getElementById("changes-loaded-files").innerHTML = "";
+  document.getElementById("changes-table-wrapper").style.display = "none";
+  showToast("Dane wyczyszczone", "success");
+}
+
 function initLogoBase64() {
   fetch("logo.png").then(r => r.blob()).then(blob => {
     const reader = new FileReader();
@@ -907,6 +956,8 @@ function registerPdfFonts(doc) {
 function setupChanges() {
   initLogoBase64();
   loadPdfFonts();
+  loadHistoryFromStorage();
+  restoreChangesUI();
 
   const dropZone = document.getElementById("changes-drop-zone");
   dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
@@ -931,6 +982,12 @@ function setupChanges() {
   document.getElementById("changes-program-filter").addEventListener("change", renderChangesTable);
   document.getElementById("changes-only-filter").addEventListener("change", renderChangesTable);
   document.getElementById("btn-pdf-rzeznik").addEventListener("click", generatePdfRzeznik);
+  document.getElementById("btn-changes-clear").addEventListener("click", clearHistory);
+
+  // Pokaż przycisk wyczyść jeśli są dane
+  if (Object.keys(auditHistory).length) {
+    document.getElementById("btn-changes-clear").style.display = "";
+  }
 }
 
 function handleHistoryFile(file) {
@@ -1011,6 +1068,8 @@ function handleHistoryFile(file) {
 
       showToast(`✓ ${file.name} — ${count} rekordów (${year})`, "success");
       updateChangesLoadedUI(file.name, year, count);
+      saveHistoryToStorage();
+      document.getElementById("btn-changes-clear").style.display = "";
       renderChangesTable();
     } catch(err) {
       showToast(`Błąd ${file.name}: ${err.message}`, "error");
