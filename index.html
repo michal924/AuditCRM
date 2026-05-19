@@ -271,7 +271,10 @@
           <h3>Dane firmy</h3>
           <div class="form-row">
             <label>Firma *</label>
-            <input type="text" id="new-title" class="form-input" placeholder="Nazwa firmy">
+            <div class="autocomplete-wrap">
+              <input type="text" id="new-title" class="form-input" placeholder="Wpisz 3 litery aby wyszukać..." autocomplete="off">
+              <ul id="autocomplete-list" class="autocomplete-list hidden"></ul>
+            </div>
           </div>
           <div class="form-row">
             <label>Program *</label>

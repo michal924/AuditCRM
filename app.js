@@ -633,6 +633,98 @@ function setupAddAudit() {
     const days = parseFloat(e.target.value);
     document.getElementById("new-mode").value = (!isNaN(days) && days <= 0.25) ? "Online" : "On-site";
   });
+
+  setupFirmaAutocomplete();
+}
+
+// ============================================================
+// AUTOCOMPLETE — pole Firma
+// ============================================================
+function setupFirmaAutocomplete() {
+  const input = document.getElementById("new-title");
+  const list  = document.getElementById("autocomplete-list");
+  let activeIdx = -1;
+
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    list.innerHTML = "";
+    activeIdx = -1;
+
+    if (q.length < 3) { list.classList.add("hidden"); return; }
+
+    // Unikalne firmy z bazy posortowane alfabetycznie
+    const names = [...new Set(allAudits.map(a => a.Title).filter(Boolean))]
+      .filter(n => n.toLowerCase().includes(q))
+      .sort((a, b) => {
+        // Firmy zaczynające się od zapytania na górze
+        const aStart = a.toLowerCase().startsWith(q);
+        const bStart = b.toLowerCase().startsWith(q);
+        if (aStart && !bStart) return -1;
+        if (!aStart && bStart) return 1;
+        return a.localeCompare(b, "pl");
+      })
+      .slice(0, 10);
+
+    if (!names.length) { list.classList.add("hidden"); return; }
+
+    names.forEach((name, i) => {
+      const li = document.createElement("li");
+      // Podświetl pasujący fragment
+      const idx = name.toLowerCase().indexOf(q);
+      li.innerHTML = name.substring(0, idx)
+        + `<strong>${name.substring(idx, idx + q.length)}</strong>`
+        + name.substring(idx + q.length);
+      li.addEventListener("mousedown", e => {
+        e.preventDefault();
+        selectFirma(name);
+      });
+      list.appendChild(li);
+    });
+
+    list.classList.remove("hidden");
+  });
+
+  // Nawigacja strzałkami + Enter
+  input.addEventListener("keydown", e => {
+    const items = list.querySelectorAll("li");
+    if (!items.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      activeIdx = Math.min(activeIdx + 1, items.length - 1);
+      items.forEach((li, i) => li.classList.toggle("active", i === activeIdx));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      activeIdx = Math.max(activeIdx - 1, 0);
+      items.forEach((li, i) => li.classList.toggle("active", i === activeIdx));
+    } else if (e.key === "Enter" && activeIdx >= 0) {
+      e.preventDefault();
+      selectFirma(items[activeIdx].textContent);
+    } else if (e.key === "Escape") {
+      list.classList.add("hidden");
+    }
+  });
+
+  input.addEventListener("blur", () => {
+    setTimeout(() => list.classList.add("hidden"), 150);
+  });
+}
+
+function selectFirma(name) {
+  document.getElementById("new-title").value = name;
+  document.getElementById("autocomplete-list").classList.add("hidden");
+
+  // Auto-uzupełnij dane z ostatniego audytu tej firmy
+  const last = allAudits
+    .filter(a => a.Title === name && a.AuditDateStart)
+    .sort((a, b) => (b.AuditDateStart || "").localeCompare(a.AuditDateStart || ""))
+    [0];
+
+  if (last) {
+    if (last.Program)     document.getElementById("new-program").value = last.Program;
+    if (last.Standard)    document.getElementById("new-standard").value = last.Standard;
+    if (last.City)        document.getElementById("new-city").value = last.City;
+    if (last.ClientEmail) document.getElementById("new-email").value = last.ClientEmail;
+  }
 }
 
 function openAddAuditModal() {
@@ -684,7 +776,6 @@ async function saveNewAudit() {
     Year:           parseInt(document.getElementById("new-year").value) || new Date().getFullYear(),
     AuditorName:    MY_AUDITOR,
     Notes:          document.getElementById("new-notes").value.trim(),
-    CreatedFrom:    "Manual",
   };
 
   const btn = document.getElementById("btn-save-new-audit");
