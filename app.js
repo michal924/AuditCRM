@@ -920,20 +920,39 @@ function handleHistoryFile(file) {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
+      // Znajdź wiersz z nagłówkami dynamicznie
+      let headerIdx = -1;
+      for (let i = 0; i < Math.min(15, rows.length); i++) {
+        const cell = String(rows[i][0] || "").toLowerCase();
+        if (cell.includes("project ref")) { headerIdx = i; break; }
+      }
+      if (headerIdx === -1) {
+        showToast(`Nie znaleziono nagłówków w: ${file.name}`, "error");
+        return;
+      }
+
+      // Mapuj kolumny po nazwach
+      const hdrs = rows[headerIdx].map(h => String(h).toLowerCase().trim());
+      const cPrj  = hdrs.findIndex(h => h.includes("project ref"));
+      const cName = hdrs.findIndex(h => h.includes("project name"));
+      const cProg = hdrs.findIndex(h => h.includes("subprogram"));
+      const cAud  = hdrs.findIndex(h => h.includes("inspector"));
+
       if (!auditHistory[year]) auditHistory[year] = {};
       let count = 0;
 
-      for (let i = 3; i < rows.length; i++) {
+      for (let i = headerIdx + 1; i < rows.length; i++) {
         const row = rows[i];
-        const prjStr = String(row[0] || "");
-        if (!prjStr.includes("PRJ")) continue;
+        const prjRaw = row[cPrj];
+        if (!prjRaw) continue;
 
-        const prj = parseInt(prjStr.replace(/\D/g, ""));
+        // Obsłuż zarówno "PRJ  840104" jak i liczbę 840104
+        const prj = parseInt(String(prjRaw).replace(/\D/g, ""));
         if (!prj) continue;
 
-        const title   = String(row[1] || "").trim();
-        const program = normProgram(String(row[8] || "").trim()) || String(row[8] || "").trim();
-        const auditor = normAuditor(String(row[13] || "").trim());
+        const title   = String(row[cName] || "").trim();
+        const program = normProgram(String(row[cProg] || "").trim()) || String(row[cProg] || "").trim();
+        const auditor = normAuditor(String(row[cAud] || "").trim());
         if (!title || !auditor) continue;
 
         const key = `${prj}_${program}`;
