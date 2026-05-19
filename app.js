@@ -495,8 +495,14 @@ function showImportPreview(filename) {
     byAuditor[name] = (byAuditor[name] || 0) + 1;
   });
 
+  // Sprawdź czy plik był już importowany
+  const alreadyImported = allAudits.some(a => a.ImportFile === filename);
+  const warningHtml = alreadyImported
+    ? `<div class="import-warning">⚠️ Plik <strong>${filename}</strong> był już wcześniej importowany — większość rekordów zostanie pominięta jako duplikaty.</div>`
+    : "";
+
   document.getElementById("import-info").innerHTML =
-    `<p>📄 <strong>${filename}</strong> — znaleziono <strong>${importParsed.length}</strong> rekordów</p>`;
+    `${warningHtml}<p>📄 <strong>${filename}</strong> — znaleziono <strong>${importParsed.length}</strong> rekordów</p>`;
 
   const chips = Object.entries(byAuditor)
     .sort((a,b) => b[1]-a[1])
@@ -590,8 +596,13 @@ async function startImport() {
     hide("import-stage-3");
     show("import-stage-4");
 
+    const alreadyMsg = imported === 0 && skipped > 0
+      ? `<div class="result-item warn">ℹ️ Ten plik był już zaimportowany — wszystkie rekordy istnieją w bazie.</div>`
+      : "";
+
     document.getElementById("import-results").innerHTML = `
       <div class="import-result-box">
+        ${alreadyMsg}
         <div class="result-item success">✅ Zaimportowano: <strong>${imported}</strong></div>
         <div class="result-item skip">⏭ Pominięto (duplikaty): <strong>${skipped}</strong></div>
         ${errors ? `<div class="result-item error">❌ Błędy: <strong>${errors}</strong>${firstError ? `<br><small style="font-size:11px;opacity:.8">${firstError}</small>` : ""}</div>` : ""}
