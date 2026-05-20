@@ -254,6 +254,26 @@ function custodyBadge(a) {
   } catch { return ""; }
 }
 
+// Pokaż/ukryj ikonę dziecka przy dacie (formularz, szczegóły audytu)
+function setDateCustodyIcon(iconId, dateVal, auditorName) {
+  const elIcon = document.getElementById(iconId);
+  if (!elIcon) return;
+  let show = false, reason = "";
+  try {
+    const auditorOk = !auditorName || auditorName === MY_AUDITOR;
+    if (auditorOk && dateVal && window.OpiekaModule && window.OpiekaModule.dayInfo) {
+      const info = window.OpiekaModule.dayInfo(dateVal);
+      show = info.father; reason = info.reason;
+    }
+  } catch {}
+  if (show) {
+    elIcon.title = `Opieka nad Szymonem: ${reason}`;
+    elIcon.classList.remove("hidden");
+  } else {
+    elIcon.classList.add("hidden");
+  }
+}
+
 function updateStats(audits) {
   document.getElementById("stat-total").textContent = audits.length;
   document.getElementById("stat-planned").textContent =
@@ -347,6 +367,7 @@ function openModal(id) {
   document.getElementById("m-phone").textContent     = a.Phone || "—";
   document.getElementById("m-mobile").textContent    = a.Mobile || "—";
   document.getElementById("m-date").textContent      = formatDate(a.AuditDateStart);
+  setDateCustodyIcon("m-date-icon", a.AuditDateStart, a.AuditorName);
   document.getElementById("m-days").textContent      = a.AuditDays != null ? `${a.AuditDays} dni` : "—";
   document.getElementById("m-mode").textContent      = a.AuditMode || "—";
   document.getElementById("m-quarter").textContent   = a.Quarter || "—";
@@ -677,6 +698,7 @@ function updateCustodyWarning(dateVal) {
     box.innerHTML = "";
     box.classList.add("hidden");
   }
+  setDateCustodyIcon("new-date-icon", dateVal, MY_AUDITOR);
 }
 
 // ============================================================

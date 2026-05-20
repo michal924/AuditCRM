@@ -816,7 +816,9 @@ tr.change-row-rzeznik:hover { background: #e0f5e8; }
 .op-notes li { font-size: 13px; margin-bottom: 5px; line-height: 1.35; }
 
 /* --- integracja z planowaniem audytów --- */
-.op-conflict { cursor: help; font-size: 13px; vertical-align: middle; }
+.op-conflict { cursor: help; font-size: 15px; vertical-align: middle; margin-left: 5px; padding: 1px 5px; background: #fff4e0; border: 1px solid var(--orange); border-radius: 6px; line-height: 1; }
+.op-date-icon { font-size: 18px; margin-left: 8px; cursor: help; vertical-align: middle; }
+.op-date-icon.hidden { display: none; }
 .op-add-warning { background: #fff4e0; border: 1px solid var(--orange); color: #7a4a00; border-radius: 8px; padding: 8px 12px; font-size: 13px; margin: 0 0 4px; line-height: 1.35; }
 /* kropka audytu w kalendarzu Opieki */
 .op-day { position: relative; }
