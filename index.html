@@ -37,6 +37,7 @@
       <button class="nav-btn active" data-view="myaudits">📋 Audyty LogisticFit</button>
       <button class="nav-btn" data-view="checkaudit">✅ Check Audyt</button>
       <button class="nav-btn" data-view="changes">🔄 Zmiany Audytora</button>
+      <button class="nav-btn" data-view="opieka">👨‍👦 Opieka — Szymon</button>
     </div>
     <div class="nav-right">
       <button id="btn-import" class="btn-action" title="Importuj kwartalny plan z CUC">⬆ Import CUC</button>
@@ -182,6 +183,65 @@
           <tr><td colspan="4" class="loading">Wgraj pliki aby zobaczyć dane</td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- WIDOK: OPIEKA — SZYMON -->
+  <div id="view-opieka" class="view hidden">
+    <div class="view-header">
+      <h2>Opieka nad Szymonem — harmonogram ojca</h2>
+      <div class="header-filters">
+        <button id="op-prev-year" class="btn-ghost">‹</button>
+        <span id="op-year-label" class="op-year-label">2026</span>
+        <button id="op-next-year" class="btn-ghost">›</button>
+        <button id="op-btn-settings" class="btn-action">⚙ Ustawienia</button>
+        <button id="op-btn-ics" class="btn-action btn-action-green">⬇ Eksport .ics</button>
+      </div>
+    </div>
+
+    <div id="op-today" class="op-today"></div>
+
+    <div id="op-settings" class="op-settings hidden">
+      <div class="op-set-row">
+        <label for="op-set-hour">Godzina przekazania „po zajęciach szkolnych":</label>
+        <input id="op-set-hour" type="number" min="0" max="23" step="1">
+        <span class="op-hint">godz. (0–23)</span>
+      </div>
+      <p class="op-hint">Daty ferii zależą od województwa — wpisz poniedziałek startu ferii dla danego roku.
+        Ojciec ma <strong>drugi tydzień</strong> w <strong>lata parzyste</strong> (piątek → kolejny piątek do 10:00).</p>
+      <div id="op-ferie-list"></div>
+    </div>
+
+    <div class="op-layout">
+      <div class="op-cal-col">
+        <div id="op-calendar" class="op-calendar"></div>
+        <div class="op-legend">
+          <span><i class="op-sw father"></i> Opieka ojca</span>
+          <span><i class="op-sw special"></i> Okres specjalny</span>
+          <span><i class="op-sw handover"></i> Dzień przekazania</span>
+          <span><i class="op-sw today"></i> Dziś</span>
+          <span><i class="op-sw audit"></i> Zaplanowany audyt</span>
+          <span><i class="op-sw conflict"></i> Kolizja audyt + opieka</span>
+        </div>
+      </div>
+      <aside class="op-side-col">
+        <h3>Najbliższe przekazania</h3>
+        <ul id="op-handovers" class="op-handovers"></ul>
+        <div class="op-notes">
+          <h4>Reguły</h4>
+          <ul>
+            <li><strong>Tygodnie nieparzyste</strong> — ojciec, od poniedziałku po zajęciach.</li>
+            <li><strong>Boże Narodzenie</strong> — lata nieparzyste (24.12 10:00 → 29.12 8:00).</li>
+            <li><strong>Sylwester / Nowy Rok</strong> — lata parzyste (29.12 8:00 → 06.01 20:00).</li>
+            <li><strong>Wielkanoc</strong> — lata parzyste (Wlk. Piątek 10:00 → Pon. Wlk. 20:00).</li>
+            <li><strong>Wakacje letnie</strong> — lata parzyste: 16–31 lipca i 16–31 sierpnia.</li>
+            <li><strong>Ferie zimowe</strong> — lata parzyste, 2. tydzień.</li>
+            <li><strong>Długi weekend majowy</strong> — lata nieparzyste.</li>
+            <li><strong>Boże Ciało</strong> — lata parzyste.</li>
+          </ul>
+          <p class="op-hint">Założenie: w „przeciwne" lata święta przypadają drugiemu rodzicowi.</p>
+        </div>
+      </aside>
     </div>
   </div>
 
@@ -367,6 +427,7 @@
             <label>Data audytu *</label>
             <input type="date" id="new-date" class="form-input">
           </div>
+          <div id="new-date-warning" class="op-add-warning hidden"></div>
           <div class="form-row">
             <label>Liczba dni</label>
             <input type="number" id="new-days" class="form-input" value="1" min="0.25" step="0.25">

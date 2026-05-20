@@ -150,6 +150,7 @@ function setupNav() {
       document.getElementById(`view-${view}`).classList.remove("hidden");
       if (view === "checkaudit") renderAuditorsTable();
       if (view === "changes") renderChangesTable();
+      if (view === "opieka") OpiekaModule.render();
     };
   });
 }
@@ -233,13 +234,24 @@ function renderTable() {
       <td title="${a.Title || ""}">${a.Title || "—"}</td>
       <td>${programBadge(a.Program)}</td>
       <td>${a.AuditType ? shortType(a.AuditType) : "—"}</td>
-      <td>${formatDate(a.AuditDateStart)}</td>
+      <td>${formatDate(a.AuditDateStart)}${custodyBadge(a)}</td>
       <td>${a.City || "—"}</td>
       <td class="${a.AuditMode === 'Online' ? 'mode-online' : 'mode-onsite'}">${a.AuditMode === 'Online' ? '💻' : '📍'} ${a.AuditMode || "—"}</td>
       <td>${statusBadge(a.AuditStatus)}</td>
       <td>${proformaBadge(a.Proforma)}</td>
     </tr>
   `).join("");
+}
+
+// Znacznik kolizji z opieką nad Szymonem — tylko dla audytów Rzeźnik Michał
+function custodyBadge(a) {
+  try {
+    if (a.AuditorName !== MY_AUDITOR || !a.AuditDateStart) return "";
+    if (!window.OpiekaModule || !window.OpiekaModule.dayInfo) return "";
+    const info = window.OpiekaModule.dayInfo(a.AuditDateStart);
+    if (!info.father) return "";
+    return ` <span class="op-conflict" title="Opieka nad Szymonem: ${info.reason} — sprawdź dostępność">👨‍👦</span>`;
+  } catch { return ""; }
 }
 
 function updateStats(audits) {
@@ -641,6 +653,7 @@ function setupAddAudit() {
       document.getElementById("new-quarter").value = detectQuarter(val);
       document.getElementById("new-year").value = detectYear(val);
     }
+    updateCustodyWarning(val);
   });
 
   document.getElementById("new-days").addEventListener("change", e => {
@@ -649,6 +662,21 @@ function setupAddAudit() {
   });
 
   setupFirmaAutocomplete();
+}
+
+// Ostrzeżenie (miękkie) o kolizji z opieką nad Szymonem przy wyborze daty audytu
+function updateCustodyWarning(dateVal) {
+  const box = document.getElementById("new-date-warning");
+  if (!box) return;
+  let info = null;
+  try { if (dateVal && window.OpiekaModule && window.OpiekaModule.dayInfo) info = window.OpiekaModule.dayInfo(dateVal); } catch {}
+  if (info && info.father) {
+    box.innerHTML = `👨‍👦 <strong>Tego dnia masz opiekę nad Szymonem</strong> (${info.reason}). Sprawdź dostępność lub zaplanuj online.`;
+    box.classList.remove("hidden");
+  } else {
+    box.innerHTML = "";
+    box.classList.add("hidden");
+  }
 }
 
 // ============================================================
@@ -753,6 +781,7 @@ function openAddAuditModal() {
   document.getElementById("new-quarter").value = "";
   document.getElementById("new-year").value = new Date().getFullYear();
   document.getElementById("new-status").value = "PLANNED";
+  updateCustodyWarning("");
   show("add-audit-overlay");
 }
 
@@ -1435,3 +1464,282 @@ async function generatePdfRzeznik() {
     console.error("PDF error:", err);
   }
 }
+
+// ============================================================
+// MODUŁ: OPIEKA NAD SZYMONEM (harmonogram opieki ojca)
+// Samowystarczalny — własny localStorage, prefiks op-/Opieka.
+// ============================================================
+const OpiekaModule = (function () {
+  const CHILD = "Szymon";
+  const CFG_KEY = "opieka_config_v1";
+  const DEFAULT_CFG = { handoverHour: 15, ferieStarts: {} };
+
+  let CFG = loadCfg();
+  let currentYear = new Date().getFullYear();
+  let inited = false;
+
+  function loadCfg() {
+    try {
+      const raw = localStorage.getItem(CFG_KEY);
+      if (!raw) return { ...DEFAULT_CFG };
+      const p = JSON.parse(raw);
+      return { ...DEFAULT_CFG, ...p, ferieStarts: { ...(p.ferieStarts || {}) } };
+    } catch { return { ...DEFAULT_CFG }; }
+  }
+  function saveCfg() { localStorage.setItem(CFG_KEY, JSON.stringify(CFG)); }
+
+  /* --- daty --- */
+  const $ = id => document.getElementById(id);
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const setTime = (d, h, mi) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, mi, 0, 0);
+  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const DNI = ["niedziela", "poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota"];
+  const MIES = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca", "sierpnia", "września", "października", "listopada", "grudnia"];
+  const MIES_NOM = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
+  const pad = n => String(n).padStart(2, "0");
+  function fmtDateTime(d) { return `${DNI[d.getDay()]} ${d.getDate()} ${MIES[d.getMonth()]} ${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  function fmtDate(d) { return `${DNI[d.getDay()]} ${d.getDate()} ${MIES[d.getMonth()]} ${d.getFullYear()}`; }
+
+  function isoWeek(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - dayNum + 3);
+    const ft = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+    const fd = (ft.getUTCDay() + 6) % 7;
+    ft.setUTCDate(ft.getUTCDate() - fd + 3);
+    return 1 + Math.round((d.getTime() - ft.getTime()) / (7 * 86400000));
+  }
+  function easterSunday(year) {
+    const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+    const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+  }
+  function custodyWeekStart(dt, hh) {
+    const day = (dt.getDay() + 6) % 7;
+    let monday = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() - day, hh, 0, 0, 0);
+    if (dt < monday) monday = addDays(monday, -7);
+    return monday;
+  }
+
+  /* --- okresy specjalne (wersja 2) --- */
+  function specialPeriodsForYear(Y, cfg) {
+    const hh = cfg.handoverHour, list = [];
+    const odd = (Y % 2 !== 0), even = (Y % 2 === 0);
+    // Boże Narodzenie — lata NIEPARZYSTE: 24.12 10:00 -> 29.12 8:00
+    list.push({ label: "Boże Narodzenie", start: new Date(Y, 11, 24, 10, 0), end: new Date(Y, 11, 29, 8, 0), owner: odd ? "father" : "mother" });
+    // Sylwester / Nowy Rok — lata PARZYSTE: 29.12 8:00 -> 06.01 (Y+1) 20:00
+    list.push({ label: "Sylwester / Nowy Rok", start: new Date(Y, 11, 29, 8, 0), end: new Date(Y + 1, 0, 6, 20, 0), owner: even ? "father" : "mother" });
+    // Wielkanoc — lata PARZYSTE
+    const easter = easterSunday(Y);
+    list.push({ label: "Wielkanoc", start: setTime(addDays(easter, -2), 10, 0), end: setTime(addDays(easter, 1), 20, 0), owner: even ? "father" : "mother" });
+    // Wakacje letnie — lata PARZYSTE
+    list.push({ label: "Wakacje letnie (lipiec)", start: new Date(Y, 6, 16, 0, 0), end: new Date(Y, 7, 1, 0, 0), owner: even ? "father" : "mother" });
+    list.push({ label: "Wakacje letnie (sierpień)", start: new Date(Y, 7, 16, 0, 0), end: new Date(Y, 8, 1, 0, 0), owner: even ? "father" : "mother" });
+    // Boże Ciało — lata PARZYSTE (Wielkanoc+60)
+    const corpus = addDays(easter, 60);
+    list.push({ label: "Boże Ciało", start: setTime(addDays(corpus, -1), hh, 0), end: setTime(addDays(corpus, 4), 8, 0), owner: even ? "father" : "mother" });
+    // Długi weekend majowy — lata NIEPARZYSTE
+    {
+      let first = new Date(Y, 4, 1), last = new Date(Y, 4, 3);
+      for (;;) { const p = addDays(first, -1); const wd = p.getDay(); if (wd === 0 || wd === 6) first = p; else break; }
+      for (;;) { const n = addDays(last, 1); const wd = n.getDay(); if (wd === 0 || wd === 6) last = n; else break; }
+      list.push({ label: "Długi weekend majowy", start: setTime(first, 0, 0), end: setTime(addDays(last, 1), 0, 0), owner: odd ? "father" : "mother" });
+    }
+    // Ferie zimowe — lata PARZYSTE, 2. tydzień: piątek -> kolejny piątek 10:00
+    const fs = cfg.ferieStarts && cfg.ferieStarts[String(Y)];
+    if (fs) {
+      const start = new Date(fs + "T00:00:00");
+      if (!isNaN(start)) {
+        const friWk1 = addDays(start, 4);
+        list.push({ label: "Ferie zimowe (2. tydzień)", start: setTime(friWk1, hh, 0), end: setTime(addDays(friWk1, 7), 10, 0), owner: even ? "father" : "mother" });
+      }
+    }
+    return list;
+  }
+
+  function ownerAt(dt, cfg) {
+    const yrs = [dt.getFullYear() - 1, dt.getFullYear(), dt.getFullYear() + 1];
+    let sp = [];
+    yrs.forEach(y => { sp = sp.concat(specialPeriodsForYear(y, cfg)); });
+    for (const p of sp) if (dt >= p.start && dt < p.end) return { owner: p.owner, reason: p.label, special: true };
+    const monday = custodyWeekStart(dt, cfg.handoverHour);
+    const wk = isoWeek(monday);
+    const owner = (wk % 2 !== 0) ? "father" : "mother";
+    return { owner, reason: owner === "father" ? `Tydzień nieparzysty (${wk})` : `Tydzień parzysty (${wk})`, special: false };
+  }
+
+  function fatherIntervals(rangeStart, rangeEnd, cfg) {
+    const bset = new Set();
+    for (let y = rangeStart.getFullYear() - 1; y <= rangeEnd.getFullYear() + 1; y++)
+      specialPeriodsForYear(y, cfg).forEach(p => { bset.add(+p.start); bset.add(+p.end); });
+    let m = custodyWeekStart(rangeStart, cfg.handoverHour);
+    while (m <= rangeEnd) { bset.add(+m); m = addDays(m, 7); }
+    bset.add(+rangeStart); bset.add(+rangeEnd);
+    const bounds = [...bset].filter(t => t >= +rangeStart && t <= +rangeEnd).sort((a, b) => a - b);
+    const raw = [];
+    for (let i = 0; i < bounds.length - 1; i++) {
+      const s = new Date(bounds[i]), e = new Date(bounds[i + 1]);
+      if (e <= s) continue;
+      const info = ownerAt(new Date((bounds[i] + bounds[i + 1]) / 2), cfg);
+      if (info.owner === "father") raw.push({ start: s, end: e, reason: info.reason, special: info.special });
+    }
+    const merged = [];
+    for (const iv of raw) {
+      const last = merged[merged.length - 1];
+      if (last && +last.end === +iv.start) { last.end = iv.end; if (iv.special && !last.special) { last.reason = iv.reason; last.special = true; } }
+      else merged.push({ ...iv });
+    }
+    return merged;
+  }
+
+  /* --- render --- */
+  function renderToday() {
+    const now = new Date(), info = ownerAt(now, CFG), box = $("op-today");
+    const isF = info.owner === "father";
+    box.className = "op-today " + (isF ? "is-father" : "is-other");
+    const ivs = fatherIntervals(addDays(now, -2), addDays(now, 400), CFG);
+    let nextTxt = "—";
+    if (isF) { const cur = ivs.find(iv => now >= iv.start && now < iv.end); if (cur) nextTxt = `Koniec opieki ojca: ${fmtDateTime(cur.end)}`; }
+    else { const nx = ivs.find(iv => iv.start > now); if (nx) nextTxt = `Następne przejęcie przez ojca: ${fmtDateTime(nx.start)}`; }
+    box.innerHTML =
+      `<div class="op-today-main"><span class="op-today-who">${isF ? `Dziś ${CHILD} jest u OJCA` : `Dziś ${CHILD} nie jest u ojca`}</span>` +
+      `<span class="op-today-reason">${info.reason}${info.special ? " · okres specjalny" : ""}</span></div>` +
+      `<div class="op-today-next">${nextTxt}</div>`;
+  }
+
+  // mapa "YYYY-MM-DD" -> [audyty Rzeźnik Michał tego dnia] (z globalnego allAudits)
+  function auditsByDayMap() {
+    const map = {};
+    try {
+      const list = (typeof allAudits !== "undefined" && Array.isArray(allAudits)) ? allAudits : [];
+      list.forEach(a => {
+        if (a.AuditorName !== MY_AUDITOR || !a.AuditDateStart) return;
+        const key = String(a.AuditDateStart).substring(0, 10);
+        (map[key] = map[key] || []).push(a);
+      });
+    } catch {}
+    return map;
+  }
+
+  function renderCalendar() {
+    $("op-year-label").textContent = currentYear;
+    const wrap = $("op-calendar"); wrap.innerHTML = "";
+    const today = new Date();
+    const auditsMap = auditsByDayMap();
+    for (let mo = 0; mo < 12; mo++) {
+      const card = document.createElement("div"); card.className = "op-month";
+      const h = document.createElement("h4"); h.textContent = MIES_NOM[mo]; card.appendChild(h);
+      const grid = document.createElement("div"); grid.className = "op-month-grid";
+      ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"].forEach(d => { const c = document.createElement("div"); c.className = "op-dow"; c.textContent = d; grid.appendChild(c); });
+      const first = new Date(currentYear, mo, 1), lead = (first.getDay() + 6) % 7;
+      for (let i = 0; i < lead; i++) grid.appendChild(document.createElement("div"));
+      const dim = new Date(currentYear, mo + 1, 0).getDate();
+      for (let d = 1; d <= dim; d++) {
+        const cell = document.createElement("div"); cell.className = "op-day";
+        const dd = new Date(currentYear, mo, d);
+        const iN = ownerAt(setTime(dd, 21, 0), CFG), iM = ownerAt(setTime(dd, 10, 0), CFG);
+        const fN = iN.owner === "father", fM = iM.owner === "father";
+        if (fN) cell.classList.add("father");
+        if (fN !== fM) cell.classList.add("handover");
+        if (sameDay(dd, today)) cell.classList.add("is-today");
+        if (iN.special && fN) cell.classList.add("special");
+        cell.textContent = d;
+        let tt = `${fmtDate(dd)}\n${iN.reason}` + (fN ? "\n→ opieka ojca" : "\n→ poza opieką ojca");
+        const key = `${currentYear}-${pad(mo + 1)}-${pad(d)}`;
+        const dayAudits = auditsMap[key];
+        if (dayAudits && dayAudits.length) {
+          cell.classList.add("has-audit");
+          if (fN) cell.classList.add("conflict");
+          const dot = document.createElement("span"); dot.className = "op-audit-dot"; cell.appendChild(dot);
+          tt += `\n\n📋 Audyt(y) tego dnia:\n` + dayAudits.map(a => `• ${a.Title || "—"} (${a.Program || "?"})`).join("\n");
+          if (fN) tt += `\n⚠ Kolizja z opieką nad Szymonem`;
+        }
+        cell.title = tt;
+        grid.appendChild(cell);
+      }
+      card.appendChild(grid); wrap.appendChild(card);
+    }
+  }
+
+  function renderHandovers() {
+    const now = new Date(), ivs = fatherIntervals(addDays(now, -1), addDays(now, 200), CFG), ev = [];
+    ivs.forEach(iv => { if (iv.start >= now) ev.push({ t: iv.start, type: "start", reason: iv.reason }); if (iv.end >= now) ev.push({ t: iv.end, type: "end", reason: iv.reason }); });
+    ev.sort((a, b) => a.t - b.t);
+    const list = $("op-handovers"); list.innerHTML = "";
+    if (!ev.length) { list.innerHTML = '<li class="op-muted">Brak nadchodzących zdarzeń.</li>'; return; }
+    ev.slice(0, 12).forEach(e => {
+      const li = document.createElement("li"); li.className = "op-ho " + e.type;
+      li.innerHTML = `<span class="op-ho-icon">${e.type === "start" ? "→" : "←"}</span>` +
+        `<span class="op-ho-text"><strong>${e.type === "start" ? "Przejęcie przez ojca" : "Powrót do matki"}</strong>` +
+        `<span class="op-ho-reason">${e.reason}</span></span><span class="op-ho-date">${fmtDateTime(e.t)}</span>`;
+      list.appendChild(li);
+    });
+  }
+
+  function renderSettings() {
+    $("op-set-hour").value = CFG.handoverHour;
+    const box = $("op-ferie-list"); box.innerHTML = "";
+    [currentYear - 1, currentYear, currentYear + 1, currentYear + 2].forEach(y => {
+      const row = document.createElement("div"); row.className = "op-ferie-row";
+      const lbl = document.createElement("label"); lbl.textContent = `Ferie ${y} — poniedziałek startu:`;
+      const inp = document.createElement("input"); inp.type = "date"; inp.value = CFG.ferieStarts[String(y)] || "";
+      inp.addEventListener("change", () => {
+        if (inp.value) CFG.ferieStarts[String(y)] = inp.value; else delete CFG.ferieStarts[String(y)];
+        saveCfg(); refreshAll();
+      });
+      row.appendChild(lbl); row.appendChild(inp); box.appendChild(row);
+    });
+  }
+
+  function icsStamp(d) { return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`; }
+  function exportICS() {
+    const ivs = fatherIntervals(new Date(currentYear, 0, 1, 0, 0), new Date(currentYear + 1, 0, 7, 0, 0), CFG);
+    const now = new Date();
+    const out = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//LogisticFit//Opieka Szymon//PL", "CALSCALE:GREGORIAN"];
+    ivs.forEach((iv, idx) => {
+      out.push("BEGIN:VEVENT", `UID:opieka-${currentYear}-${idx}@logisticfit`, `DTSTAMP:${icsStamp(now)}`,
+        `DTSTART:${icsStamp(iv.start)}`, `DTEND:${icsStamp(iv.end)}`,
+        `SUMMARY:Opieka ojca — ${CHILD}`, `DESCRIPTION:${iv.reason}`, "END:VEVENT");
+    });
+    out.push("END:VCALENDAR");
+    const blob = new Blob([out.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `Opieka_${CHILD}_${currentYear}.ics`; a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  function refreshAll() { renderToday(); renderCalendar(); renderHandovers(); }
+
+  /* --- API dla planowania audytów: czy dany dzień to dzień opieki ojca --- */
+  /* Tryb "cały dzień zajęty": dzień liczy się jako opieka, jeśli ojciec ma Szymona
+     w jakimkolwiek momencie tej doby. */
+  function dayInfo(dateInput) {
+    const d = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
+    if (isNaN(d)) return { father: false, reason: "" };
+    const day0 = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+    const ivs = fatherIntervals(day0, addDays(day0, 1), CFG);
+    if (!ivs.length) return { father: false, reason: "" };
+    return { father: true, reason: ivs[0].reason, special: !!ivs[0].special };
+  }
+
+  function setup() {
+    $("op-prev-year").addEventListener("click", () => { currentYear--; refreshAll(); renderSettings(); });
+    $("op-next-year").addEventListener("click", () => { currentYear++; refreshAll(); renderSettings(); });
+    $("op-btn-ics").addEventListener("click", exportICS);
+    $("op-btn-settings").addEventListener("click", () => $("op-settings").classList.toggle("hidden"));
+    $("op-set-hour").addEventListener("change", e => {
+      const v = parseInt(e.target.value, 10);
+      if (!isNaN(v) && v >= 0 && v <= 23) { CFG.handoverHour = v; saveCfg(); refreshAll(); }
+    });
+  }
+
+  function render() {
+    if (!inited) { setup(); renderSettings(); inited = true; }
+    refreshAll();
+  }
+
+  return { render, dayInfo };
+})();
+window.OpiekaModule = OpiekaModule;
