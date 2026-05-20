@@ -11,6 +11,7 @@ let currentProforma = null;
 let importParsed = [];
 let sortCol = "AuditDateStart";
 let sortDir = 1; // 1 = ASC, -1 = DESC
+let isEditMode = false;
 
 // ============================================================
 // MAPOWANIA (zgodne z 03_Import-QuarterlyPlan.py)
@@ -390,6 +391,9 @@ function setupModal() {
   document.getElementById("modal-overlay").onclick = e => {
     if (e.target === document.getElementById("modal-overlay")) closeModal();
   };
+  document.getElementById("btn-edit-audit").onclick = enterEditMode;
+  document.getElementById("btn-cancel-edit").onclick = cancelEditMode;
+
   document.querySelectorAll(".status-btn").forEach(btn => {
     btn.onclick = () => {
       document.querySelectorAll(".status-btn").forEach(b => b.classList.remove("active"));
@@ -405,6 +409,16 @@ function setupModal() {
     };
   });
   document.getElementById("btn-save").onclick = saveChanges;
+
+  // Zmiana daty w trybie edycji → aktualizuj kwartał i rok
+  document.getElementById("e-date").addEventListener("change", e => {
+    const val = e.target.value;
+    if (val) {
+      document.getElementById("m-quarter").textContent = detectQuarter(val);
+      document.getElementById("m-year").textContent    = detectYear(val);
+      setDateCustodyIcon("m-date-icon", val, currentAudit ? currentAudit.AuditorName : null);
+    }
+  });
 }
 
 function openModal(id) {
@@ -456,8 +470,40 @@ function openModal(id) {
   show("modal-overlay");
 }
 
+function enterEditMode() {
+  if (!currentAudit) return;
+  const a = currentAudit;
+  isEditMode = true;
+  document.getElementById("e-address").value = a.Address || "";
+  document.getElementById("e-city").value    = a.City || "";
+  document.getElementById("e-postal").value  = a.PostalCode || "";
+  document.getElementById("e-email").value   = a.ClientEmail || "";
+  document.getElementById("e-phone").value   = a.Phone || "";
+  document.getElementById("e-mobile").value  = a.Mobile || "";
+  document.getElementById("e-date").value    = a.AuditDateStart ? a.AuditDateStart.substring(0, 10) : "";
+  document.getElementById("e-days").value    = a.AuditDays != null ? a.AuditDays : "";
+  document.getElementById("e-mode").value    = a.AuditMode || "On-site";
+  document.getElementById("e-cu").value      = a.PlannedCUDate ? a.PlannedCUDate.substring(0, 10) : "";
+  document.getElementById("e-notes").value   = a.Notes || "";
+  document.getElementById("modal-overlay").classList.add("edit-mode");
+}
+
+function cancelEditMode() {
+  isEditMode = false;
+  document.getElementById("modal-overlay").classList.remove("edit-mode");
+  // Przywróć link mapy jeśli jest adres
+  const a = currentAudit;
+  if (a && [a.Address, a.City, a.PostalCode].some(Boolean)) {
+    document.getElementById("m-maps-link").classList.remove("hidden");
+  }
+}
+
 function closeModal() {
   hide("modal-overlay");
+  if (isEditMode) {
+    isEditMode = false;
+    document.getElementById("modal-overlay").classList.remove("edit-mode");
+  }
   currentAudit = null;
 }
 
@@ -467,11 +513,47 @@ async function saveChanges() {
   btn.textContent = "Zapisywanie...";
   btn.disabled = true;
   try {
-    await updateAudit(currentAudit.Id, { AuditStatus: currentStatus, Proforma: currentProforma });
-    currentAudit.AuditStatus = currentStatus;
-    currentAudit.Proforma    = currentProforma;
+    const prevStatus = currentAudit.AuditStatus;
+    const fields = { AuditStatus: currentStatus, Proforma: currentProforma };
+
+    if (isEditMode) {
+      const dateVal = document.getElementById("e-date").value;
+      const cuVal   = document.getElementById("e-cu").value;
+      fields.Address       = document.getElementById("e-address").value.trim() || null;
+      fields.City          = document.getElementById("e-city").value.trim()    || null;
+      fields.PostalCode    = document.getElementById("e-postal").value.trim()  || null;
+      fields.ClientEmail   = document.getElementById("e-email").value.trim()   || null;
+      fields.Phone         = document.getElementById("e-phone").value.trim()   || null;
+      fields.Mobile        = document.getElementById("e-mobile").value.trim()  || null;
+      fields.AuditDateStart = dateVal ? safeDate(dateVal) : null;
+      const daysVal = document.getElementById("e-days").value;
+      fields.AuditDays     = daysVal !== "" ? parseFloat(daysVal) : null;
+      fields.AuditMode     = document.getElementById("e-mode").value || null;
+      fields.PlannedCUDate = cuVal ? safeDate(cuVal) : null;
+      fields.Notes         = document.getElementById("e-notes").value.trim()   || null;
+      if (dateVal) {
+        fields.Quarter = detectQuarter(dateVal);
+        fields.Year    = detectYear(dateVal);
+      }
+    }
+
+    await updateAudit(currentAudit.Id, fields);
+    Object.assign(currentAudit, fields);
     renderTable();
-    showToast("Zapisano pomyślnie", "success");
+
+    // Integracja kalendarza — tylko przy pierwszym ustawieniu Invoice
+    if (currentStatus === "Invoice" && prevStatus !== "Invoice" && currentAudit.AuditDateStart) {
+      try {
+        await createCalendarEvent(currentAudit);
+        showToast("💾 Zapisano + 📅 Dodano do kalendarza!", "success");
+      } catch (calErr) {
+        console.error("Błąd kalendarza:", calErr);
+        showToast("💾 Zapisano. ⚠️ Dodaj uprawnienie Calendars.ReadWrite w Azure Portal.", "warn");
+      }
+    } else {
+      showToast("Zapisano pomyślnie", "success");
+    }
+
     closeModal();
   } catch (e) {
     showToast(`Błąd zapisu: ${e.message}`, "error");
@@ -479,6 +561,53 @@ async function saveChanges() {
     btn.textContent = "💾 Zapisz zmiany";
     btn.disabled = false;
   }
+}
+
+// ============================================================
+// INTEGRACJA MICROSOFT CALENDAR (Graph API)
+// ============================================================
+async function createCalendarEvent(audit) {
+  const token = await getGraphToken();
+  const dateStr  = audit.AuditDateStart.substring(0, 10);
+  const nextDate = new Date(dateStr + "T12:00:00");
+  nextDate.setDate(nextDate.getDate() + 1);
+  const nextStr  = nextDate.toISOString().substring(0, 10);
+
+  const loc  = [audit.Address, audit.City, audit.PostalCode].filter(Boolean).join(", ");
+  const subj = `🔍 Audyt ${audit.Program || ""}: ${audit.Title || ""}${audit.City ? " — " + audit.City : ""}`.trim();
+
+  const body = [
+    `PRJ: ${audit.ProjectID || "—"}`,
+    `Program: ${audit.Program || "—"}`,
+    `Typ: ${audit.AuditType || "—"}`,
+    `Audytor: ${audit.AuditorName || "—"}`,
+    `Adres: ${loc || "—"}`,
+  ].join("\n");
+
+  const event = {
+    subject: subj,
+    isAllDay: true,
+    start: { dateTime: `${dateStr}T00:00:00`, timeZone: "Europe/Warsaw" },
+    end:   { dateTime: `${nextStr}T00:00:00`,  timeZone: "Europe/Warsaw" },
+    showAs: "busy",
+    body:  { contentType: "text", content: body },
+    categories: ["Audyt LogisticFit"],
+  };
+
+  const r = await fetch("https://graph.microsoft.com/v1.0/me/events", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(event),
+  });
+
+  if (!r.ok) {
+    const err = await r.text().catch(() => "");
+    throw new Error(`Graph ${r.status}: ${err.substring(0, 150)}`);
+  }
+  return r.json();
 }
 
 // ============================================================

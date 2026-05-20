@@ -259,7 +259,11 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="modal-title">—</h2>
-      <button id="modal-close" class="btn-ghost">✕</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="btn-edit-audit" class="btn-ghost btn-edit-toggle" title="Edytuj dane audytu">✏️ Edytuj</button>
+        <button id="btn-cancel-edit" class="btn-ghost btn-edit-toggle hidden" title="Anuluj edycję">↩ Anuluj</button>
+        <button id="modal-close" class="btn-ghost">✕</button>
+      </div>
     </div>
     <div class="modal-body">
       <div class="modal-grid">
@@ -269,27 +273,72 @@
           <div class="field-row"><label>Program</label><span id="m-program">—</span></div>
           <div class="field-row"><label>Typ audytu</label><span id="m-type">—</span></div>
           <div class="field-row"><label>Standard</label><span id="m-standard">—</span></div>
-          <div class="field-row"><label>Adres</label><span id="m-address">—</span></div>
-          <div class="field-row"><label>Miasto</label><span id="m-city">—</span><a id="m-maps-link" href="#" target="_blank" rel="noopener" class="maps-link hidden" title="Otwórz trasę w Mapach">🗺 Trasa</a></div>
-          <div class="field-row"><label>Email</label><span id="m-email">—</span></div>
-          <div class="field-row"><label>Telefon</label><span id="m-phone">—</span></div>
-          <div class="field-row"><label>Komórka</label><span id="m-mobile">—</span></div>
+          <div class="field-row">
+            <label>Adres</label>
+            <span id="m-address" class="view-val">—</span>
+            <input id="e-address" type="text" class="edit-val field-input" placeholder="Ulica i numer">
+          </div>
+          <div class="field-row">
+            <label>Miasto</label>
+            <span id="m-city" class="view-val">—</span>
+            <a id="m-maps-link" href="#" target="_blank" rel="noopener" class="maps-link view-val hidden" title="Otwórz trasę w Mapach">🗺 Trasa</a>
+            <div id="e-city-wrap" class="edit-val edit-city-wrap">
+              <input id="e-city" type="text" class="field-input" placeholder="Miasto">
+              <input id="e-postal" type="text" class="field-input field-input-sm" placeholder="00-000">
+            </div>
+          </div>
+          <div class="field-row">
+            <label>Email</label>
+            <span id="m-email" class="view-val">—</span>
+            <input id="e-email" type="email" class="edit-val field-input" placeholder="email@firma.pl">
+          </div>
+          <div class="field-row">
+            <label>Telefon</label>
+            <span id="m-phone" class="view-val">—</span>
+            <input id="e-phone" type="tel" class="edit-val field-input" placeholder="+48 ...">
+          </div>
+          <div class="field-row">
+            <label>Komórka</label>
+            <span id="m-mobile" class="view-val">—</span>
+            <input id="e-mobile" type="tel" class="edit-val field-input" placeholder="+48 ...">
+          </div>
         </div>
         <div class="modal-section">
           <h3>Planowanie</h3>
-          <div class="field-row"><label>Data audytu</label><span id="m-date">—</span><span id="m-date-icon" class="op-date-icon hidden">👨‍👦</span></div>
-          <div class="field-row"><label>Liczba dni</label><span id="m-days">—</span></div>
-          <div class="field-row"><label>Tryb</label><span id="m-mode">—</span></div>
+          <div class="field-row">
+            <label>Data audytu</label>
+            <span id="m-date" class="view-val">—</span>
+            <span id="m-date-icon" class="op-date-icon hidden">👨‍👦</span>
+            <input id="e-date" type="date" class="edit-val field-input">
+          </div>
+          <div class="field-row">
+            <label>Liczba dni</label>
+            <span id="m-days" class="view-val">—</span>
+            <input id="e-days" type="number" step="0.5" min="0.25" max="30" class="edit-val field-input field-input-sm" placeholder="1">
+          </div>
+          <div class="field-row">
+            <label>Tryb</label>
+            <span id="m-mode" class="view-val">—</span>
+            <select id="e-mode" class="edit-val field-input field-input-sm">
+              <option value="On-site">On-site</option>
+              <option value="Online">Online</option>
+            </select>
+          </div>
           <div class="field-row"><label>Kwartał</label><span id="m-quarter">—</span></div>
           <div class="field-row"><label>Rok</label><span id="m-year">—</span></div>
           <div class="field-row"><label>Audytor</label><span id="m-auditor">—</span></div>
-          <div class="field-row"><label>Planned CU</label><span id="m-cu">—</span></div>
+          <div class="field-row">
+            <label>Planned CU</label>
+            <span id="m-cu" class="view-val">—</span>
+            <input id="e-cu" type="date" class="edit-val field-input">
+          </div>
           <div class="field-row"><label>Cert. ważny do</label><span id="m-certvalid">—</span></div>
         </div>
       </div>
       <div class="modal-section full">
         <h3>Notatki</h3>
-        <p id="m-notes" class="notes-text">—</p>
+        <p id="m-notes" class="notes-text view-val">—</p>
+        <textarea id="e-notes" class="edit-val field-textarea" rows="3" placeholder="Notatki..."></textarea>
       </div>
       <div class="modal-actions">
         <div class="action-group">

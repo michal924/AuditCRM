@@ -14,7 +14,8 @@ const MSAL_CONFIG = {
   },
 };
 
-const SCOPES = ["https://logisticfit.sharepoint.com/.default"];
+const SCOPES       = ["https://logisticfit.sharepoint.com/.default"];
+const GRAPH_SCOPES = ["Calendars.ReadWrite"];
 
 const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
 
@@ -45,5 +46,19 @@ async function getToken() {
     return result.accessToken;
   } catch {
     await msalInstance.acquireTokenRedirect({ scopes: SCOPES });
+  }
+}
+
+async function getGraphToken() {
+  const accounts = msalInstance.getAllAccounts();
+  if (!accounts.length) throw new Error("Nie zalogowano");
+  try {
+    const result = await msalInstance.acquireTokenSilent({
+      scopes: GRAPH_SCOPES,
+      account: accounts[0],
+    });
+    return result.accessToken;
+  } catch {
+    await msalInstance.acquireTokenRedirect({ scopes: GRAPH_SCOPES });
   }
 }

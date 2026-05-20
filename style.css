@@ -419,6 +419,67 @@ tbody td.firma-col {
 }
 .maps-link:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+/* ============================================================
+   MODAL — TRYB EDYCJI
+   ============================================================ */
+
+/* Domyślnie: chowamy pola edycji */
+.edit-val { display: none; }
+
+/* W trybie edycji: pokazujemy edycję, chowamy wartości */
+.modal-overlay.edit-mode .view-val  { display: none !important; }
+.modal-overlay.edit-mode .edit-val  { display: block; }
+.modal-overlay.edit-mode .edit-city-wrap { display: flex; }
+
+/* Przycisk Edytuj — wyróżnienie */
+.btn-edit-toggle {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 7px;
+}
+.modal-overlay.edit-mode #btn-edit-audit { display: none !important; }
+.modal-overlay:not(.edit-mode) #btn-cancel-edit { display: none !important; }
+
+/* Inputy w modalu */
+.field-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg3);
+  border: 1px solid var(--accent-light);
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: 'Nunito', sans-serif;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.field-input:focus { outline: none; border-color: var(--accent); }
+.field-input-sm { flex: 0 0 auto; width: 90px; }
+
+.edit-city-wrap {
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+}
+.edit-city-wrap .field-input { flex: 1; }
+
+.field-textarea {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--accent-light);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: 'Nunito', sans-serif;
+  resize: vertical;
+  box-sizing: border-box;
+  min-height: 60px;
+  transition: border-color 0.15s;
+}
+.field-textarea:focus { outline: none; border-color: var(--accent); }
+
 .notes-text {
   color: var(--text);
   font-size: 13px;
