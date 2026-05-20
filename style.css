@@ -261,6 +261,7 @@ tbody tr:hover { background: var(--bg3); }
 tbody tr.row-manual { background: #f5f0ff; }
 tbody tr.row-manual:hover { background: #ede5ff; }
 td.prj-col { color: var(--text2); font-size: 12px; white-space: nowrap; width: 60px; }
+th[data-sort]:hover { background: var(--bg3); color: var(--accent); }
 
 tbody td {
   padding: 10px 14px;
@@ -269,6 +270,16 @@ tbody td {
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Kolumna Firma — zawijanie tekstu */
+tbody td.firma-col {
+  white-space: normal;
+  word-break: break-word;
+  max-width: 280px;
+  overflow: visible;
+  text-overflow: unset;
+  line-height: 1.4;
 }
 
 .loading { text-align: center; color: var(--text2); padding: 40px !important; }
@@ -389,6 +400,24 @@ tbody td {
   font-weight: 600;
 }
 .field-row span { color: var(--text); word-break: break-word; }
+
+.maps-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg3);
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.maps-link:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 .notes-text {
   color: var(--text);

@@ -9,6 +9,8 @@ let currentAudit = null;
 let currentStatus = null;
 let currentProforma = null;
 let importParsed = [];
+let sortCol = "AuditDateStart";
+let sortDir = 1; // 1 = ASC, -1 = DESC
 
 // ============================================================
 // MAPOWANIA (zgodne z 03_Import-QuarterlyPlan.py)
@@ -171,13 +173,36 @@ async function loadAudits() {
 }
 
 // ============================================================
-// FILTRY
+// FILTRY — z persystencją w localStorage
 // ============================================================
+const FILTER_IDS = ["search","filter-quarter","filter-year","filter-program","filter-status"];
+const FILTERS_KEY = "auditFilters_v1";
+
+function saveFilters() {
+  const state = {};
+  FILTER_IDS.forEach(id => { state[id] = document.getElementById(id).value; });
+  try { localStorage.setItem(FILTERS_KEY, JSON.stringify(state)); } catch {}
+}
+
+function restoreFilters() {
+  try {
+    const raw = localStorage.getItem(FILTERS_KEY);
+    if (!raw) return;
+    const state = JSON.parse(raw);
+    FILTER_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && state[id] !== undefined) el.value = state[id];
+    });
+  } catch {}
+}
+
 function setupFilters() {
-  ["search","filter-quarter","filter-year","filter-program","filter-status"].forEach(id => {
+  restoreFilters();
+
+  FILTER_IDS.forEach(id => {
     const el = document.getElementById(id);
-    el.addEventListener("input", renderTable);
-    el.addEventListener("change", renderTable);
+    el.addEventListener("input",  () => { saveFilters(); renderTable(); });
+    el.addEventListener("change", () => { saveFilters(); renderTable(); });
   });
 
   document.getElementById("btn-clear-filters").onclick = () => {
@@ -185,6 +210,7 @@ function setupFilters() {
     ["filter-quarter","filter-year","filter-program","filter-status"].forEach(id => {
       document.getElementById(id).value = "";
     });
+    saveFilters();
     renderTable();
   };
 
@@ -217,10 +243,42 @@ function applyFilters(audits) {
 // ============================================================
 // RENDER TABELI AUDYTÓW (tylko moje)
 // ============================================================
+function sortAudits(arr) {
+  return [...arr].sort((a, b) => {
+    let va = a[sortCol] ?? "";
+    let vb = b[sortCol] ?? "";
+    // Daty: string ISO — porównuj leksykograficznie
+    if (typeof va === "string") va = va.toLowerCase();
+    if (typeof vb === "string") vb = vb.toLowerCase();
+    if (va < vb) return -1 * sortDir;
+    if (va > vb) return  1 * sortDir;
+    return 0;
+  });
+}
+
+function setSort(col) {
+  if (sortCol === col) {
+    sortDir = -sortDir;
+  } else {
+    sortCol = col;
+    sortDir = 1;
+  }
+  renderTable();
+}
+
+function renderSortIcons() {
+  document.querySelectorAll("#audits-table thead th[data-sort]").forEach(th => {
+    const col = th.dataset.sort;
+    const base = th.dataset.label || th.textContent.replace(/[↑↓ ]/g, "").trim();
+    th.textContent = base + (sortCol === col ? (sortDir === 1 ? " ↑" : " ↓") : "");
+  });
+}
+
 function renderTable() {
   const myAudits = allAudits.filter(a => a.AuditorName === MY_AUDITOR);
-  const filtered = applyFilters(myAudits);
+  const filtered = sortAudits(applyFilters(myAudits));
   updateStats(filtered);
+  renderSortIcons();
 
   const tbody = document.getElementById("audits-tbody");
   if (!filtered.length) {
@@ -231,7 +289,7 @@ function renderTable() {
   tbody.innerHTML = filtered.map(a => `
     <tr onclick="openModal(${a.Id})" ${!a.ImportFile ? 'class="row-manual"' : ""}>
       <td class="prj-col">${a.ProjectID || "—"}</td>
-      <td title="${a.Title || ""}">${a.Title || "—"}</td>
+      <td class="firma-col">${a.Title || "—"}</td>
       <td>${programBadge(a.Program)}</td>
       <td>${a.AuditType ? shortType(a.AuditType) : "—"}</td>
       <td>${formatDate(a.AuditDateStart)}${custodyBadge(a)}</td>
@@ -362,7 +420,22 @@ function openModal(id) {
   document.getElementById("m-type").textContent      = a.AuditType || "—";
   document.getElementById("m-standard").textContent  = (a.Standard || "—").replace(/\n/g, " | ");
   document.getElementById("m-address").textContent   = a.Address || "—";
-  document.getElementById("m-city").textContent      = `${a.City || "—"} ${a.PostalCode || ""}`.trim();
+  const cityFull = `${a.City || ""} ${a.PostalCode || ""}`.trim();
+  document.getElementById("m-city").textContent      = cityFull || "—";
+
+  // Link do trasy w mapach
+  const mapsLink = document.getElementById("m-maps-link");
+  const addrParts = [a.Address, a.City, a.PostalCode].filter(Boolean);
+  if (addrParts.length) {
+    const q = encodeURIComponent(addrParts.join(", "));
+    const isApple = /iPad|iPhone|Macintosh/.test(navigator.userAgent) && !window.MSStream;
+    mapsLink.href = isApple
+      ? `https://maps.apple.com/?daddr=${q}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${q}`;
+    mapsLink.classList.remove("hidden");
+  } else {
+    mapsLink.classList.add("hidden");
+  }
   document.getElementById("m-email").textContent     = a.ClientEmail || "—";
   document.getElementById("m-phone").textContent     = a.Phone || "—";
   document.getElementById("m-mobile").textContent    = a.Mobile || "—";
@@ -585,7 +658,7 @@ async function startImport() {
       document.getElementById("import-progress-text").textContent =
         `Importowanie ${i+1}/${total} — ${rec.Title || ""}`;
 
-      const dupKey = `${rec.ProjectID}_${rec.Year || ""}`;
+      const dupKey = `${rec.ProjectID}_${rec.Year || ""}_${rec.Program || ""}`;
       if (existingIds.has(dupKey)) { skipped++; continue; }
 
       // Wyślij tylko pola istniejące w SharePoint
@@ -615,7 +688,7 @@ async function startImport() {
       };
 
       try {
-        const newItem = await addAudit(spFields);
+        await addAudit(spFields);
         existingIds.add(dupKey);
         imported++;
       } catch(err) {

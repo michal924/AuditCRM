@@ -95,8 +95,15 @@
       <table id="audits-table">
         <thead>
           <tr>
-            <th>PRJ</th><th>Firma</th><th>Program</th><th>Typ</th><th>Data</th>
-            <th>Miasto</th><th>Tryb</th><th>Status</th><th>Proforma</th>
+            <th data-sort="ProjectID"   data-label="PRJ"      onclick="setSort('ProjectID')"     style="cursor:pointer">PRJ</th>
+            <th data-sort="Title"       data-label="Firma"    onclick="setSort('Title')"          style="cursor:pointer">Firma</th>
+            <th data-sort="Program"     data-label="Program"  onclick="setSort('Program')"        style="cursor:pointer">Program</th>
+            <th data-sort="AuditType"   data-label="Typ"      onclick="setSort('AuditType')"      style="cursor:pointer">Typ</th>
+            <th data-sort="AuditDateStart" data-label="Data"  onclick="setSort('AuditDateStart')" style="cursor:pointer">Data ↑</th>
+            <th data-sort="City"        data-label="Miasto"   onclick="setSort('City')"           style="cursor:pointer">Miasto</th>
+            <th data-sort="AuditMode"   data-label="Tryb"     onclick="setSort('AuditMode')"      style="cursor:pointer">Tryb</th>
+            <th data-sort="AuditStatus" data-label="Status"   onclick="setSort('AuditStatus')"    style="cursor:pointer">Status</th>
+            <th data-sort="Proforma"    data-label="Proforma" onclick="setSort('Proforma')"       style="cursor:pointer">Proforma</th>
           </tr>
         </thead>
         <tbody id="audits-tbody">
@@ -263,7 +270,7 @@
           <div class="field-row"><label>Typ audytu</label><span id="m-type">—</span></div>
           <div class="field-row"><label>Standard</label><span id="m-standard">—</span></div>
           <div class="field-row"><label>Adres</label><span id="m-address">—</span></div>
-          <div class="field-row"><label>Miasto</label><span id="m-city">—</span></div>
+          <div class="field-row"><label>Miasto</label><span id="m-city">—</span><a id="m-maps-link" href="#" target="_blank" rel="noopener" class="maps-link hidden" title="Otwórz trasę w Mapach">🗺 Trasa</a></div>
           <div class="field-row"><label>Email</label><span id="m-email">—</span></div>
           <div class="field-row"><label>Telefon</label><span id="m-phone">—</span></div>
           <div class="field-row"><label>Komórka</label><span id="m-mobile">—</span></div>
