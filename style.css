@@ -286,9 +286,14 @@ tbody td.firma-col {
 tbody td.program-col {
   white-space: normal;
   max-width: 120px;
-  overflow: visible;
-  text-overflow: unset;
-  line-height: 1.6;
+  overflow: hidden;
+  line-height: 1.8;
+  word-break: break-word;
+}
+tbody td.program-col .badge {
+  white-space: normal;
+  word-break: break-word;
+  display: inline-block;
 }
 
 /* Kolumny dat — stały rozmiar, nie ucina */
