@@ -1,29 +1,60 @@
 /* ============================================================
-   AUDIT CRM — LogisticFit Style
+   AUDIT CRM — LogisticFit · Operational Clarity Design System
+   Headlines/Nav: Bricolage Grotesque · Data: Work Sans · Mono: Geist Mono
    ============================================================ */
 
+/* --- Bricolage Grotesque (variable) --- */
 @font-face {
-  font-family: 'Nunito';
-  src: url('fonts/Nunito-VariableFont_wght.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
+  font-family: 'Bricolage Grotesque';
+  src: url('fonts/BricolageGrotesque-variable-latin-ext.woff2') format('woff2');
+  font-weight: 400 800; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
-  font-family: 'Nunito';
-  src: url('fonts/Nunito-Italic-VariableFont_wght.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: italic;
+  font-family: 'Bricolage Grotesque';
+  src: url('fonts/BricolageGrotesque-variable-latin.woff2') format('woff2');
+  font-weight: 400 800; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* --- Work Sans (variable) --- */
+@font-face {
+  font-family: 'Work Sans';
+  src: url('fonts/WorkSans-variable-latin-ext.woff2') format('woff2');
+  font-weight: 400 700; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Work Sans';
+  src: url('fonts/WorkSans-variable-latin.woff2') format('woff2');
+  font-weight: 400 700; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* --- Geist Mono (variable) --- */
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('fonts/GeistMono-variable-latin-ext.woff2') format('woff2');
+  font-weight: 400 500; font-style: normal; font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('fonts/GeistMono-variable-latin.woff2') format('woff2');
+  font-weight: 400 500; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 :root {
-  --bg:           #f0f2f7;
-  --bg2:          #ffffff;
-  --bg3:          #e8ebf4;
-  --border:       #cdd3e8;
-  --accent:       #3a4d98;
+  /* Tokeny kolorów — Operational Clarity */
+  --bg:           #f8f9fc;  /* Surface */
+  --bg2:          #ffffff;  /* Panel */
+  --bg3:          #eef1f8;  /* Powierzchnia podniesiona / hover */
+  --border:       #e2e6f0;  /* Border */
+  --accent:       #3a4d98;  /* Navy — autorytet, nawigacja */
   --accent2:      #2d3d7a;
   --accent-light: #4f65c0;
-  --green:        #239d46;
+  --green:        #239d46;  /* Green — postęp, potwierdzenie */
   --green2:       #1a7a34;
   --text:         #1a2540;
   --text2:        #6b7a9f;
@@ -32,20 +63,51 @@
   --yellow:       #d4a017;
   --radius:       10px;
   --shadow:       0 4px 24px rgba(58,77,152,0.10);
+  /* Tokeny typografii */
+  --font-head: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-data: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-data);
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .hidden { display: none !important; }
 .page { min-height: 100vh; }
+
+/* ============================================================
+   TYPOGRAFIA — Operational Clarity
+   Nagłówki/nawigacja/marka → Bricolage Grotesque
+   Dane techniczne (kody, daty, liczby) → Geist Mono
+   ============================================================ */
+h1, h2, h3, h4,
+.nav-title, .nav-btn, .nav-logo,
+.login-box h1,
+.view-header h2,
+.modal-header h2,
+.modal-section h3,
+.op-year-label, .op-today-who, .op-side-col h3, .op-month h4, .op-notes h4 {
+  font-family: var(--font-head);
+  letter-spacing: -0.01em;
+}
+
+.stat-num,
+td.prj-col,
+td.date-col,
+.ch-cell,
+.chip-count {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum' 1;
+}
 
 /* ============================================================
    LOGIN
@@ -93,7 +155,7 @@ body {
   cursor: pointer;
   transition: background 0.2s;
   width: 100%;
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-data);
 }
 .btn-primary:hover { background: var(--accent-light); }
 
@@ -106,7 +168,7 @@ body {
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-data);
 }
 .btn-ghost:hover { color: var(--text); border-color: var(--accent-light); }
 
@@ -145,7 +207,7 @@ body {
   font-size: 13px;
   font-weight: 600;
   transition: all 0.2s;
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-data);
 }
 .nav-btn:hover { background: var(--bg3); color: var(--text); }
 .nav-btn.active { background: var(--accent); color: white; }
@@ -179,7 +241,7 @@ body {
   width: 220px;
   outline: none;
   transition: border 0.2s;
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-data);
 }
 .search-input:focus { border-color: var(--accent-light); }
 
@@ -193,7 +255,7 @@ body {
   cursor: pointer;
   outline: none;
   transition: border 0.2s;
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-data);
 }
 .filter-select:focus { border-color: var(--accent-light); }
 
@@ -470,7 +532,7 @@ tbody td.date-col {
   padding: 5px 9px;
   font-size: 13px;
   color: var(--text);
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-data);
   box-sizing: border-box;
   transition: border-color 0.15s;
 }
@@ -492,7 +554,7 @@ tbody td.date-col {
   padding: 10px 12px;
   font-size: 13px;
   color: var(--text);
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-data);
   resize: vertical;
   box-sizing: border-box;
   min-height: 60px;
@@ -534,7 +596,7 @@ tbody td.date-col {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-data);
 }
 .status-btn:hover, .proforma-btn:hover { border-color: var(--accent-light); color: var(--text); }
 .status-btn.active  { background: var(--accent); border-color: var(--accent); color: white; }
@@ -555,7 +617,7 @@ tbody td.date-col {
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s;
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-data);
   white-space: nowrap;
 }
 .btn-action:hover { background: var(--accent-light); }
@@ -671,7 +733,7 @@ tbody td.date-col {
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 13px;
-  font-family: 'Nunito', sans-serif;
+  font-family: var(--font-data);
   outline: none;
   transition: border 0.2s;
   width: 100%;
