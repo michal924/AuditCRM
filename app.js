@@ -42,8 +42,8 @@ const AUDITOR_MAP = {
 };
 
 const SPG_TO_PROGRAM = {
-  "fsc chain of custody (coc)": "FSC",
-  "pefc - chain of custody":    "PEFC",
+  "fsc chain of custody (coc)": "FSC CoC",
+  "pefc - chain of custody":    "PEFC CoC",
   "kzr inig":                   "KZR INiG",
   "sure-eu_pl":                 "SURE",
   "sure-eu":                    "SURE",
@@ -229,13 +229,19 @@ function getFilters() {
   };
 }
 
+// Normalizuj program do porównania (FSC CoC ↔ FSC, PEFC CoC ↔ PEFC)
+function normProgramKey(p) {
+  if (!p) return "";
+  return p.replace(/\s*CoC$/i, "").trim().toUpperCase();
+}
+
 function applyFilters(audits) {
   const f = getFilters();
   return audits.filter(a => {
     if (f.search  && !((a.Title || "").toLowerCase().includes(f.search))) return false;
     if (f.quarter && a.Quarter !== f.quarter) return false;
     if (f.year    && String(a.Year) !== f.year) return false;
-    if (f.program && a.Program !== f.program) return false;
+    if (f.program && normProgramKey(a.Program) !== normProgramKey(f.program)) return false;
     if (f.status  && a.AuditStatus !== f.status) return false;
     return true;
   });
@@ -1085,8 +1091,15 @@ function shortType(t) {
 }
 
 function programBadge(p) {
-  const cls = { FSC:"fsc", PEFC:"pefc", "KZR INiG":"kzr", SURE:"sure", EUDR:"eudr" };
-  return `<span class="badge badge-${cls[p] || 'fsc'}">${p || "—"}</span>`;
+  const cls = {
+    "FSC CoC": "fsc", "FSC": "fsc",
+    "PEFC CoC": "pefc", "PEFC": "pefc",
+    "KZR INiG": "kzr",
+    "SURE": "sure",
+    "EUDR": "eudr",
+  };
+  const label = p === "FSC" ? "FSC CoC" : p === "PEFC" ? "PEFC CoC" : (p || "—");
+  return `<span class="badge badge-${cls[p] || 'fsc'}">${label}</span>`;
 }
 
 function statusBadge(s) {
