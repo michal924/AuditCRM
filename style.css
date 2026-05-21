@@ -282,6 +282,21 @@ tbody td.firma-col {
   line-height: 1.4;
 }
 
+/* Kolumna Program — zawijanie badge'ów */
+tbody td.program-col {
+  white-space: normal;
+  max-width: 120px;
+  overflow: visible;
+  text-overflow: unset;
+  line-height: 1.6;
+}
+
+/* Kolumny dat — stały rozmiar, nie ucina */
+tbody td.date-col {
+  white-space: nowrap;
+  min-width: 88px;
+}
+
 .loading { text-align: center; color: var(--text2); padding: 40px !important; }
 
 /* BADGES */

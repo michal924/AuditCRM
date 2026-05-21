@@ -163,7 +163,7 @@ function setupNav() {
 // ============================================================
 async function loadAudits() {
   document.getElementById("audits-tbody").innerHTML =
-    '<tr><td colspan="8" class="loading">Ładowanie danych...</td></tr>';
+    '<tr><td colspan="10" class="loading">Ładowanie danych...</td></tr>';
   try {
     allAudits = await fetchAllAudits();
     renderTable();
@@ -283,7 +283,7 @@ function renderTable() {
 
   const tbody = document.getElementById("audits-tbody");
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="loading">Brak wyników</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="loading">Brak wyników</td></tr>';
     return;
   }
 
@@ -291,9 +291,10 @@ function renderTable() {
     <tr onclick="openModal(${a.Id})" ${!a.ImportFile ? 'class="row-manual"' : ""}>
       <td class="prj-col">${a.ProjectID || "—"}</td>
       <td class="firma-col">${a.Title || "—"}</td>
-      <td>${programBadge(a.Program)}</td>
+      <td class="program-col">${programBadge(a.Program)}</td>
       <td>${a.AuditType ? shortType(a.AuditType) : "—"}</td>
-      <td>${formatDate(a.AuditDateStart)}${custodyBadge(a)}</td>
+      <td class="date-col">${formatDate(a.PlannedCUDate) || "—"}</td>
+      <td class="date-col">${formatDate(a.AuditDateStart)}${custodyBadge(a)}</td>
       <td>${a.City || "—"}</td>
       <td class="${a.AuditMode === 'Online' ? 'mode-online' : 'mode-onsite'}">${a.AuditMode === 'Online' ? '💻' : '📍'} ${a.AuditMode || "—"}</td>
       <td>${statusBadge(a.AuditStatus)}</td>
