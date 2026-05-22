@@ -9,7 +9,7 @@ let currentAudit = null;
 let currentStatus = null;
 let currentProforma = null;
 let importParsed = [];
-let sortCol = "AuditDateStart";
+let sortCol = "PlannedCUDate";
 let sortDir = 1; // 1 = ASC, -1 = DESC
 let isEditMode = false;
 
@@ -697,8 +697,9 @@ function parseImportRows(rows, filename) {
     const prj = parseFloat(row["Project_ID"] || row["ProjectID"] || row["PRJ"] || "");
     if (isNaN(prj)) return;
 
-    const days = parseFloat(row["Insp. Days"] || row["Days"] || row["DAYS"] || "");
-    const start = row["Pl. St. Dt."] || row["AuditDateStart"] || row["AUDDATE"] || "";
+    const days  = parseFloat(row["Insp. Days"] || row["Days"] || row["DAYS"] || "");
+    // Data CU = data planowana przez CUC (z pliku Excel)
+    const cuDate = row["Pl. St. Dt."] || row["AuditDateStart"] || row["AUDDATE"] || "";
 
     records.push({
       Title:          safeStr(row["Project"] || row["Name"] || row["NAME"] || row["Title"]),
@@ -706,8 +707,11 @@ function parseImportRows(rows, filename) {
       Program:        normProgram(row["SPG. Name"] || row["Program"] || row["PROGRAM"]),
       AuditType:      normAuditType(row["Insp. Type"] || row["AuditType"] || row["TYPE"]),
       Standard:       safeStr(row["Insp. Module"] || row["Standard"] || row["STANDARD"]),
-      AuditDateStart: safeDate(start),
-      AuditDateEnd:   safeDate(row["Pl. End Dt."] || row["AuditDateEnd"] || ""),
+      // AuditDateStart = Data audytu LF — nigdy nie wypełniamy z importu, ustawia Michał ręcznie
+      AuditDateStart: null,
+      AuditDateEnd:   null,
+      // PlannedCUDate = Data CU — data z pliku CUC
+      PlannedCUDate:  safeDate(cuDate),
       AuditDays:      isNaN(days) ? null : days,
       AuditMode:      detectMode(days),
       AuditStatus:    "PLANNED",
@@ -719,8 +723,9 @@ function parseImportRows(rows, filename) {
       Mobile:         safeStr(row["Mobile"] || row["MOBILE"]),
       ClientEmail:    safeStr(row["EMail"] || row["Email"] || row["EMAIL"]),
       Notes:          safeStr(row["UWAGI"] || row["Notes"] || row["NOTES"]),
-      Quarter:        detectQuarter(start),
-      Year:           detectYear(start),
+      // Kwartał i rok z daty CUC (bo to jest planowanie)
+      Quarter:        detectQuarter(cuDate),
+      Year:           detectYear(cuDate),
       AuditorName:    normAuditor(row["Lead auditor"] || row["Auditor"] || row["AUDITOR"]),
       ImportFile:     filename,
       CreatedFrom:    "WebImport",
@@ -804,8 +809,9 @@ async function startImport() {
         Program:        rec.Program,
         AuditType:      rec.AuditType,
         Standard:       rec.Standard,
-        AuditDateStart: rec.AuditDateStart,
-        AuditDateEnd:   rec.AuditDateEnd,
+        AuditDateStart: null,               // Data audytu LF — ustawiana ręcznie
+        AuditDateEnd:   null,
+        PlannedCUDate:  rec.PlannedCUDate,  // Data CU — z pliku CUC
         AuditDays:      rec.AuditDays,
         AuditMode:      rec.AuditMode,
         AuditStatus:    rec.AuditStatus,
