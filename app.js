@@ -986,32 +986,63 @@ function selectFirma(name) {
   document.getElementById("new-title").value = name;
   document.getElementById("autocomplete-list").classList.add("hidden");
 
-  // Auto-uzupełnij dane z ostatniego audytu tej firmy
+  // Znajdź ostatni audyt tej firmy (posortuj po dacie malejąco)
   const last = allAudits
-    .filter(a => a.Title === name && a.AuditDateStart)
+    .filter(a => a.Title === name)
     .sort((a, b) => (b.AuditDateStart || "").localeCompare(a.AuditDateStart || ""))
     [0];
 
-  if (last) {
-    if (last.Program)     document.getElementById("new-program").value = last.Program;
-    if (last.Standard)    document.getElementById("new-standard").value = last.Standard;
-    if (last.City)        document.getElementById("new-city").value = last.City;
-    if (last.ClientEmail) document.getElementById("new-email").value = last.ClientEmail;
+  if (!last) return;
+
+  // Pola do autofill — (id elementu, wartość z bazy)
+  const fills = [
+    ["new-program",  last.Program    || ""],
+    ["new-standard", last.Standard   || ""],
+    ["new-address",  last.Address    || ""],
+    ["new-city",     last.City       || ""],
+    ["new-postal",   last.PostalCode || ""],
+    ["new-email",    last.ClientEmail|| ""],
+    ["new-phone",    last.Phone      || ""],
+    ["new-mobile",   last.Mobile     || ""],
+  ];
+
+  const filled = [];
+  fills.forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (val) {
+      el.value = val;
+      el.classList.add("autofilled");
+      setTimeout(() => el.classList.remove("autofilled"), 2000);
+      filled.push(el.labels?.[0]?.textContent || id);
+    }
+  });
+
+  // Banner informacyjny
+  const banner = document.getElementById("autofill-banner");
+  if (banner) {
+    const dateStr = last.AuditDateStart ? ` (ostatni audyt: ${formatDate(last.AuditDateStart)})` : "";
+    banner.innerHTML = `✅ Dane uzupełnione z bazy${dateStr} — możesz edytować każde pole`;
+    banner.classList.remove("hidden");
   }
 }
 
 function openAddAuditModal() {
-  ["new-title","new-standard","new-city","new-email","new-notes"].forEach(id => {
-    document.getElementById(id).value = "";
+  ["new-title","new-standard","new-address","new-city","new-postal",
+   "new-email","new-phone","new-mobile","new-notes"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
   });
-  document.getElementById("new-program").value = "";
-  document.getElementById("new-type").value = "";
-  document.getElementById("new-date").value = "";
-  document.getElementById("new-days").value = "1";
-  document.getElementById("new-mode").value = "On-site";
-  document.getElementById("new-quarter").value = "";
-  document.getElementById("new-year").value = new Date().getFullYear();
-  document.getElementById("new-status").value = "PLANNED";
+  document.getElementById("new-program").value  = "";
+  document.getElementById("new-type").value     = "";
+  document.getElementById("new-date").value     = "";
+  document.getElementById("new-days").value     = "1";
+  document.getElementById("new-mode").value     = "On-site";
+  document.getElementById("new-quarter").value  = "";
+  document.getElementById("new-year").value     = new Date().getFullYear();
+  document.getElementById("new-status").value   = "PLANNED";
+  const banner = document.getElementById("autofill-banner");
+  if (banner) banner.classList.add("hidden");
   updateCustodyWarning("");
   show("add-audit-overlay");
 }
@@ -1034,22 +1065,27 @@ async function saveNewAudit() {
   const days = parseFloat(document.getElementById("new-days").value) || 1;
   const quarter = document.getElementById("new-quarter").value || detectQuarter(date);
 
+  const g = id => (document.getElementById(id)?.value || "").trim();
   const rec = {
     Title:          title,
     Program:        program,
     AuditType:      type,
-    Standard:       document.getElementById("new-standard").value.trim(),
+    Standard:       g("new-standard"),
     AuditDateStart: safeDate(date),
     AuditDays:      days,
-    AuditMode:      document.getElementById("new-mode").value,
-    AuditStatus:    document.getElementById("new-status").value,
+    AuditMode:      g("new-mode") || "On-site",
+    AuditStatus:    g("new-status") || "PLANNED",
     Proforma:       "Brak",
-    City:           document.getElementById("new-city").value.trim(),
-    ClientEmail:    document.getElementById("new-email").value.trim(),
+    Address:        g("new-address"),
+    City:           g("new-city"),
+    PostalCode:     g("new-postal"),
+    ClientEmail:    g("new-email"),
+    Phone:          g("new-phone"),
+    Mobile:         g("new-mobile"),
     Quarter:        quarter,
-    Year:           parseInt(document.getElementById("new-year").value) || new Date().getFullYear(),
+    Year:           parseInt(g("new-year")) || new Date().getFullYear(),
     AuditorName:    MY_AUDITOR,
-    Notes:          document.getElementById("new-notes").value.trim(),
+    Notes:          g("new-notes"),
   };
 
   const btn = document.getElementById("btn-save-new-audit");

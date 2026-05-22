@@ -739,6 +739,28 @@ tbody td.date-col {
   width: 100%;
 }
 .form-input:focus { border-color: var(--accent-light); }
+
+/* Autofill — efekt podświetlenia pola przez 2s */
+@keyframes autofill-flash {
+  0%   { border-color: var(--green); background: #f0fbf4; }
+  70%  { border-color: var(--green); background: #f0fbf4; }
+  100% { border-color: var(--border); background: var(--bg); }
+}
+.form-input.autofilled {
+  animation: autofill-flash 2s ease forwards;
+}
+
+/* Banner autofill */
+.autofill-banner {
+  margin-top: 12px;
+  padding: 8px 14px;
+  background: var(--green-light, #d4f0dc);
+  color: #1a7a34;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #a8dbb8;
+}
 .form-textarea {
   min-height: 80px;
   resize: vertical;

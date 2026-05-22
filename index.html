@@ -475,13 +475,29 @@
             <input type="text" id="new-standard" class="form-input" placeholder="np. FSC-STD-40-004">
           </div>
           <div class="form-row">
+            <label>Adres</label>
+            <input type="text" id="new-address" class="form-input" placeholder="Ulica i numer">
+          </div>
+          <div class="form-row">
             <label>Miasto</label>
-            <input type="text" id="new-city" class="form-input" placeholder="Miasto">
+            <div style="display:flex;gap:8px">
+              <input type="text" id="new-city" class="form-input" placeholder="Miasto" style="flex:1">
+              <input type="text" id="new-postal" class="form-input" placeholder="00-000" style="width:90px">
+            </div>
           </div>
           <div class="form-row">
             <label>Email klienta</label>
             <input type="email" id="new-email" class="form-input" placeholder="email@firma.pl">
           </div>
+          <div class="form-row">
+            <label>Telefon</label>
+            <input type="tel" id="new-phone" class="form-input" placeholder="+48 ...">
+          </div>
+          <div class="form-row">
+            <label>Komórka</label>
+            <input type="tel" id="new-mobile" class="form-input" placeholder="+48 ...">
+          </div>
+          <div id="autofill-banner" class="autofill-banner hidden"></div>
         </div>
         <div class="modal-section">
           <h3>Planowanie</h3>
