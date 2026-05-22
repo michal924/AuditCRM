@@ -1656,7 +1656,18 @@ async function generatePdfRzeznik() {
       const hasRzeznik = vals.includes(MY_AUDITOR);
       if (!hasRzeznik) return;
       const hasOther = vals.some(v => v && v !== MY_AUDITOR);
-      if (!hasOther) { stayedRzeznik.push(r); return; }
+      if (!hasOther) {
+        // Firma tylko z jednym audytorem (Rzeźnik) — sprawdź czy nowa (pojawia się tylko w ostatnim roku)
+        const lastYear = String(activeYears[activeYears.length - 1]);
+        const prevYears = activeYears.slice(0, -1).map(String);
+        const isNewClient = prevYears.length > 0 && prevYears.every(y => !r.years[y]);
+        if (isNewClient) {
+          cameToRzeznik.push({ ...r, from: "nowy klient", year: Number(lastYear) });
+        } else {
+          stayedRzeznik.push(r);
+        }
+        return;
+      }
       for (let i = 0; i < activeYears.length - 1; i++) {
         const prev = r.years[String(activeYears[i])];
         const next = r.years[String(activeYears[i + 1])];
