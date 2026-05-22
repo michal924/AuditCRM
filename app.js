@@ -1317,6 +1317,13 @@ function clearHistory() {
   localStorage.removeItem(LS_FILES_KEY);
   document.getElementById("changes-loaded-files").innerHTML = "";
   document.getElementById("changes-table-wrapper").style.display = "none";
+  document.getElementById("btn-changes-clear").style.display = "none";
+  // Reset year filter options
+  const yrSel = document.getElementById("changes-year-filter");
+  yrSel.innerHTML = `<option value="">Wszystkie lata</option>`;
+  // Reset table body
+  document.getElementById("changes-tbody").innerHTML =
+    `<tr><td colspan="4" class="loading">Wgraj pliki aby zobaczyć dane</td></tr>`;
   showToast("Dane wyczyszczone", "success");
 }
 
