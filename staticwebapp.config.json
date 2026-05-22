@@ -5,6 +5,6 @@
     ".woff2": "font/woff2"
   },
   "globalHeaders": {
-    "Cache-Control": "public, max-age=3600"
+    "Cache-Control": "no-cache, no-store, must-revalidate"
   }
 }
