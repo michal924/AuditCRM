@@ -370,7 +370,9 @@ function renderAuditorsTable() {
   filtered.forEach(a => {
     const name = a.AuditorName || "—";
     if (!map[name]) { map[name] = { total: 0 }; programs.forEach(p => { map[name][p] = 0; }); }
-    map[name][a.Program] = (map[name][a.Program] || 0) + 1;
+    const progKey = normProgramKey(a.Program); // normalizuj: "FSC CoC" → "FSC"
+    if (map[name][progKey] !== undefined) map[name][progKey]++;
+    else map[name][progKey] = 1;
     map[name].total++;
   });
 
@@ -1375,7 +1377,10 @@ function setupChanges() {
     dropZone.classList.remove("drag-over");
     [...e.dataTransfer.files].forEach(handleHistoryFile);
   });
-
+  // Klik na całą strefę lub przycisk — otwórz file picker
+  dropZone.addEventListener("click", e => {
+    document.getElementById("changes-file").click();
+  });
   document.getElementById("btn-changes-pick").addEventListener("click", e => {
     e.stopPropagation();
     document.getElementById("changes-file").click();
