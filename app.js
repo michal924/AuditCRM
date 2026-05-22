@@ -1377,14 +1377,7 @@ function setupChanges() {
     dropZone.classList.remove("drag-over");
     [...e.dataTransfer.files].forEach(handleHistoryFile);
   });
-  // Klik na całą strefę lub przycisk — otwórz file picker
-  dropZone.addEventListener("click", e => {
-    document.getElementById("changes-file").click();
-  });
-  document.getElementById("btn-changes-pick").addEventListener("click", e => {
-    e.stopPropagation();
-    document.getElementById("changes-file").click();
-  });
+  // btn-changes-pick to teraz <label for="changes-file"> — nie potrzebuje JS click
 
   document.getElementById("changes-file").addEventListener("change", e => {
     [...e.target.files].forEach(handleHistoryFile);
