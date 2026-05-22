@@ -12,6 +12,7 @@ let importParsed = [];
 let sortCol = "PlannedCUDate";
 let sortDir = 1; // 1 = ASC, -1 = DESC
 let isEditMode = false;
+let originalAuditDate = null; // śledzi oryginał daty AuditDateStart przy wejściu w tryb edycji
 
 // ============================================================
 // MAPOWANIA (zgodne z 03_Import-QuarterlyPlan.py)
@@ -425,7 +426,24 @@ function setupModal() {
       document.getElementById("m-year").textContent    = detectYear(val);
       setDateCustodyIcon("m-date-icon", val, currentAudit ? currentAudit.AuditorName : null);
     }
+    updatePlanAuditBtn(val);
   });
+
+  document.getElementById("btn-plan-audit").addEventListener("click", () => {
+    document.getElementById("e-date").focus();
+  });
+}
+
+function updatePlanAuditBtn(dateVal) {
+  const btn = document.getElementById("btn-plan-audit");
+  if (!btn) return;
+  if (dateVal && dateVal !== originalAuditDate) {
+    btn.classList.add("scheduled");
+    btn.title = `Przy zapisaniu — wyślij zaproszenie (${formatDate(dateVal)}) do kalendarzy office@logisticfit.com i michal@logisticfit.com`;
+  } else {
+    btn.classList.remove("scheduled");
+    btn.title = "Przy zapisaniu daty — wyślij zaproszenie do kalendarzy office@logisticfit.com i michal@logisticfit.com";
+  }
 }
 
 function openModal(id) {
@@ -481,28 +499,33 @@ function enterEditMode() {
   if (!currentAudit) return;
   const a = currentAudit;
   isEditMode = true;
+  originalAuditDate = a.AuditDateStart ? a.AuditDateStart.substring(0, 10) : "";
   document.getElementById("e-address").value = a.Address || "";
   document.getElementById("e-city").value    = a.City || "";
   document.getElementById("e-postal").value  = a.PostalCode || "";
   document.getElementById("e-email").value   = a.ClientEmail || "";
   document.getElementById("e-phone").value   = a.Phone || "";
   document.getElementById("e-mobile").value  = a.Mobile || "";
-  document.getElementById("e-date").value    = a.AuditDateStart ? a.AuditDateStart.substring(0, 10) : "";
+  document.getElementById("e-date").value    = originalAuditDate;
   document.getElementById("e-days").value    = a.AuditDays != null ? a.AuditDays : "";
   document.getElementById("e-mode").value    = a.AuditMode || "On-site";
   document.getElementById("e-cu").value      = a.PlannedCUDate ? a.PlannedCUDate.substring(0, 10) : "";
   document.getElementById("e-notes").value   = a.Notes || "";
   document.getElementById("modal-overlay").classList.add("edit-mode");
+  updatePlanAuditBtn(originalAuditDate);
 }
 
 function cancelEditMode() {
   isEditMode = false;
+  originalAuditDate = null;
   document.getElementById("modal-overlay").classList.remove("edit-mode");
   // Przywróć link mapy jeśli jest adres
   const a = currentAudit;
   if (a && [a.Address, a.City, a.PostalCode].some(Boolean)) {
     document.getElementById("m-maps-link").classList.remove("hidden");
   }
+  const btn = document.getElementById("btn-plan-audit");
+  if (btn) btn.classList.remove("scheduled");
 }
 
 function closeModal() {
@@ -548,11 +571,23 @@ async function saveChanges() {
     Object.assign(currentAudit, fields);
     renderTable();
 
-    // Integracja kalendarza — tylko przy pierwszym ustawieniu Invoice
-    if (currentStatus === "Invoice" && prevStatus !== "Invoice" && currentAudit.AuditDateStart) {
+    // ── Integracja kalendarza: Zaplanuj audyt — gdy data audytu LF nowa lub zmieniona ──
+    const newDateVal = isEditMode ? document.getElementById("e-date").value : null;
+    const dateChanged = newDateVal && newDateVal !== originalAuditDate;
+
+    if (dateChanged && currentAudit.AuditDateStart) {
+      try {
+        await createAuditCalendarEvents(currentAudit);
+        showToast("💾 Zapisano + 📅 Zaproszenia wysłane do kalendarzy!", "success");
+      } catch (calErr) {
+        console.error("Błąd kalendarza:", calErr);
+        showToast("💾 Zapisano. ⚠️ Błąd kalendarza: " + calErr.message.substring(0, 60), "warn");
+      }
+    } else if (currentStatus === "Invoice" && prevStatus !== "Invoice" && currentAudit.AuditDateStart) {
+      // Powiadomienie kalendarza przy zmianie statusu na Invoice
       try {
         await createCalendarEvent(currentAudit);
-        showToast("💾 Zapisano + 📅 Dodano do kalendarza!", "success");
+        showToast("💾 Zapisano + 📅 Dodano do kalendarza (Invoice)!", "success");
       } catch (calErr) {
         console.error("Błąd kalendarza:", calErr);
         showToast("💾 Zapisano. ⚠️ Dodaj uprawnienie Calendars.ReadWrite w Azure Portal.", "warn");
@@ -599,6 +634,63 @@ async function createCalendarEvent(audit) {
     showAs: "busy",
     body:  { contentType: "text", content: body },
     categories: ["Audyt LogisticFit"],
+  };
+
+  const r = await fetch("https://graph.microsoft.com/v1.0/me/events", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(event),
+  });
+
+  if (!r.ok) {
+    const err = await r.text().catch(() => "");
+    throw new Error(`Graph ${r.status}: ${err.substring(0, 150)}`);
+  }
+  return r.json();
+}
+
+// ============================================================
+// ZAPLANUJ AUDYT — wysyłka do kalendarzy office@ + michal@
+// Tworzy wydarzenie w kalendarzu Michała z office@ jako uczestnikiem
+// (office@ otrzymuje e-mail z zaproszeniem do kalendarza)
+// ============================================================
+async function createAuditCalendarEvents(audit) {
+  const token = await getGraphToken();
+  const dateStr  = audit.AuditDateStart.substring(0, 10);
+  const nextDate = new Date(dateStr + "T12:00:00");
+  nextDate.setDate(nextDate.getDate() + 1);
+  const nextStr  = nextDate.toISOString().substring(0, 10);
+
+  const loc  = [audit.Address, audit.City, audit.PostalCode].filter(Boolean).join(", ");
+  const subj = `📅 Audyt ${audit.Program || ""}: ${audit.Title || ""}${audit.City ? " — " + audit.City : ""}`.trim();
+
+  const body = [
+    `PRJ: ${audit.ProjectID || "—"}`,
+    `Program: ${audit.Program || "—"}`,
+    `Typ: ${audit.AuditType || "—"}`,
+    `Audytor: ${audit.AuditorName || "—"}`,
+    `Adres: ${loc || "—"}`,
+    ``,
+    `Zaplanowano przez Audit CRM — LogisticFit`,
+  ].join("\n");
+
+  const event = {
+    subject: subj,
+    isAllDay: true,
+    start: { dateTime: `${dateStr}T00:00:00`, timeZone: "Europe/Warsaw" },
+    end:   { dateTime: `${nextStr}T00:00:00`, timeZone: "Europe/Warsaw" },
+    showAs: "busy",
+    body:  { contentType: "text", content: body },
+    categories: ["Audyt LogisticFit"],
+    attendees: [
+      {
+        emailAddress: { address: "office@logisticfit.com", name: "LogisticFit Office" },
+        type: "required",
+      },
+    ],
   };
 
   const r = await fetch("https://graph.microsoft.com/v1.0/me/events", {

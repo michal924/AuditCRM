@@ -546,6 +546,43 @@ tbody td.date-col {
 }
 .edit-city-wrap .field-input { flex: 1; }
 
+/* Wrapper: data audytu LF + przycisk Zaplanuj audyt */
+.date-plan-row {
+  display: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.modal-overlay.edit-mode .date-plan-row { display: flex; }
+.date-plan-row .field-input { flex: 1; min-width: 0; }
+
+/* Przycisk Zaplanuj audyt */
+.btn-plan-audit {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px;
+  border-radius: 7px;
+  border: 1.5px solid var(--green);
+  background: transparent;
+  color: var(--green);
+  font-size: 12px;
+  font-family: var(--font-data);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-plan-audit:hover { background: var(--green); color: #fff; }
+.btn-plan-audit.scheduled {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green2);
+}
+
 .field-textarea {
   width: 100%;
   background: var(--bg3);
