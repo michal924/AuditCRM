@@ -178,8 +178,10 @@
         <div class="drop-icon">📂</div>
         <p>Wgraj pliki <strong>Auditsoverview2XL</strong> (2024, 2025, 2026…)<br>
            Można wgrać wiele plików naraz</p>
-        <input type="file" id="changes-file" accept=".xlsx,.xls" multiple style="display:none">
-        <label for="changes-file" id="btn-changes-pick" class="btn-primary" style="width:auto;margin-top:12px;cursor:pointer;display:inline-block">Wybierz pliki .xlsx</label>
+        <label id="btn-changes-pick" class="btn-primary" style="width:auto;margin-top:12px;cursor:pointer;display:inline-block;position:relative;overflow:hidden">
+          Wybierz pliki .xlsx
+          <input type="file" id="changes-file" accept=".xlsx,.xls" multiple style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0">
+        </label>
       </div>
       <div id="changes-loaded-files" class="loaded-files-row"></div>
       <button id="btn-changes-clear" class="btn-clear-history" title="Wyczyść wgrane dane" style="display:none">🗑 Wyczyść dane</button>
