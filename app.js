@@ -1463,7 +1463,7 @@ function handleHistoryFile(file) {
         const auditor = normAuditor(getVal(r, cAud));
         if (!title || !auditor) continue;
 
-        const key = `${prj}_${program}`;
+        const key = `${prj}_${normProgramKey(program)}`;
         auditHistory[year][key] = { prj, title, program, auditor };
         count++;
       }
@@ -1553,7 +1553,7 @@ function renderChangesTable() {
     return { ...r, hasChange, hasRzeznik };
   });
 
-  if (programFilter) rows = rows.filter(r => r.program === programFilter);
+  if (programFilter) rows = rows.filter(r => normProgramKey(r.program) === normProgramKey(programFilter));
   if (auditorFilter) rows = rows.filter(r => Object.values(r.years).includes(auditorFilter));
   // Filtr roku: pokaż tylko wiersze, które mają audytora w wybranym roku
   if (yearFilter)    rows = rows.filter(r => r.years[yearFilter]);
@@ -1647,7 +1647,7 @@ async function generatePdfRzeznik() {
 
     // Stosuj filtry
     let records = Object.values(map);
-    if (programFilter) records = records.filter(r => r.program === programFilter);
+    if (programFilter) records = records.filter(r => normProgramKey(r.program) === normProgramKey(programFilter));
     if (auditorFilter) records = records.filter(r => Object.values(r.years).includes(auditorFilter));
     if (yearFilter)    records = records.filter(r => r.years[yearFilter]);  // tylko z audytorem w wybranym roku
 
