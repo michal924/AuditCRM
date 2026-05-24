@@ -1717,27 +1717,12 @@ async function generatePdfRzeznik() {
       doc.setFillColor(...GREEN);
       doc.rect(0, 32, 210, 3, "F");
 
-      // Logo
-      if (logoBase64) {
-        try {
-          const img = new Image(); img.src = logoBase64;
-          const logoW = 44;
-          const ratio = img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 0.28;
-          const logoH = Math.max(Math.min(logoW * ratio, 14), 7);
-          const lx = 14, ly = (32 - logoH) / 2;
-          doc.setFillColor(...WHITE);
-          doc.roundedRect(lx - 2, ly - 2, logoW + 4, logoH + 4, 1.5, 1.5, "F");
-          doc.addImage(logoBase64, "PNG", lx, ly, logoW, logoH);
-        } catch(e) {
-          doc.setTextColor(...WHITE); doc.setFontSize(11); doc.setFont(F,"bold");
-          doc.text("LOGISTICFIT", 14, 19);
-        }
-      } else {
-        doc.setTextColor(...WHITE); doc.setFontSize(11); doc.setFont(F,"bold");
-        doc.text("LOGISTICFIT", 14, 19);
-      }
+      // Nazwa firmy (tekst zamiast logo)
+      doc.setTextColor(...WHITE);
+      doc.setFontSize(11); doc.setFont(F, "bold");
+      doc.text("LOGISTICFIT", 14, 19);
 
-      // Prawda strona headera
+      // Prawa strona headera
       doc.setTextColor(184, 192, 224);  // --fg-on-dark-2
       doc.setFontSize(6.5); doc.setFont(F, "normal");
       doc.text("RAPORT ZMIAN AUDYTORA", 196, 10, { align: "right" });
