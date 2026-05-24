@@ -177,25 +177,26 @@ async function loadAudits() {
 // ============================================================
 // FILTRY — z persystencją w localStorage
 // ============================================================
-const FILTER_IDS = ["search","filter-quarter","filter-year","filter-program"];
-const FILTERS_KEY = "auditFilters_v2";
+const FILTERS_KEY = "auditFilters_v3";
+const MULTI_KEYS  = ["quarter", "year", "program", "status"];
+const MULTI_LABELS = { quarter: "Kwartał", year: "Rok", program: "Program", status: "Status" };
 
-function getSelectedStatuses() {
-  return [...document.querySelectorAll("#filter-status-panel input[type=checkbox]:checked")].map(cb => cb.value);
+function getSelectedMulti(key) {
+  return [...document.querySelectorAll(`#filter-${key}-panel input[type=checkbox]:checked`)].map(cb => cb.value);
 }
 
-function updateStatusBtn() {
-  const sel = getSelectedStatuses();
-  const btn = document.getElementById("filter-status-btn");
+function updateMultiBtn(key) {
+  const sel = getSelectedMulti(key);
+  const btn = document.getElementById(`filter-${key}-btn`);
   if (!btn) return;
-  btn.textContent = sel.length === 0 ? "Status" : sel.length === 1 ? sel[0] : `Status (${sel.length})`;
+  const label = MULTI_LABELS[key];
+  btn.textContent = sel.length === 0 ? label : sel.length === 1 ? sel[0] : `${label} (${sel.length})`;
   btn.classList.toggle("filter-multi-active", sel.length > 0);
 }
 
 function saveFilters() {
-  const state = {};
-  FILTER_IDS.forEach(id => { state[id] = document.getElementById(id).value; });
-  state.statusMulti = getSelectedStatuses();
+  const state = { search: document.getElementById("search").value };
+  MULTI_KEYS.forEach(key => { state[key] = getSelectedMulti(key); });
   try { localStorage.setItem(FILTERS_KEY, JSON.stringify(state)); } catch {}
 }
 
@@ -204,42 +205,51 @@ function restoreFilters() {
     const raw = localStorage.getItem(FILTERS_KEY);
     if (!raw) return;
     const state = JSON.parse(raw);
-    FILTER_IDS.forEach(id => {
-      const el = document.getElementById(id);
-      if (el && state[id] !== undefined) el.value = state[id];
-    });
-    if (Array.isArray(state.statusMulti)) {
-      document.querySelectorAll("#filter-status-panel input[type=checkbox]").forEach(cb => {
-        cb.checked = state.statusMulti.includes(cb.value);
+    const search = document.getElementById("search");
+    if (search && state.search !== undefined) search.value = state.search;
+    MULTI_KEYS.forEach(key => {
+      if (!Array.isArray(state[key])) return;
+      document.querySelectorAll(`#filter-${key}-panel input[type=checkbox]`).forEach(cb => {
+        cb.checked = state[key].includes(cb.value);
       });
-      updateStatusBtn();
-    }
+      updateMultiBtn(key);
+    });
   } catch {}
 }
 
 function setupFilters() {
   restoreFilters();
 
-  FILTER_IDS.forEach(id => {
-    const el = document.getElementById(id);
-    el.addEventListener("input",  () => { saveFilters(); renderTable(); });
-    el.addEventListener("change", () => { saveFilters(); renderTable(); });
+  document.getElementById("search").addEventListener("input", () => { saveFilters(); renderTable(); });
+
+  // Wspólny setup dla wszystkich multi-select filtrów
+  MULTI_KEYS.forEach(key => {
+    const btn   = document.getElementById(`filter-${key}-btn`);
+    const panel = document.getElementById(`filter-${key}-panel`);
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      // Zamknij pozostałe panele
+      MULTI_KEYS.forEach(k => { if (k !== key) document.getElementById(`filter-${k}-panel`).classList.add("hidden"); });
+      panel.classList.toggle("hidden");
+    });
+    panel.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      cb.addEventListener("change", () => { updateMultiBtn(key); saveFilters(); renderTable(); });
+    });
   });
 
-  // Multi-select status dropdown
-  const btn   = document.getElementById("filter-status-btn");
-  const panel = document.getElementById("filter-status-panel");
-  btn.addEventListener("click", e => { e.stopPropagation(); panel.classList.toggle("hidden"); });
-  document.addEventListener("click", e => { if (!e.target.closest("#filter-status-wrap")) panel.classList.add("hidden"); });
-  panel.querySelectorAll("input[type=checkbox]").forEach(cb => {
-    cb.addEventListener("change", () => { updateStatusBtn(); saveFilters(); renderTable(); });
+  // Klik poza dropdownem zamyka wszystkie
+  document.addEventListener("click", e => {
+    if (!e.target.closest(".filter-multi-wrap")) {
+      MULTI_KEYS.forEach(key => { document.getElementById(`filter-${key}-panel`).classList.add("hidden"); });
+    }
   });
 
   document.getElementById("btn-clear-filters").onclick = () => {
     document.getElementById("search").value = "";
-    ["filter-quarter","filter-year","filter-program"].forEach(id => { document.getElementById(id).value = ""; });
-    document.querySelectorAll("#filter-status-panel input[type=checkbox]").forEach(cb => { cb.checked = false; });
-    updateStatusBtn();
+    MULTI_KEYS.forEach(key => {
+      document.querySelectorAll(`#filter-${key}-panel input[type=checkbox]`).forEach(cb => { cb.checked = false; });
+      updateMultiBtn(key);
+    });
     saveFilters();
     renderTable();
   };
@@ -251,10 +261,10 @@ function setupFilters() {
 function getFilters() {
   return {
     search:   document.getElementById("search").value.toLowerCase(),
-    quarter:  document.getElementById("filter-quarter").value,
-    year:     document.getElementById("filter-year").value,
-    program:  document.getElementById("filter-program").value,
-    statuses: getSelectedStatuses(),
+    quarters: getSelectedMulti("quarter"),
+    years:    getSelectedMulti("year"),
+    programs: getSelectedMulti("program"),
+    statuses: getSelectedMulti("status"),
   };
 }
 
@@ -267,10 +277,10 @@ function normProgramKey(p) {
 function applyFilters(audits) {
   const f = getFilters();
   return audits.filter(a => {
-    if (f.search  && !((a.Title || "").toLowerCase().includes(f.search))) return false;
-    if (f.quarter && a.Quarter !== f.quarter) return false;
-    if (f.year    && String(a.Year) !== f.year) return false;
-    if (f.program && normProgramKey(a.Program) !== normProgramKey(f.program)) return false;
+    if (f.search       && !((a.Title || "").toLowerCase().includes(f.search))) return false;
+    if (f.quarters.length > 0 && !f.quarters.includes(a.Quarter)) return false;
+    if (f.years.length > 0    && !f.years.includes(String(a.Year))) return false;
+    if (f.programs.length > 0 && !f.programs.some(p => normProgramKey(p) === normProgramKey(a.Program))) return false;
     if (f.statuses.length > 0 && !f.statuses.includes(a.AuditStatus)) return false;
     return true;
   });
