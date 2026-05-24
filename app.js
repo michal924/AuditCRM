@@ -579,11 +579,13 @@ async function saveChanges() {
 
     if (dateChanged && currentAudit.AuditDateStart) {
       try {
-        await createAuditCalendarEvents(currentAudit);
-        showToast("💾 Zapisano + 📅 Zaproszenia wysłane do kalendarzy!", "success");
+        const calResult = await createAuditCalendarEvents(currentAudit);
+        const link = calResult?.webLink;
+        showToast("💾 Zapisano + 📅 Event dodany do kalendarza!" + (link ? " (sprawdź konsolę F12)" : ""), "success");
+        if (link) console.log("[Calendar] Otwórz event:", link);
       } catch (calErr) {
         console.error("Błąd kalendarza:", calErr);
-        showToast("💾 Zapisano. ⚠️ Błąd kalendarza: " + calErr.message.substring(0, 60), "warn");
+        showToast("💾 Zapisano. ⚠️ Błąd kalendarza: " + calErr.message.substring(0, 80), "warn");
       }
     } else if (currentStatus === "Invoice" && prevStatus !== "Invoice" && currentAudit.AuditDateStart) {
       // Powiadomienie kalendarza przy zmianie statusu na Invoice
@@ -661,6 +663,8 @@ async function createCalendarEvent(audit) {
 // ============================================================
 async function createAuditCalendarEvents(audit) {
   const token = await getGraphToken();
+  if (!token) throw new Error("Brak tokenu Graph — zaloguj się ponownie");
+
   const dateStr  = audit.AuditDateStart.substring(0, 10);
   const nextDate = new Date(dateStr + "T12:00:00");
   nextDate.setDate(nextDate.getDate() + 1);
@@ -669,7 +673,7 @@ async function createAuditCalendarEvents(audit) {
   const loc  = [audit.Address, audit.City, audit.PostalCode].filter(Boolean).join(", ");
   const subj = `📅 Audyt ${audit.Program || ""}: ${audit.Title || ""}${audit.City ? " — " + audit.City : ""}`.trim();
 
-  const body = [
+  const bodyText = [
     `PRJ: ${audit.ProjectID || "—"}`,
     `Program: ${audit.Program || "—"}`,
     `Typ: ${audit.AuditType || "—"}`,
@@ -685,7 +689,7 @@ async function createAuditCalendarEvents(audit) {
     start: { dateTime: `${dateStr}T00:00:00`, timeZone: "Europe/Warsaw" },
     end:   { dateTime: `${nextStr}T00:00:00`, timeZone: "Europe/Warsaw" },
     showAs: "busy",
-    body:  { contentType: "text", content: body },
+    body:  { contentType: "text", content: bodyText },
     categories: ["Audyt LogisticFit"],
     attendees: [
       {
@@ -694,6 +698,8 @@ async function createAuditCalendarEvents(audit) {
       },
     ],
   };
+
+  console.log("[Calendar] Tworzę event:", subj, dateStr, "→", nextStr);
 
   const r = await fetch("https://graph.microsoft.com/v1.0/me/events", {
     method: "POST",
@@ -704,11 +710,23 @@ async function createAuditCalendarEvents(audit) {
     body: JSON.stringify(event),
   });
 
+  const responseText = await r.text();
+  console.log("[Calendar] Graph response status:", r.status);
+
   if (!r.ok) {
-    const err = await r.text().catch(() => "");
-    throw new Error(`Graph ${r.status}: ${err.substring(0, 150)}`);
+    console.error("[Calendar] Graph error body:", responseText);
+    throw new Error(`Graph ${r.status}: ${responseText.substring(0, 200)}`);
   }
-  return r.json();
+
+  let created;
+  try { created = JSON.parse(responseText); } catch(e) { created = {}; }
+
+  console.log("[Calendar] Event ID:", created.id);
+  console.log("[Calendar] webLink:", created.webLink);
+  console.log("[Calendar] organizer:", JSON.stringify(created.organizer));
+  console.log("[Calendar] calendar:", JSON.stringify(created.calendar));
+
+  return created;
 }
 
 // ============================================================
