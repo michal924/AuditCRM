@@ -1270,8 +1270,8 @@ init();
 let auditHistory = {};      // { year: { "prj_program": { prj, title, program, auditor } } }
 let changesFilesByYear = {}; // { year: [{filename, count}] }
 let logoBase64 = null;
-let pdfFontRegular = null;  // base64 NotoSans-Regular
-let pdfFontBold    = null;  // base64 NotoSans-Bold
+let pdfFontRegular = null;  // base64 Poppins-Regular
+let pdfFontBold    = null;  // base64 Poppins-SemiBold
 
 const LS_HISTORY_KEY = "auditHistory_v1";
 const LS_FILES_KEY   = "changesFilesByYear_v1";
@@ -1347,19 +1347,19 @@ async function loadPdfFonts() {
     return btoa(bin);
   }
   try {
-    if (!pdfFontRegular) pdfFontRegular = await ttfToBase64("fonts/NotoSans-Regular.ttf");
-    if (!pdfFontBold)    pdfFontBold    = await ttfToBase64("fonts/NotoSans-Bold.ttf");
+    if (!pdfFontRegular) pdfFontRegular = await ttfToBase64("fonts/Poppins-Regular.ttf");
+    if (!pdfFontBold)    pdfFontBold    = await ttfToBase64("fonts/Poppins-SemiBold.ttf");
   } catch(e) { console.warn("Nie udało się załadować fontów PDF:", e); }
 }
 
 function registerPdfFonts(doc) {
   if (pdfFontRegular) {
-    doc.addFileToVFS("NotoSans-Regular.ttf", pdfFontRegular);
-    doc.addFont("NotoSans-Regular.ttf", "NotoSans", "normal");
+    doc.addFileToVFS("Poppins-Regular.ttf", pdfFontRegular);
+    doc.addFont("Poppins-Regular.ttf", "Poppins", "normal");
   }
   if (pdfFontBold) {
-    doc.addFileToVFS("NotoSans-Bold.ttf", pdfFontBold);
-    doc.addFont("NotoSans-Bold.ttf", "NotoSans", "bold");
+    doc.addFileToVFS("Poppins-SemiBold.ttf", pdfFontBold);
+    doc.addFont("Poppins-SemiBold.ttf", "Poppins", "bold");
   }
 }
 
@@ -1635,6 +1635,7 @@ async function generatePdfRzeznik() {
   const auditorFilter = document.getElementById("changes-auditor-filter").value.trim();
   const yearFilter    = document.getElementById("changes-year-filter").value.trim();
 
+  showToast("Generowanie PDF…", "info");
   await loadPdfFonts();
 
   try {
@@ -1681,20 +1682,24 @@ async function generatePdfRzeznik() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     registerPdfFonts(doc);
-    const F = pdfFontRegular ? "NotoSans" : "helvetica";
+    const F = pdfFontRegular ? "Poppins" : "helvetica";
 
-    // ── Design System — Operational Clarity ─────────────────────
-    // Tokeny: #3a4d98 navy, #239d46 green, #1a2540 text, #5c677d text2
-    const NAVY    = [58,  77, 152];   // --accent
-    const GREEN   = [35, 157,  70];   // --green
-    const RED     = [185,  55,  40];  // danger
-    const SLATE   = [70,  82, 110];   // stali klienci (ciemny szary-niebieski)
+    // ── LogisticFit Design System tokens ────────────────────────
+    const NAVY    = [58,  77, 152];   // --lf-navy   #3a4d98
+    const NAVY900 = [28,  38,  80];   // --lf-navy-900 #1c2650
+    const NAVY100 = [230, 233, 245];  // --lf-navy-100
+    const GREEN   = [35, 157,  70];   // --lf-green  #239d46
+    const GREEN100= [224, 243, 230];  // --lf-green-100
+    const DANGER  = [200,  54,  45];  // --lf-danger #c8362d
+    const DANGER_BG=[251, 229, 227];  // --lf-danger-bg
+    const INK     = [14,  20,  48];   // --lf-ink    #0e1430
+    const S700    = [58,  66,  99];   // --lf-slate-700
+    const S500    = [107,115, 146];   // --lf-slate-500
+    const S300    = [194,199, 214];   // --lf-slate-300
+    const S200    = [225,228, 238];   // --lf-slate-200
+    const S100    = [238,240, 246];   // --lf-slate-100
+    const S50     = [247,248, 251];   // --lf-slate-50
     const WHITE   = [255, 255, 255];
-    const SURFACE = [248, 249, 252];  // --bg (jasne tło)
-    const BG3     = [238, 240, 247];  // --bg3 (nagłówki tabel)
-    const BORDER  = [226, 230, 240];  // --border
-    const DARK    = [26,  37,  64];   // --text
-    const TEXT2   = [92, 103, 125];   // --text2
 
     const now   = new Date();
     const dd    = String(now.getDate()).padStart(2,"0");
@@ -1702,214 +1707,220 @@ async function generatePdfRzeznik() {
     const yyyy  = now.getFullYear();
     const dateStr = `${dd}.${mm_}.${yyyy}`;
 
-    // ── Szablon strony: nagłówek + stopka ────────────────────────
+    // ── Szablon strony (header + footer) — rysowany na końcu ────
     function drawPageTemplate(pageNum, totalPages) {
-      // Nagłówek — navy block 48mm
-      doc.setFillColor(...NAVY);
-      doc.rect(0, 0, 210, 46, "F");
+      // Pasek navy górny (32mm)
+      doc.setFillColor(...NAVY900);
+      doc.rect(0, 0, 210, 32, "F");
 
-      // Logo z białym tłem
+      // Zielony akcent (3mm)
+      doc.setFillColor(...GREEN);
+      doc.rect(0, 32, 210, 3, "F");
+
+      // Logo
       if (logoBase64) {
         try {
           const img = new Image(); img.src = logoBase64;
-          const logoW = 50;
+          const logoW = 44;
           const ratio = img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 0.28;
-          const logoH = Math.max(Math.min(logoW * ratio, 18), 8);
-          const lx = 12, ly = (46 - logoH) / 2;
+          const logoH = Math.max(Math.min(logoW * ratio, 14), 7);
+          const lx = 14, ly = (32 - logoH) / 2;
           doc.setFillColor(...WHITE);
-          doc.roundedRect(lx - 3, ly - 3, logoW + 6, logoH + 6, 2, 2, "F");
+          doc.roundedRect(lx - 2, ly - 2, logoW + 4, logoH + 4, 1.5, 1.5, "F");
           doc.addImage(logoBase64, "PNG", lx, ly, logoW, logoH);
         } catch(e) {
-          doc.setTextColor(...WHITE); doc.setFontSize(13); doc.setFont(F,"bold");
-          doc.text("LOGISTICFIT", 14, 26);
+          doc.setTextColor(...WHITE); doc.setFontSize(11); doc.setFont(F,"bold");
+          doc.text("LOGISTICFIT", 14, 19);
         }
       } else {
-        doc.setTextColor(...WHITE); doc.setFontSize(13); doc.setFont(F,"bold");
-        doc.text("LOGISTICFIT", 14, 26);
+        doc.setTextColor(...WHITE); doc.setFontSize(11); doc.setFont(F,"bold");
+        doc.text("LOGISTICFIT", 14, 19);
       }
 
-      // Tytuł + meta po prawej
+      // Prawda strona headera
+      doc.setTextColor(184, 192, 224);  // --fg-on-dark-2
+      doc.setFontSize(6.5); doc.setFont(F, "normal");
+      doc.text("RAPORT ZMIAN AUDYTORA", 196, 10, { align: "right" });
       doc.setTextColor(...WHITE);
-      doc.setFontSize(14); doc.setFont(F,"bold");
-      doc.text("Raport zmian audytora", 198, 13, { align: "right" });
-      doc.setFontSize(9.5); doc.setFont(F,"normal");
-      doc.text("Michał Rzeźnik — LogisticFit", 198, 21.5, { align: "right" });
-      doc.setFontSize(8.5); doc.setFont(F,"bold");
+      doc.setFontSize(11); doc.setFont(F, "bold");
+      doc.text("Michał Rzeźnik", 196, 18, { align: "right" });
+      doc.setFontSize(7.5); doc.setFont(F, "normal");
       doc.setTextColor(...GREEN);
-      doc.text(programLabel, 198, 30, { align: "right" });
-      doc.setFontSize(7.5); doc.setFont(F,"normal");
-      doc.setTextColor(190, 200, 230);
-      doc.text("Wygenerowano: " + dateStr, 198, 38, { align: "right" });
-
-      // Zielona kreska separator (3mm)
-      doc.setFillColor(...GREEN);
-      doc.rect(0, 46, 210, 2.5, "F");
+      doc.text(programLabel, 196, 25, { align: "right" });
 
       // Stopka
-      doc.setDrawColor(...BORDER);
-      doc.setLineWidth(0.3);
+      doc.setDrawColor(...S200);
+      doc.setLineWidth(0.25);
       doc.line(14, 283, 196, 283);
-      doc.setFontSize(7); doc.setFont(F,"normal");
-      doc.setTextColor(...TEXT2);
-      doc.text("LogisticFit • Audit CRM • Dokument poufny", 14, 289);
-      doc.text("Strona " + pageNum + " / " + totalPages, 196, 289, { align: "right" });
+      doc.setFontSize(6.5); doc.setFont(F, "normal");
+      doc.setTextColor(...S500);
+      doc.text("LogisticFit  ·  Audit CRM  ·  Dokument poufny  ·  " + dateStr, 14, 288.5);
+      doc.text(pageNum + " / " + totalPages, 196, 288.5, { align: "right" });
     }
 
-    // ── Pasek meta (tylko str. 1) ────────────────────────────────
-    doc.setFillColor(...SURFACE);
-    doc.rect(0, 48.5, 210, 13, "F");
-    doc.setDrawColor(...BORDER); doc.setLineWidth(0.2);
-    doc.line(0, 61.5, 210, 61.5);
+    // ── Breadcrumb / meta (str. 1, poniżej headera) ─────────────
+    // Zaczyna od y=43 (32 header + 3 green + 8 gap)
+    let y = 43;
 
-    doc.setFontSize(7.5); doc.setFont(F,"normal");
-    doc.setTextColor(...TEXT2);
-    doc.text("Lata analizy:", 14, 57);
-    doc.setTextColor(...DARK); doc.setFont(F,"bold");
-    doc.text(activeYears.join(", "), 38, 57);
+    doc.setFontSize(7); doc.setFont(F, "normal");
+    doc.setTextColor(...S500);
+    const metaParts = ["Lata: " + activeYears.join(", ")];
+    if (programFilter) metaParts.push("System: " + programLabel);
+    if (yearFilter)    metaParts.push("Rok: " + yearFilter);
+    doc.text(metaParts.join("   ·   "), 14, y);
 
-    doc.setFont(F,"normal"); doc.setTextColor(...TEXT2);
-    doc.text("System:", 90, 57);
-    doc.setTextColor(programFilter ? GREEN[0] : DARK[0],
-                     programFilter ? GREEN[1] : DARK[1],
-                     programFilter ? GREEN[2] : DARK[2]);
-    doc.setFont(F, programFilter ? "bold" : "normal");
-    doc.text(programLabel, 106, 57);
+    y += 10;
 
-    if (yearFilter) {
-      doc.setFont(F,"normal"); doc.setTextColor(...TEXT2);
-      doc.text("Rok:", 155, 57);
-      doc.setTextColor(...GREEN); doc.setFont(F,"bold");
-      doc.text(yearFilter, 164, 57);
-    }
-
-    let y = 72;
-
-    // ── 4 Stat boxy ──────────────────────────────────────────────
+    // ── 4 KPI Cards (białe, z bordem — styl dashboard) ───────────
     const total = stayedRzeznik.length + cameToRzeznik.length + leftRzeznik.length;
-    const boxes = [
-      { label: "Klientów łącznie", val: total,                color: NAVY  },
-      { label: "Nowi klienci",                      val: cameToRzeznik.length, color: GREEN },
-      { label: "Odeszli klienci",                   val: leftRzeznik.length,   color: RED   },
-      { label: "Stali klienci",                     val: stayedRzeznik.length, color: SLATE },
+    const kpis = [
+      { overline: "KLIENTÓW ŁĄCZNIE",  val: total,                valColor: NAVY,   bg: WHITE,    border: S200 },
+      { overline: "NOWI KLIENCI",       val: cameToRzeznik.length, valColor: GREEN,  bg: GREEN100, border: GREEN },
+      { overline: "ODESZLI KLIENCI",    val: leftRzeznik.length,   valColor: DANGER, bg: DANGER_BG,border: DANGER },
+      { overline: "STALI KLIENCI",      val: stayedRzeznik.length, valColor: NAVY,   bg: S50,      border: S200 },
     ];
-    const boxW = 43, boxH = 27, boxGap = 3.3;
-    boxes.forEach((box, i) => {
-      const bx = 14 + i * (boxW + boxGap);
-      // Cien (lekki szary)
-      doc.setFillColor(210, 215, 230);
-      doc.roundedRect(bx + 0.8, y + 1, boxW, boxH, 3, 3, "F");
-      // Box
-      doc.setFillColor(...box.color);
-      doc.roundedRect(bx, y, boxW, boxH, 3, 3, "F");
+    const cardW = 43, cardH = 28, cardGap = 3;
+    kpis.forEach((k, i) => {
+      const cx = 14 + i * (cardW + cardGap);
+      // Karta
+      doc.setFillColor(...k.bg);
+      doc.setDrawColor(...k.border);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(cx, y, cardW, cardH, 2.5, 2.5, "FD");
+      // Overline label
+      doc.setFontSize(5.5); doc.setFont(F, "bold");
+      doc.setTextColor(...S500);
+      doc.text(k.overline, cx + cardW / 2, y + 7, { align: "center" });
       // Liczba
-      doc.setTextColor(...WHITE);
-      doc.setFontSize(23); doc.setFont(F,"bold");
-      doc.text(String(box.val), bx + boxW / 2, y + 15.5, { align: "center" });
-      // Etykieta
-      doc.setFontSize(7); doc.setFont(F,"normal");
-      doc.text(box.label, bx + boxW / 2, y + 23, { align: "center" });
+      doc.setFontSize(26); doc.setFont(F, "bold");
+      doc.setTextColor(...k.valColor);
+      doc.text(String(k.val), cx + cardW / 2, y + 21, { align: "center" });
     });
-    y += boxH + 14;
+    y += cardH + 14;
 
-    // ── Helper: nagłówek sekcji z akcentem ──────────────────────────
-    function sectionHeading(text, color, yPos) {
-      // Pionowy accent bar
-      doc.setFillColor(...color);
-      doc.roundedRect(14, yPos, 3.5, 9.5, 1, 1, "F");
-      // Tytuł
-      doc.setTextColor(...color);
-      doc.setFontSize(10.5); doc.setFont(F,"bold");
-      doc.text(text, 21, yPos + 7);
-      // Pozioma linia
-      doc.setDrawColor(...BORDER); doc.setLineWidth(0.3);
-      doc.line(14, yPos + 11, 196, yPos + 11);
-      return yPos + 14;
+    // ── Helper: section header (overline + title) ────────────────
+    function sectionHeading(overline, title, yPos) {
+      // Overline
+      doc.setFontSize(6); doc.setFont(F, "bold");
+      doc.setTextColor(...S500);
+      doc.text(overline, 14, yPos);
+      // Title
+      doc.setFontSize(11); doc.setFont(F, "bold");
+      doc.setTextColor(...INK);
+      doc.text(title, 14, yPos + 6);
+      // Divider
+      doc.setDrawColor(...S200);
+      doc.setLineWidth(0.25);
+      doc.line(14, yPos + 9, 196, yPos + 9);
+      return yPos + 13;
     }
 
     // ── Style tabel ──────────────────────────────────────────────
     const tblStyles = {
-      font: F, fontSize: 8,
-      cellPadding: { top: 2.5, right: 3, bottom: 2.5, left: 3 },
-      textColor: DARK,
-      lineColor: BORDER, lineWidth: 0.2,
+      font: F, fontSize: 7.5,
+      cellPadding: { top: 2.5, right: 3.5, bottom: 2.5, left: 3.5 },
+      textColor: S700,
+      lineColor: S200, lineWidth: 0.2,
     };
-    const tblHeadStyle = (color) => ({
-      fillColor: color, textColor: WHITE,
-      fontStyle: "bold", fontSize: 7.5, font: F,
+    const tblHead = (accent) => ({
+      fillColor: S100, textColor: S500,
+      fontStyle: "bold", fontSize: 6.5, font: F,
+      halign: "left",
     });
-    const tblAlt = { fillColor: SURFACE };
-    const tblM  = { top: 58, left: 14, right: 14 };
-    const cols4 = {
-      0: { cellWidth: 16, halign: "right" },
-      1: { cellWidth: 76 },
+    const tblAlt  = { fillColor: S50 };
+    const tblM    = { top: 45, left: 14, right: 14 };
+    const cols4   = {
+      0: { cellWidth: 16, halign: "right", textColor: S500 },
+      1: { cellWidth: 78 },
       2: { cellWidth: 22 },
-      3: { cellWidth: 48 },
+      3: { cellWidth: 46 },
       4: { cellWidth: 14, halign: "center" },
     };
 
     // ── Nowi klienci ─────────────────────────────────────────────
     if (cameToRzeznik.length) {
-      y = sectionHeading("Nowi klienci Rzeźnika (" + cameToRzeznik.length + ")", GREEN, y);
+      y = sectionHeading("ZMIANY · NOWI", "Nowi klienci Rzeźnika", y);
       doc.autoTable({
         startY: y,
         head: [["PRJ", "Firma", "Program", "Poprzedni audytor", "Rok"]],
         body: cameToRzeznik.map(r => [
           r.prj,
-          r.title.length > 44 ? r.title.slice(0,42) + "…" : r.title,
+          r.title.length > 46 ? r.title.slice(0, 44) + "…" : r.title,
           r.program, r.from, r.year,
         ]),
-        styles: tblStyles, headStyles: tblHeadStyle(GREEN),
+        styles: tblStyles, headStyles: tblHead(GREEN),
         alternateRowStyles: tblAlt, columnStyles: cols4,
         margin: tblM,
+        didParseCell: (d) => {
+          if (d.section === "body" && d.column.index === 4) {
+            d.cell.styles.textColor = GREEN;
+            d.cell.styles.fontStyle = "bold";
+          }
+        },
       });
-      y = doc.lastAutoTable.finalY + 13;
+      y = doc.lastAutoTable.finalY + 14;
     }
 
     // ── Odeszli klienci ──────────────────────────────────────────
     if (leftRzeznik.length) {
-      if (y > 225) { doc.addPage(); y = 62; }
-      y = sectionHeading("Klienci, którzy odeszli od Rzeźnika (" + leftRzeznik.length + ")", RED, y);
+      if (y > 224) { doc.addPage(); y = 48; }
+      y = sectionHeading("ZMIANY · ODESZLI", "Klienci, którzy odeszli od Rzeźnika", y);
       doc.autoTable({
         startY: y,
         head: [["PRJ", "Firma", "Program", "Nowy audytor", "Rok"]],
         body: leftRzeznik.map(r => [
           r.prj,
-          r.title.length > 44 ? r.title.slice(0,42) + "…" : r.title,
+          r.title.length > 46 ? r.title.slice(0, 44) + "…" : r.title,
           r.program, r.to, r.year,
         ]),
-        styles: tblStyles, headStyles: tblHeadStyle(RED),
+        styles: tblStyles, headStyles: tblHead(DANGER),
         alternateRowStyles: tblAlt, columnStyles: cols4,
         margin: tblM,
+        didParseCell: (d) => {
+          if (d.section === "body" && d.column.index === 4) {
+            d.cell.styles.textColor = DANGER;
+            d.cell.styles.fontStyle = "bold";
+          }
+        },
       });
-      y = doc.lastAutoTable.finalY + 13;
+      y = doc.lastAutoTable.finalY + 14;
     }
 
     // ── Stali klienci ────────────────────────────────────────────
     if (stayedRzeznik.length) {
-      if (y > 215) { doc.addPage(); y = 62; }
-      y = sectionHeading("Stali klienci Rzeźnika (" + stayedRzeznik.length + ")", NAVY, y);
+      if (y > 218) { doc.addPage(); y = 48; }
+      y = sectionHeading("KLIENCI STALI", "Stali klienci Rzeźnika", y);
       const stayCols = {
-        0: { cellWidth: 16, halign: "right" },
-        1: { cellWidth: 82 },
-        2: { cellWidth: 22 },
+        0: { cellWidth: 16, halign: "right", textColor: S500 },
+        1: { cellWidth: 84 },
+        2: { cellWidth: 24 },
       };
-      years.forEach((yr, idx) => { stayCols[3 + idx] = { cellWidth: 14, halign: "center" }; });
+      years.forEach((yr, idx) => {
+        stayCols[3 + idx] = { cellWidth: 14, halign: "center" };
+      });
       doc.autoTable({
         startY: y,
         head: [["PRJ", "Firma", "Program", ...years.map(String)]],
         body: stayedRzeznik.map(r => [
           r.prj,
-          r.title.length > 44 ? r.title.slice(0,42) + "…" : r.title,
+          r.title.length > 46 ? r.title.slice(0, 44) + "…" : r.title,
           r.program,
           ...years.map(yr => r.years[String(yr)] ? "✓" : "–"),
         ]),
-        styles: tblStyles, headStyles: tblHeadStyle(NAVY),
+        styles: tblStyles, headStyles: tblHead(NAVY),
         alternateRowStyles: tblAlt, columnStyles: stayCols,
         margin: tblM,
+        didParseCell: (d) => {
+          if (d.section === "body" && d.column.index >= 3) {
+            const v = d.cell.raw;
+            d.cell.styles.textColor = v === "✓" ? GREEN : S300;
+            d.cell.styles.fontStyle = v === "✓" ? "bold" : "normal";
+          }
+        },
       });
     }
 
-    // ── Narysuj szablon na wszystkich stronach (na końcu!) ──────────
+    // ── Narysuj szablon na wszystkich stronach ───────────────────
     const totalPages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
@@ -1917,7 +1928,7 @@ async function generatePdfRzeznik() {
     }
 
     doc.save("Raport_Rzeznik_" + yyyy + "-" + mm_ + "-" + dd + ".pdf");
-    showToast("PDF wygenerowany (" + programLabel + ")", "success");
+    showToast("PDF wygenerowany — " + programLabel, "success");
 
   } catch(err) {
     showToast("Błąd generowania PDF: " + err.message, "error");
