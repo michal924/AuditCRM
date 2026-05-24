@@ -155,6 +155,7 @@ function setupNav() {
       if (view === "checkaudit") renderAuditorsTable();
       if (view === "changes") renderChangesTable();
       if (view === "opieka") OpiekaModule.render();
+      if (view === "mapa")   MapModule.render();
     };
   });
 }
@@ -1981,6 +1982,198 @@ async function generatePdfRzeznik() {
 // MODUŁ: OPIEKA NAD SZYMONEM (harmonogram opieki ojca)
 // Samowystarczalny — własny localStorage, prefiks op-/Opieka.
 // ============================================================
+// ============================================================
+// MODUŁ: MAPA AUDYTÓW (Leaflet + OpenStreetMap + Nominatim)
+// ============================================================
+const MapModule = (function () {
+  const GEO_CACHE_KEY = "auditGeoCache_v1";
+  const STATUS_COLORS = {
+    PLANNED:  "#3a4d98",
+    DONE:     "#239d46",
+    REJECTED: "#dc3545",
+    CHANGE:   "#fd7e14",
+    Invoice:  "#6f42c1",
+  };
+
+  let map = null;
+  let markers = [];
+  let geoCache = {};
+  let geocodeQueue = [];
+  let geocoding = false;
+
+  function loadCache() {
+    try { geoCache = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || "{}"); } catch { geoCache = {}; }
+  }
+  function saveCache() {
+    try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geoCache)); } catch {}
+  }
+
+  function cityKey(city) { return (city || "").trim().toLowerCase(); }
+
+  function initMap() {
+    if (map) return;
+    // Fix Leaflet icon paths (bundled locally)
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({ iconUrl: "marker-icon.png", iconRetinaUrl: "marker-icon-2x.png", shadowUrl: "marker-shadow.png" });
+
+    map = L.map("audit-map", { zoomControl: true }).setView([52.0, 19.5], 6);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 18,
+    }).addTo(map);
+  }
+
+  function clearMarkers() {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+  }
+
+  function statusColor(status) { return STATUS_COLORS[status] || "#8a93ad"; }
+
+  function circleMarker(latlng, color, count) {
+    const size = Math.min(10 + count * 4, 32);
+    return L.circleMarker(latlng, {
+      radius: size,
+      fillColor: color,
+      color: "#fff",
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.85,
+    });
+  }
+
+  function buildPopup(city, audits) {
+    const lines = audits.slice(0, 20).map(a => {
+      const date = a.AuditDateStart ? String(a.AuditDateStart).substring(0, 10) : "—";
+      const color = statusColor(a.AuditStatus);
+      return `<li style="margin-bottom:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:5px;flex-shrink:0"></span><strong>${a.Title || "—"}</strong><br><span style="color:#666;font-size:11px">${a.Program || ""} · ${a.AuditStatus || ""} · ${date}</span></li>`;
+    }).join("");
+    const more = audits.length > 20 ? `<li style="color:#666;font-size:11px">…i ${audits.length - 20} więcej</li>` : "";
+    return `<div style="min-width:220px;max-width:300px"><strong style="font-size:14px">${city}</strong><br><span style="color:#666;font-size:12px">${audits.length} audyt${audits.length === 1 ? "" : audits.length < 5 ? "y" : "ów"}</span><ul style="margin:8px 0 0;padding-left:0;list-style:none;max-height:200px;overflow-y:auto">${lines}${more}</ul></div>`;
+  }
+
+  function renderMarkers(audits) {
+    clearMarkers();
+    // Grupuj wg miasta
+    const byCity = {};
+    audits.forEach(a => {
+      const city = (a.City || "").trim();
+      if (!city) return;
+      const k = cityKey(city);
+      if (!byCity[k]) byCity[k] = { city, audits: [] };
+      byCity[k].audits.push(a);
+    });
+
+    Object.values(byCity).forEach(({ city, audits: cityAudits }) => {
+      const coords = geoCache[cityKey(city)];
+      if (!coords) return;
+      // Kolor = najczęstszy status w tym mieście
+      const statusCount = {};
+      cityAudits.forEach(a => { statusCount[a.AuditStatus] = (statusCount[a.AuditStatus] || 0) + 1; });
+      const topStatus = Object.entries(statusCount).sort((a, b) => b[1] - a[1])[0]?.[0];
+      const color = statusColor(topStatus);
+      const m = circleMarker([coords.lat, coords.lon], color, cityAudits.length);
+      m.bindPopup(buildPopup(city, cityAudits), { maxWidth: 320 });
+      // Etykieta liczby
+      if (cityAudits.length > 1) {
+        m.bindTooltip(String(cityAudits.length), { permanent: true, direction: "center", className: "map-count-label" });
+      }
+      m.addTo(map);
+      markers.push(m);
+    });
+  }
+
+  function renderList(audits, yearFilter) {
+    const el = document.getElementById("map-list");
+    const cnt = document.getElementById("map-count");
+    if (!el) return;
+    const list = audits.filter(a => !yearFilter || String(a.Year) === yearFilter)
+                       .sort((a, b) => (a.City || "").localeCompare(b.City || "", "pl"));
+    cnt.textContent = `${list.length} audyt${list.length === 1 ? "" : list.length < 5 ? "y" : "ów"}`;
+    el.innerHTML = list.map(a => {
+      const color = statusColor(a.AuditStatus);
+      const date  = a.AuditDateStart ? String(a.AuditDateStart).substring(0, 10) : "—";
+      return `<li class="map-list-item">
+        <span class="map-list-dot" style="background:${color}"></span>
+        <div class="map-list-body">
+          <div class="map-list-title">${a.Title || "—"}</div>
+          <div class="map-list-meta">${a.City || "—"} · ${a.Program || "?"} · ${date}</div>
+        </div>
+        <span class="map-list-status" style="color:${color}">${a.AuditStatus || "?"}</span>
+      </li>`;
+    }).join("");
+  }
+
+  // Nominatim geocoding z kolejką i rate-limiting (1 req/s)
+  function scheduleGeocode(cities, onDone) {
+    const toFetch = cities.filter(c => !geoCache[cityKey(c)]);
+    if (!toFetch.length) { onDone(); return; }
+    geocodeQueue = [...toFetch];
+    let done = 0;
+    const total = toFetch.length;
+    const status = document.getElementById("map-geocode-status");
+
+    function next() {
+      if (!geocodeQueue.length) { geocoding = false; saveCache(); onDone(); if (status) status.textContent = ""; return; }
+      const city = geocodeQueue.shift();
+      if (status) status.textContent = `Geokodowanie: ${city} (${++done}/${total})…`;
+      fetch(`https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(city)}&country=Poland&format=json&limit=1`, {
+        headers: { "Accept-Language": "pl", "User-Agent": "LogisticFit-AuditCRM/1.0" }
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data && data[0]) geoCache[cityKey(city)] = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), name: data[0].display_name };
+        else geoCache[cityKey(city)] = null; // nie znaleziono
+        setTimeout(next, 1100); // respektuj limit Nominatim (1 req/s)
+      })
+      .catch(() => { setTimeout(next, 1100); });
+    }
+    geocoding = true;
+    next();
+  }
+
+  function getAuditsForMap() {
+    const yearFilter = (document.getElementById("map-filter-year") || {}).value || "";
+    const all = (typeof allAudits !== "undefined" && Array.isArray(allAudits)) ? allAudits : [];
+    return all.filter(a => a.AuditorName === MY_AUDITOR && (!yearFilter || String(a.Year) === yearFilter));
+  }
+
+  function refresh() {
+    if (!map) return;
+    const yearFilter = (document.getElementById("map-filter-year") || {}).value || "";
+    const audits = getAuditsForMap();
+    renderMarkers(audits);
+    renderList(audits, yearFilter);
+  }
+
+  function render() {
+    loadCache();
+    initMap();
+    setTimeout(() => map.invalidateSize(), 100); // fix gdy div był ukryty
+
+    const audits = getAuditsForMap();
+    const cities = [...new Set(audits.map(a => (a.City || "").trim()).filter(Boolean))];
+
+    renderList(audits, (document.getElementById("map-filter-year") || {}).value || "");
+
+    // Podpięcie filtra roku
+    const yearSel = document.getElementById("map-filter-year");
+    if (yearSel && !yearSel._mapBound) {
+      yearSel.addEventListener("change", refresh);
+      yearSel._mapBound = true;
+    }
+
+    scheduleGeocode(cities, () => {
+      renderMarkers(audits);
+    });
+    // Pokaż już zakeszowane miasta od razu
+    renderMarkers(audits);
+  }
+
+  return { render };
+})();
+window.MapModule = MapModule;
+
 const OpiekaModule = (function () {
   const CHILD = "Szymon";
   const CFG_KEY = "opieka_config_v1";

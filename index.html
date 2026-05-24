@@ -6,6 +6,8 @@
   <title>Audit CRM — LogisticFit</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="leaflet.css">
+  <script src="leaflet.js"></script>
   <script src="msal-browser.min.js"></script>
   <script src="xlsx.full.min.js"></script>
   <script src="jspdf.umd.min.js"></script>
@@ -38,6 +40,7 @@
       <button class="nav-btn" data-view="checkaudit">✅ Check Audyt</button>
       <button class="nav-btn" data-view="changes">🔄 Zmiany Audytora</button>
       <button class="nav-btn" data-view="opieka">👨‍👦 Opieka — Szymon</button>
+      <button class="nav-btn" data-view="mapa">🗺 Mapa audytów</button>
     </div>
     <div class="nav-right">
       <button id="btn-import" class="btn-action" title="Importuj kwartalny plan z CUC">⬆ Import CUC</button>
@@ -277,6 +280,33 @@
           <p class="op-hint">Założenie: w „przeciwne" lata święta przypadają drugiemu rodzicowi.</p>
         </div>
       </aside>
+    </div>
+  </div>
+
+  <!-- WIDOK: MAPA AUDYTÓW -->
+  <div id="view-mapa" class="view hidden">
+    <div class="view-header">
+      <h2>Mapa audytów</h2>
+      <div class="header-filters">
+        <span class="map-legend-item"><span class="map-dot planned"></span> PLANNED</span>
+        <span class="map-legend-item"><span class="map-dot done"></span> DONE</span>
+        <span class="map-legend-item"><span class="map-dot rejected"></span> REJECTED</span>
+        <span class="map-legend-item"><span class="map-dot other"></span> Inne</span>
+        <span id="map-geocode-status" class="map-geocode-status"></span>
+      </div>
+    </div>
+    <div id="map-container">
+      <div id="audit-map"></div>
+      <div id="map-sidebar" class="map-sidebar">
+        <div class="map-sidebar-header">
+          <span id="map-count">— audytów</span>
+          <select id="map-filter-year" class="filter-select" style="font-size:12px;padding:5px 8px">
+            <option value="">Wszystkie lata</option>
+            <option>2024</option><option>2025</option><option selected>2026</option>
+          </select>
+        </div>
+        <ul id="map-list" class="map-list"></ul>
+      </div>
     </div>
   </div>
 
