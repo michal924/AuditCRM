@@ -177,12 +177,25 @@ async function loadAudits() {
 // ============================================================
 // FILTRY — z persystencją w localStorage
 // ============================================================
-const FILTER_IDS = ["search","filter-quarter","filter-year","filter-program","filter-status"];
-const FILTERS_KEY = "auditFilters_v1";
+const FILTER_IDS = ["search","filter-quarter","filter-year","filter-program"];
+const FILTERS_KEY = "auditFilters_v2";
+
+function getSelectedStatuses() {
+  return [...document.querySelectorAll("#filter-status-panel input[type=checkbox]:checked")].map(cb => cb.value);
+}
+
+function updateStatusBtn() {
+  const sel = getSelectedStatuses();
+  const btn = document.getElementById("filter-status-btn");
+  if (!btn) return;
+  btn.textContent = sel.length === 0 ? "Status" : sel.length === 1 ? sel[0] : `Status (${sel.length})`;
+  btn.classList.toggle("filter-multi-active", sel.length > 0);
+}
 
 function saveFilters() {
   const state = {};
   FILTER_IDS.forEach(id => { state[id] = document.getElementById(id).value; });
+  state.statusMulti = getSelectedStatuses();
   try { localStorage.setItem(FILTERS_KEY, JSON.stringify(state)); } catch {}
 }
 
@@ -195,6 +208,12 @@ function restoreFilters() {
       const el = document.getElementById(id);
       if (el && state[id] !== undefined) el.value = state[id];
     });
+    if (Array.isArray(state.statusMulti)) {
+      document.querySelectorAll("#filter-status-panel input[type=checkbox]").forEach(cb => {
+        cb.checked = state.statusMulti.includes(cb.value);
+      });
+      updateStatusBtn();
+    }
   } catch {}
 }
 
@@ -207,11 +226,20 @@ function setupFilters() {
     el.addEventListener("change", () => { saveFilters(); renderTable(); });
   });
 
+  // Multi-select status dropdown
+  const btn   = document.getElementById("filter-status-btn");
+  const panel = document.getElementById("filter-status-panel");
+  btn.addEventListener("click", e => { e.stopPropagation(); panel.classList.toggle("hidden"); });
+  document.addEventListener("click", e => { if (!e.target.closest("#filter-status-wrap")) panel.classList.add("hidden"); });
+  panel.querySelectorAll("input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", () => { updateStatusBtn(); saveFilters(); renderTable(); });
+  });
+
   document.getElementById("btn-clear-filters").onclick = () => {
     document.getElementById("search").value = "";
-    ["filter-quarter","filter-year","filter-program","filter-status"].forEach(id => {
-      document.getElementById(id).value = "";
-    });
+    ["filter-quarter","filter-year","filter-program"].forEach(id => { document.getElementById(id).value = ""; });
+    document.querySelectorAll("#filter-status-panel input[type=checkbox]").forEach(cb => { cb.checked = false; });
+    updateStatusBtn();
     saveFilters();
     renderTable();
   };
@@ -222,11 +250,11 @@ function setupFilters() {
 
 function getFilters() {
   return {
-    search:  document.getElementById("search").value.toLowerCase(),
-    quarter: document.getElementById("filter-quarter").value,
-    year:    document.getElementById("filter-year").value,
-    program: document.getElementById("filter-program").value,
-    status:  document.getElementById("filter-status").value,
+    search:   document.getElementById("search").value.toLowerCase(),
+    quarter:  document.getElementById("filter-quarter").value,
+    year:     document.getElementById("filter-year").value,
+    program:  document.getElementById("filter-program").value,
+    statuses: getSelectedStatuses(),
   };
 }
 
@@ -243,7 +271,7 @@ function applyFilters(audits) {
     if (f.quarter && a.Quarter !== f.quarter) return false;
     if (f.year    && String(a.Year) !== f.year) return false;
     if (f.program && normProgramKey(a.Program) !== normProgramKey(f.program)) return false;
-    if (f.status  && a.AuditStatus !== f.status) return false;
+    if (f.statuses.length > 0 && !f.statuses.includes(a.AuditStatus)) return false;
     return true;
   });
 }

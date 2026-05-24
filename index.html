@@ -67,11 +67,16 @@
         <option value="SURE">SURE</option>
         <option value="EUDR">EUDR</option>
       </select>
-      <select id="filter-status" class="filter-select">
-        <option value="">Status</option>
-        <option>PLANNED</option><option>DONE</option>
-        <option>REJECTED</option><option>CHANGE</option><option>Invoice</option>
-      </select>
+      <div class="filter-multi-wrap" id="filter-status-wrap">
+        <button class="filter-select filter-multi-btn" id="filter-status-btn">Status</button>
+        <div class="filter-multi-panel hidden" id="filter-status-panel">
+          <label class="filter-multi-opt"><input type="checkbox" value="PLANNED"> PLANNED</label>
+          <label class="filter-multi-opt"><input type="checkbox" value="DONE"> DONE</label>
+          <label class="filter-multi-opt"><input type="checkbox" value="REJECTED"> REJECTED</label>
+          <label class="filter-multi-opt"><input type="checkbox" value="CHANGE"> CHANGE</label>
+          <label class="filter-multi-opt"><input type="checkbox" value="Invoice"> Invoice</label>
+        </div>
+      </div>
       <button id="btn-clear-filters" class="btn-ghost">✕ Wyczyść</button>
     </div>
 

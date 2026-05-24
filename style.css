@@ -259,6 +259,17 @@ td.date-col,
 }
 .filter-select:focus { border-color: var(--accent-light); }
 
+/* Multi-select status dropdown */
+.filter-multi-wrap { position: relative; }
+.filter-multi-btn { text-align: left; min-width: 110px; appearance: none; }
+.filter-multi-btn::after { content: " ▾"; font-size: 11px; color: var(--text2); }
+.filter-multi-btn.filter-multi-active { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.filter-multi-panel { position: absolute; top: calc(100% + 4px); left: 0; z-index: 200; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 140px; display: flex; flex-direction: column; gap: 2px; }
+.filter-multi-panel.hidden { display: none; }
+.filter-multi-opt { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text); transition: background .1s; }
+.filter-multi-opt:hover { background: var(--bg3); }
+.filter-multi-opt input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+
 /* ============================================================
    STATS
    ============================================================ */
