@@ -2083,12 +2083,11 @@ const MapModule = (function () {
     });
   }
 
-  function renderList(audits, yearFilter) {
+  function renderList(audits) {
     const el = document.getElementById("map-list");
     const cnt = document.getElementById("map-count");
     if (!el) return;
-    const list = audits.filter(a => !yearFilter || String(a.Year) === yearFilter)
-                       .sort((a, b) => (a.City || "").localeCompare(b.City || "", "pl"));
+    const list = [...audits].sort((a, b) => (a.City || "").localeCompare(b.City || "", "pl"));
     cnt.textContent = `${list.length} audyt${list.length === 1 ? "" : list.length < 5 ? "y" : "ów"}`;
     el.innerHTML = list.map(a => {
       const color = statusColor(a.AuditStatus);
@@ -2132,42 +2131,94 @@ const MapModule = (function () {
     next();
   }
 
+  const MAP_FILTER_KEYS = ["status", "year", "quarter", "program"];
+  const MAP_FILTER_LABELS = { status: "Status", year: "Rok", quarter: "Kwartał", program: "Program" };
+  let mapFiltersInited = false;
+
+  function getMapSelectedMulti(key) {
+    return [...document.querySelectorAll(`#map-filter-${key}-panel input[type=checkbox]:checked`)].map(cb => cb.value);
+  }
+
+  function updateMapBtn(key) {
+    const sel = getMapSelectedMulti(key);
+    const btn = document.getElementById(`map-filter-${key}-btn`);
+    if (!btn) return;
+    const label = MAP_FILTER_LABELS[key];
+    btn.textContent = sel.length === 0 ? label : sel.length === 1 ? sel[0] : `${label} (${sel.length})`;
+    btn.classList.toggle("filter-multi-active", sel.length > 0);
+  }
+
   function getAuditsForMap() {
-    const yearFilter = (document.getElementById("map-filter-year") || {}).value || "";
+    const statuses = getMapSelectedMulti("status");
+    const years    = getMapSelectedMulti("year");
+    const quarters = getMapSelectedMulti("quarter");
+    const programs = getMapSelectedMulti("program");
     const all = (typeof allAudits !== "undefined" && Array.isArray(allAudits)) ? allAudits : [];
-    return all.filter(a => a.AuditorName === MY_AUDITOR && (!yearFilter || String(a.Year) === yearFilter));
+    return all.filter(a => {
+      if (a.AuditorName !== MY_AUDITOR) return false;
+      if (statuses.length > 0 && !statuses.includes(a.AuditStatus)) return false;
+      if (years.length    > 0 && !years.includes(String(a.Year))) return false;
+      if (quarters.length > 0 && !quarters.includes(a.Quarter)) return false;
+      if (programs.length > 0 && !programs.some(p => normProgramKey(p) === normProgramKey(a.Program))) return false;
+      return true;
+    });
   }
 
   function refresh() {
     if (!map) return;
-    const yearFilter = (document.getElementById("map-filter-year") || {}).value || "";
     const audits = getAuditsForMap();
     renderMarkers(audits);
-    renderList(audits, yearFilter);
+    renderList(audits);
+  }
+
+  function setupMapFilters() {
+    if (mapFiltersInited) return;
+    mapFiltersInited = true;
+
+    MAP_FILTER_KEYS.forEach(key => {
+      const btn   = document.getElementById(`map-filter-${key}-btn`);
+      const panel = document.getElementById(`map-filter-${key}-panel`);
+      if (!btn || !panel) return;
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        MAP_FILTER_KEYS.forEach(k => { if (k !== key) document.getElementById(`map-filter-${k}-panel`)?.classList.add("hidden"); });
+        panel.classList.toggle("hidden");
+      });
+      panel.querySelectorAll("input[type=checkbox]").forEach(cb => {
+        cb.addEventListener("change", () => { updateMapBtn(key); refresh(); });
+      });
+      updateMapBtn(key); // inicjalizuj etykietę (obsługa checked w HTML)
+    });
+
+    document.addEventListener("click", e => {
+      if (!e.target.closest(".filter-multi-wrap")) {
+        MAP_FILTER_KEYS.forEach(key => { document.getElementById(`map-filter-${key}-panel`)?.classList.add("hidden"); });
+      }
+    }, { capture: false });
+
+    document.getElementById("map-btn-clear")?.addEventListener("click", () => {
+      MAP_FILTER_KEYS.forEach(key => {
+        document.querySelectorAll(`#map-filter-${key}-panel input[type=checkbox]`).forEach(cb => { cb.checked = false; });
+        updateMapBtn(key);
+      });
+      refresh();
+    });
   }
 
   function render() {
     loadCache();
     initMap();
-    setTimeout(() => map.invalidateSize(), 100); // fix gdy div był ukryty
+    setTimeout(() => map.invalidateSize(), 100);
+    setupMapFilters();
+
+    const all = (typeof allAudits !== "undefined" && Array.isArray(allAudits)) ? allAudits : [];
+    const allMyCities = [...new Set(all.filter(a => a.AuditorName === MY_AUDITOR).map(a => (a.City || "").trim()).filter(Boolean))];
 
     const audits = getAuditsForMap();
-    const cities = [...new Set(audits.map(a => (a.City || "").trim()).filter(Boolean))];
-
-    renderList(audits, (document.getElementById("map-filter-year") || {}).value || "");
-
-    // Podpięcie filtra roku
-    const yearSel = document.getElementById("map-filter-year");
-    if (yearSel && !yearSel._mapBound) {
-      yearSel.addEventListener("change", refresh);
-      yearSel._mapBound = true;
-    }
-
-    scheduleGeocode(cities, () => {
-      renderMarkers(audits);
-    });
-    // Pokaż już zakeszowane miasta od razu
+    renderList(audits);
     renderMarkers(audits);
+
+    scheduleGeocode(allMyCities, () => { renderMarkers(getAuditsForMap()); });
   }
 
   return { render };

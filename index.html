@@ -288,10 +288,48 @@
     <div class="view-header">
       <h2>Mapa audytów</h2>
       <div class="header-filters">
-        <span class="map-legend-item"><span class="map-dot planned"></span> PLANNED</span>
-        <span class="map-legend-item"><span class="map-dot done"></span> DONE</span>
-        <span class="map-legend-item"><span class="map-dot rejected"></span> REJECTED</span>
-        <span class="map-legend-item"><span class="map-dot other"></span> Inne</span>
+        <!-- Status -->
+        <div class="filter-multi-wrap" id="map-filter-status-wrap">
+          <button class="filter-select filter-multi-btn" id="map-filter-status-btn">Status</button>
+          <div class="filter-multi-panel hidden" id="map-filter-status-panel">
+            <label class="filter-multi-opt"><input type="checkbox" value="PLANNED"> PLANNED</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="DONE"> DONE</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="REJECTED"> REJECTED</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="CHANGE"> CHANGE</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="Invoice"> Invoice</label>
+          </div>
+        </div>
+        <!-- Rok -->
+        <div class="filter-multi-wrap" id="map-filter-year-wrap">
+          <button class="filter-select filter-multi-btn" id="map-filter-year-btn">Rok</button>
+          <div class="filter-multi-panel hidden" id="map-filter-year-panel">
+            <label class="filter-multi-opt"><input type="checkbox" value="2024"> 2024</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="2025"> 2025</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="2026" checked> 2026</label>
+          </div>
+        </div>
+        <!-- Kwartał -->
+        <div class="filter-multi-wrap" id="map-filter-quarter-wrap">
+          <button class="filter-select filter-multi-btn" id="map-filter-quarter-btn">Kwartał</button>
+          <div class="filter-multi-panel hidden" id="map-filter-quarter-panel">
+            <label class="filter-multi-opt"><input type="checkbox" value="Q1"> Q1</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="Q2"> Q2</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="Q3"> Q3</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="Q4"> Q4</label>
+          </div>
+        </div>
+        <!-- Program -->
+        <div class="filter-multi-wrap" id="map-filter-program-wrap">
+          <button class="filter-select filter-multi-btn" id="map-filter-program-btn">Program</button>
+          <div class="filter-multi-panel hidden" id="map-filter-program-panel">
+            <label class="filter-multi-opt"><input type="checkbox" value="FSC CoC"> FSC CoC</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="PEFC CoC"> PEFC CoC</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="KZR INiG"> KZR INiG</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="SURE"> SURE</label>
+            <label class="filter-multi-opt"><input type="checkbox" value="EUDR"> EUDR</label>
+          </div>
+        </div>
+        <button id="map-btn-clear" class="btn-ghost">✕ Wyczyść</button>
         <span id="map-geocode-status" class="map-geocode-status"></span>
       </div>
     </div>
@@ -300,10 +338,11 @@
       <div id="map-sidebar" class="map-sidebar">
         <div class="map-sidebar-header">
           <span id="map-count">— audytów</span>
-          <select id="map-filter-year" class="filter-select" style="font-size:12px;padding:5px 8px">
-            <option value="">Wszystkie lata</option>
-            <option>2024</option><option>2025</option><option selected>2026</option>
-          </select>
+          <div class="map-legend-row">
+            <span class="map-legend-item"><span class="map-dot planned"></span> PLANNED</span>
+            <span class="map-legend-item"><span class="map-dot done"></span> DONE</span>
+            <span class="map-legend-item"><span class="map-dot rejected"></span> REJECTED</span>
+          </div>
         </div>
         <ul id="map-list" class="map-list"></ul>
       </div>
