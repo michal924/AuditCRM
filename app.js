@@ -1950,6 +1950,13 @@ const OpiekaModule = (function () {
 
   let CFG = loadCfg();
   let currentYear = new Date().getFullYear();
+  let currentMonth = new Date().getMonth();
+  let currentView = "year";
+  let currentWeekStart = (() => {
+    const now = new Date();
+    const day = (now.getDay() + 6) % 7;
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+  })();
   let inited = false;
 
   function loadCfg() {
@@ -2098,9 +2105,29 @@ const OpiekaModule = (function () {
     return map;
   }
 
+  function updateLabel() {
+    const lbl = $("op-year-label");
+    if (currentView === "year") {
+      lbl.textContent = currentYear;
+    } else if (currentView === "month") {
+      lbl.textContent = `${MIES_NOM[currentMonth]} ${currentYear}`;
+    } else {
+      const end = addDays(currentWeekStart, 6);
+      const wk = isoWeek(currentWeekStart);
+      const fmtS = d => `${d.getDate()} ${MIES[d.getMonth()].substring(0, 3)}`;
+      lbl.textContent = `Tydz. ${wk} · ${fmtS(currentWeekStart)}–${fmtS(end)} ${end.getFullYear()}`;
+    }
+  }
+
   function renderCalendar() {
-    $("op-year-label").textContent = currentYear;
-    const wrap = $("op-calendar"); wrap.innerHTML = "";
+    updateLabel();
+    if (currentView === "year") renderYearView();
+    else if (currentView === "month") renderMonthView();
+    else renderWeekView();
+  }
+
+  function renderYearView() {
+    const wrap = $("op-calendar"); wrap.className = "op-calendar op-calendar-year"; wrap.innerHTML = "";
     const today = new Date();
     const auditsMap = auditsByDayMap();
     for (let mo = 0; mo < 12; mo++) {
@@ -2136,6 +2163,111 @@ const OpiekaModule = (function () {
       }
       card.appendChild(grid); wrap.appendChild(card);
     }
+  }
+
+  function renderMonthView() {
+    const wrap = $("op-calendar"); wrap.className = "op-calendar op-calendar-month"; wrap.innerHTML = "";
+    const today = new Date();
+    const auditsMap = auditsByDayMap();
+    const cont = document.createElement("div"); cont.className = "op-month-large";
+
+    // Header row with day names
+    const hdrRow = document.createElement("div"); hdrRow.className = "op-month-large-header";
+    ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"].forEach(d => {
+      const h = document.createElement("div"); h.className = "op-dow-large"; h.textContent = d; hdrRow.appendChild(h);
+    });
+    cont.appendChild(hdrRow);
+
+    const grid = document.createElement("div"); grid.className = "op-month-large-grid";
+    const first = new Date(currentYear, currentMonth, 1);
+    const lead = (first.getDay() + 6) % 7;
+    const dim = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+    for (let i = 0; i < lead; i++) {
+      const emp = document.createElement("div"); emp.className = "op-day-large op-day-empty"; grid.appendChild(emp);
+    }
+    for (let d = 1; d <= dim; d++) {
+      const cell = document.createElement("div"); cell.className = "op-day-large";
+      const dd = new Date(currentYear, currentMonth, d);
+      const iN = ownerAt(setTime(dd, 21, 0), CFG), iM = ownerAt(setTime(dd, 10, 0), CFG);
+      const fN = iN.owner === "father", fM = iM.owner === "father";
+      if (fN) cell.classList.add("father");
+      if (fN !== fM) cell.classList.add("handover");
+      if (sameDay(dd, today)) cell.classList.add("is-today");
+      if (iN.special && fN) cell.classList.add("special");
+
+      const num = document.createElement("div"); num.className = "op-day-large-num"; num.textContent = d; cell.appendChild(num);
+      if (fN) {
+        const st = document.createElement("div"); st.className = "op-day-large-status";
+        st.textContent = iN.special ? "★ Specjalny" : "Ojciec"; cell.appendChild(st);
+      }
+      if (fN !== fM) {
+        const ho = document.createElement("div"); ho.className = "op-day-large-ho";
+        ho.textContent = fM ? "← powrót" : "→ przejęcie"; cell.appendChild(ho);
+      }
+      const key = `${currentYear}-${pad(currentMonth + 1)}-${pad(d)}`;
+      const dayAudits = auditsMap[key];
+      if (dayAudits && dayAudits.length) {
+        cell.classList.add("has-audit"); if (fN) cell.classList.add("conflict");
+        dayAudits.slice(0, 2).forEach(a => {
+          const au = document.createElement("div"); au.className = "op-day-large-audit";
+          au.textContent = `📋 ${a.Title || "Audyt"}`; cell.appendChild(au);
+        });
+      }
+      let tt = `${fmtDate(dd)}\n${iN.reason}` + (fN ? "\n→ opieka ojca" : "\n→ poza opieką ojca");
+      if (dayAudits && dayAudits.length) { tt += `\n\n📋 Audyt(y):\n` + dayAudits.map(a => `• ${a.Title || "—"} (${a.Program || "?"})`).join("\n"); if (fN) tt += `\n⚠ Kolizja`; }
+      cell.title = tt;
+      grid.appendChild(cell);
+    }
+    cont.appendChild(grid); wrap.appendChild(cont);
+  }
+
+  function renderWeekView() {
+    const wrap = $("op-calendar"); wrap.className = "op-calendar op-calendar-week"; wrap.innerHTML = "";
+    const today = new Date();
+    const auditsMap = auditsByDayMap();
+    const DOW_FULL = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"];
+    const grid = document.createElement("div"); grid.className = "op-week-grid";
+
+    for (let i = 0; i < 7; i++) {
+      const dd = addDays(currentWeekStart, i);
+      const col = document.createElement("div"); col.className = "op-week-col";
+      const iN = ownerAt(setTime(dd, 21, 0), CFG), iM = ownerAt(setTime(dd, 10, 0), CFG);
+      const fN = iN.owner === "father", fM = iM.owner === "father";
+      if (fN) col.classList.add("father");
+      if (fN !== fM) col.classList.add("handover");
+      if (sameDay(dd, today)) col.classList.add("is-today");
+      if (iN.special && fN) col.classList.add("special");
+
+      const hdr = document.createElement("div"); hdr.className = "op-week-col-hdr";
+      hdr.innerHTML = `<span class="op-week-dow">${DOW_FULL[i]}</span><span class="op-week-date">${dd.getDate()} ${MIES[dd.getMonth()]}</span>`;
+      col.appendChild(hdr);
+
+      const body = document.createElement("div"); body.className = "op-week-col-body";
+      const cust = document.createElement("div"); cust.className = "op-week-custody" + (fN ? " father" : "");
+      cust.innerHTML = fN
+        ? `<strong>${iN.special ? "★ Specjalny" : "🏠 Ojciec"}</strong><small>${iN.reason}</small>`
+        : `<small>${iN.reason}</small>`;
+      body.appendChild(cust);
+
+      if (fN !== fM) {
+        const hoEl = document.createElement("div"); hoEl.className = "op-week-ho";
+        hoEl.textContent = fM ? `← powrót ~${CFG.handoverHour}:00` : `→ przejęcie ~${CFG.handoverHour}:00`;
+        body.appendChild(hoEl);
+      }
+
+      const key = `${dd.getFullYear()}-${pad(dd.getMonth() + 1)}-${pad(dd.getDate())}`;
+      const dayAudits = auditsMap[key];
+      if (dayAudits && dayAudits.length) {
+        col.classList.add("has-audit"); if (fN) col.classList.add("conflict");
+        dayAudits.forEach(a => {
+          const au = document.createElement("div"); au.className = "op-week-audit" + (fN ? " conflict" : "");
+          au.textContent = `📋 ${a.Title || "Audyt"} (${a.Program || "?"})`; body.appendChild(au);
+        });
+      }
+      col.appendChild(body); grid.appendChild(col);
+    }
+    wrap.appendChild(grid);
   }
 
   function renderHandovers() {
@@ -2199,8 +2331,52 @@ const OpiekaModule = (function () {
   }
 
   function setup() {
-    $("op-prev-year").addEventListener("click", () => { currentYear--; refreshAll(); renderSettings(); });
-    $("op-next-year").addEventListener("click", () => { currentYear++; refreshAll(); renderSettings(); });
+    // View switcher
+    ["year", "month", "week"].forEach(v => {
+      $(`op-view-${v}`).addEventListener("click", () => {
+        // Sync state when switching views
+        if (v === "month" && currentView === "week") {
+          currentYear = currentWeekStart.getFullYear();
+          currentMonth = currentWeekStart.getMonth();
+        } else if (v === "week" && currentView === "month") {
+          const first = new Date(currentYear, currentMonth, 1);
+          const day = (first.getDay() + 6) % 7;
+          currentWeekStart = new Date(first.getFullYear(), first.getMonth(), first.getDate() - day);
+        } else if (v === "week" && currentView === "year") {
+          const now = new Date();
+          const day = (now.getDay() + 6) % 7;
+          currentWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+          currentYear = currentWeekStart.getFullYear();
+        }
+        currentView = v;
+        document.querySelectorAll(".op-view-btn").forEach(b => b.classList.remove("active"));
+        $(`op-view-${v}`).classList.add("active");
+        refreshAll();
+      });
+    });
+
+    // Prev / Next navigation — context-aware
+    $("op-prev-year").addEventListener("click", () => {
+      if (currentView === "year") { currentYear--; renderSettings(); }
+      else if (currentView === "month") {
+        currentMonth--; if (currentMonth < 0) { currentMonth = 11; currentYear--; renderSettings(); }
+      } else {
+        currentWeekStart = addDays(currentWeekStart, -7);
+        currentYear = currentWeekStart.getFullYear();
+      }
+      refreshAll();
+    });
+    $("op-next-year").addEventListener("click", () => {
+      if (currentView === "year") { currentYear++; renderSettings(); }
+      else if (currentView === "month") {
+        currentMonth++; if (currentMonth > 11) { currentMonth = 0; currentYear++; renderSettings(); }
+      } else {
+        currentWeekStart = addDays(currentWeekStart, 7);
+        currentYear = currentWeekStart.getFullYear();
+      }
+      refreshAll();
+    });
+
     $("op-btn-ics").addEventListener("click", exportICS);
     $("op-btn-settings").addEventListener("click", () => $("op-settings").classList.toggle("hidden"));
     $("op-set-hour").addEventListener("change", e => {

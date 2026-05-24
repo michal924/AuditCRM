@@ -987,7 +987,13 @@ tr.change-row-rzeznik:hover { background: #e0f5e8; }
 /* ============================================================
    MODUŁ: OPIEKA — SZYMON
    ============================================================ */
-.op-year-label { font-size: 20px; font-weight: 800; color: var(--accent); min-width: 56px; text-align: center; }
+.op-year-label { font-size: 16px; font-weight: 800; color: var(--accent); min-width: 80px; text-align: center; white-space: nowrap; }
+
+/* --- View switcher --- */
+.op-view-switcher { display: inline-flex; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; }
+.op-view-btn { background: none; border: none; padding: 5px 13px; border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 700; color: var(--text2); cursor: pointer; transition: background .15s, color .15s; }
+.op-view-btn:hover { background: var(--bg2); color: var(--text); }
+.op-view-btn.active { background: var(--accent); color: #fff; box-shadow: 0 1px 4px rgba(58,77,152,.25); }
 
 .op-today { border-radius: var(--radius); padding: 18px 22px; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; color: #fff; box-shadow: var(--shadow); }
 .op-today.is-father { background: linear-gradient(135deg, var(--green), #2bb557); }
@@ -1045,6 +1051,55 @@ tr.change-row-rzeznik:hover { background: #e0f5e8; }
 .op-notes h4 { margin: 0 0 9px; color: var(--accent); font-size: 14px; }
 .op-notes ul { margin: 0 0 9px; padding-left: 18px; }
 .op-notes li { font-size: 13px; margin-bottom: 5px; line-height: 1.35; }
+
+/* --- Widok: Miesiąc (duży) --- */
+.op-calendar-month { display: block !important; }
+.op-month-large { width: 100%; }
+.op-month-large-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+.op-dow-large { text-align: center; font-size: 12px; font-weight: 800; color: var(--text2); padding: 6px 0; text-transform: uppercase; letter-spacing: .05em; }
+.op-month-large-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.op-day-large { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; min-height: 80px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; transition: box-shadow .12s; }
+.op-day-large.op-day-empty { background: transparent; border-color: transparent; }
+.op-day-large.father { background: #d6f0de; border-color: #b2dfc0; }
+.op-day-large.special { background: #8fd6a3; border-color: #5ebf7a; }
+.op-day-large.handover { box-shadow: inset 0 0 0 2px var(--orange); }
+.op-day-large.is-today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.op-day-large.conflict { box-shadow: inset 0 0 0 2px var(--red); }
+.op-day-large-num { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1; }
+.op-day-large.father .op-day-large-num { color: var(--green2); }
+.op-day-large.is-today .op-day-large-num { color: var(--accent); }
+.op-day-large-status { font-size: 11px; font-weight: 700; color: var(--green2); text-transform: uppercase; letter-spacing: .04em; }
+.op-day-large.special .op-day-large-status { color: #0f5b27; }
+.op-day-large-ho { font-size: 11px; color: var(--orange); font-weight: 700; }
+.op-day-large-audit { font-size: 11px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op-day-large.conflict .op-day-large-audit { color: var(--red); }
+
+/* --- Widok: Tydzień --- */
+.op-calendar-week { display: block !important; }
+.op-week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+@media (max-width: 768px) { .op-week-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 500px) { .op-week-grid { grid-template-columns: repeat(2, 1fr); } }
+.op-week-col { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; min-height: 160px; }
+.op-week-col.father { background: #d6f0de; border-color: #b2dfc0; }
+.op-week-col.special { background: #8fd6a3; border-color: #5ebf7a; }
+.op-week-col.handover { box-shadow: inset 0 0 0 2px var(--orange); }
+.op-week-col.is-today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.op-week-col.conflict { box-shadow: inset 0 0 0 2px var(--red); }
+.op-week-col-hdr { padding: 10px 12px 8px; border-bottom: 1px solid var(--border); background: var(--bg3); }
+.op-week-col.father .op-week-col-hdr { background: rgba(35,157,70,.12); border-bottom-color: #b2dfc0; }
+.op-week-col.is-today .op-week-col-hdr { background: rgba(58,77,152,.1); }
+.op-week-dow { display: block; font-size: 11px; font-weight: 800; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; }
+.op-week-date { display: block; font-size: 20px; font-weight: 800; color: var(--text); line-height: 1.1; margin-top: 2px; }
+.op-week-col.father .op-week-date { color: var(--green2); }
+.op-week-col.is-today .op-week-date { color: var(--accent); }
+.op-week-col-body { padding: 10px 12px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.op-week-custody { display: flex; flex-direction: column; gap: 2px; }
+.op-week-custody strong { font-size: 13px; font-weight: 800; color: var(--green2); }
+.op-week-custody.father strong { color: var(--green2); }
+.op-week-custody small { font-size: 11px; color: var(--text2); line-height: 1.3; }
+.op-week-ho { font-size: 11px; color: var(--orange); font-weight: 700; background: #fff4e0; border-radius: 5px; padding: 3px 6px; }
+.op-week-audit { font-size: 11px; color: var(--accent); background: rgba(58,77,152,.07); border-radius: 5px; padding: 3px 6px; font-weight: 600; }
+.op-week-audit.conflict { color: var(--red); background: rgba(220,53,69,.07); }
 
 /* --- integracja z planowaniem audytów --- */
 .op-conflict { cursor: help; font-size: 15px; vertical-align: middle; margin-left: 5px; padding: 1px 5px; background: #fff4e0; border: 1px solid var(--orange); border-radius: 6px; line-height: 1; }
