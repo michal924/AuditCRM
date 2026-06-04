@@ -129,15 +129,6 @@ td.date-col,
   box-shadow: var(--shadow);
 }
 
-.login-logo {
-  width: 140px;
-  margin: 0 auto 24px;
-}
-.login-logo img {
-  width: 100%;
-  height: auto;
-}
-
 .login-box h1 { font-size: 22px; margin-bottom: 6px; font-weight: 700; }
 .login-box p  { color: var(--text2); margin-bottom: 28px; font-size: 13px; }
 
@@ -187,14 +178,13 @@ td.date-col,
 }
 
 .nav-left { display: flex; align-items: center; gap: 14px; }
-.nav-logo {
-  height: 36px;
-  display: flex;
-  align-items: center;
-}
-.nav-logo img { height: 36px; width: auto; }
-.nav-divider { width: 1px; height: 24px; background: var(--border); }
-.nav-title { font-weight: 700; font-size: 13px; color: var(--text2); letter-spacing: 0.3px; }
+
+/* AuditCRM logo lockup */
+.acrm-lockup { display: inline-flex; align-items: center; gap: 0.55em; text-decoration: none; flex-shrink: 0; }
+.acrm-lockup.acrm-stacked { flex-direction: column; gap: 0.35em; align-items: center; }
+.acrm-wm { font-family: 'Poppins', var(--font-head); font-weight: 800; letter-spacing: -0.03em; line-height: 1; white-space: nowrap; }
+.acrm-a { color: var(--accent); }
+.acrm-c { color: var(--green); }
 
 .nav-links { display: flex; gap: 4px; }
 .nav-btn {

@@ -4,9 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Audit CRM — LogisticFit</title>
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="auditcrm-favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="auditcrm-favicon-32.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="auditcrm-favicon-64.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="auditcrm-icon-256.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="leaflet.css">
   <script src="leaflet.js"></script>
@@ -17,11 +21,36 @@
 </head>
 <body>
 
+<!-- SVG SYMBOLS — AuditCRM logo mark -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Pełny kolor: granatowy kafel, biała karta, zielony check -->
+    <symbol id="acrm-full" viewBox="0 0 64 64">
+      <rect x="4" y="4" width="56" height="56" rx="15" fill="#3a4d98"/>
+      <rect x="13" y="13" width="38" height="38" rx="9" fill="#fff"/>
+      <path d="M22 32.5 L29 39.5 L43 24.5" fill="none" stroke="#239d46" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <!-- Favicon / małe rozmiary: uproszczony — sam check, bez karty -->
+    <symbol id="acrm-fav" viewBox="0 0 64 64">
+      <rect x="2" y="2" width="60" height="60" rx="15" fill="#3a4d98"/>
+      <path d="M19 33 L28.5 42.5 L46 21.5" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <!-- Inwersja: białe tło, granatowa karta, jasnozielony check (na ciemnym tle) -->
+    <symbol id="acrm-inv" viewBox="0 0 64 64">
+      <rect x="4" y="4" width="56" height="56" rx="15" fill="#fff"/>
+      <rect x="13" y="13" width="38" height="38" rx="9" fill="#3a4d98"/>
+      <path d="M22 32.5 L29 39.5 L43 24.5" fill="none" stroke="#5fd089" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+</svg>
+
 <!-- LOGIN -->
 <div id="page-login" class="page">
   <div class="login-box">
-    <div class="login-logo"><img src="logo.png" alt="LogisticFit"></div>
-    <h1>Audit CRM</h1>
+    <div class="acrm-lockup acrm-stacked" style="margin-bottom:20px">
+      <svg width="64" height="64"><use href="#acrm-full"/></svg>
+      <span class="acrm-wm" style="font-size:32px"><span class="acrm-a">Audit</span><span class="acrm-c">CRM</span></span>
+    </div>
     <p>LogisticFit — system planowania audytów</p>
     <button id="btn-login" class="btn-primary">Zaloguj się przez Microsoft</button>
   </div>
@@ -33,9 +62,10 @@
   <!-- NAVBAR -->
   <nav class="navbar">
     <div class="nav-left">
-      <div class="nav-logo"><img src="logo.png" alt="LogisticFit"></div>
-      <div class="nav-divider"></div>
-      <span class="nav-title">Audit CRM</span>
+      <div class="acrm-lockup">
+        <svg width="32" height="32"><use href="#acrm-full"/></svg>
+        <span class="acrm-wm" style="font-size:22px"><span class="acrm-a">Audit</span><span class="acrm-c">CRM</span></span>
+      </div>
     </div>
     <div class="nav-links">
       <button class="nav-btn active" data-view="myaudits">📋 Audyty LogisticFit</button>
