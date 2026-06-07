@@ -12,7 +12,8 @@ let importParsed = [];
 let sortCol = "PlannedCUDate";
 let sortDir = 1; // 1 = ASC, -1 = DESC
 let isEditMode = false;
-let originalAuditDate = null; // śledzi oryginał daty AuditDateStart przy wejściu w tryb edycji
+let originalAuditDate = null;  // śledzi oryginał daty AuditDateStart przy wejściu w tryb edycji
+let planAuditRequested = false; // true tylko gdy użytkownik świadomie kliknął "Zaplanuj audyt"
 
 // ============================================================
 // MAPOWANIA (zgodne z 03_Import-QuarterlyPlan.py)
@@ -471,7 +472,22 @@ function setupModal() {
   });
 
   document.getElementById("btn-plan-audit").addEventListener("click", () => {
-    document.getElementById("e-date").focus();
+    // Ustaw status na PLANNED i zaznacz że użytkownik chce wysłać zaproszenie
+    const dateVal = document.getElementById("e-date").value;
+    if (!dateVal) {
+      showToast("Najpierw wpisz datę audytu LF", "warn");
+      document.getElementById("e-date").focus();
+      return;
+    }
+    planAuditRequested = true;
+    // Ustaw status na PLANNED jeśli jeszcze nie jest
+    currentStatus = "PLANNED";
+    document.querySelectorAll(".status-btn").forEach(b => b.classList.toggle("active", b.dataset.val === "PLANNED"));
+    const btn = document.getElementById("btn-plan-audit");
+    btn.classList.add("scheduled");
+    btn.textContent = "📅 Zaplanowano — wyślij zaproszenie";
+    btn.title = `Przy zapisaniu wyślij zaproszenie (${formatDate(dateVal)}) do office@logisticfit.com i michal@logisticfit.com`;
+    showToast("📅 Gotowe — kliknij Zapisz aby wysłać zaproszenie do kalendarzy", "success");
   });
 }
 
@@ -576,6 +592,7 @@ function closeModal() {
     document.getElementById("modal-overlay").classList.remove("edit-mode");
   }
   currentAudit = null;
+  planAuditRequested = false; // reset flagi przy zamknięciu modalu (Anuluj / klik poza)
 }
 
 async function saveChanges() {
@@ -612,32 +629,21 @@ async function saveChanges() {
     Object.assign(currentAudit, fields);
     renderTable();
 
-    // ── Integracja kalendarza: Zaplanuj audyt — gdy data audytu LF nowa lub zmieniona ──
-    const newDateVal = isEditMode ? document.getElementById("e-date").value : null;
-    const dateChanged = newDateVal && newDateVal !== originalAuditDate;
-
-    if (dateChanged && currentAudit.AuditDateStart) {
+    // ── Integracja kalendarza: TYLKO gdy użytkownik kliknął "Zaplanuj audyt" i status = PLANNED ──
+    if (planAuditRequested && currentStatus === "PLANNED" && currentAudit.AuditDateStart) {
       try {
         const calResult = await createAuditCalendarEvents(currentAudit);
         const link = calResult?.webLink;
-        showToast("💾 Zapisano + 📅 Event dodany do kalendarza!" + (link ? " (sprawdź konsolę F12)" : ""), "success");
+        showToast("💾 Zapisano + 📅 Zaproszenie wysłane!" + (link ? " (sprawdź konsolę F12)" : ""), "success");
         if (link) console.log("[Calendar] Otwórz event:", link);
       } catch (calErr) {
         console.error("Błąd kalendarza:", calErr);
-        showToast("💾 Zapisano. ⚠️ Błąd kalendarza: " + calErr.message.substring(0, 80), "warn");
-      }
-    } else if (currentStatus === "Invoice" && prevStatus !== "Invoice" && currentAudit.AuditDateStart) {
-      // Powiadomienie kalendarza przy zmianie statusu na Invoice
-      try {
-        await createCalendarEvent(currentAudit);
-        showToast("💾 Zapisano + 📅 Dodano do kalendarza (Invoice)!", "success");
-      } catch (calErr) {
-        console.error("Błąd kalendarza:", calErr);
-        showToast("💾 Zapisano. ⚠️ Dodaj uprawnienie Calendars.ReadWrite w Azure Portal.", "warn");
+        showToast("💾 Zapisano. ⚠️ Błąd wysyłania zaproszenia: " + calErr.message.substring(0, 80), "warn");
       }
     } else {
       showToast("Zapisano pomyślnie", "success");
     }
+    planAuditRequested = false; // zawsze resetuj flagę po zapisie
 
     closeModal();
   } catch (e) {
