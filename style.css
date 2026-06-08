@@ -624,6 +624,95 @@ tbody td.date-col {
   font-size: 12px;
 }
 
+/* ── Podgląd wiersza (accordion) ── */
+.audit-row { cursor: pointer; transition: background .15s; }
+.audit-row:hover { background: var(--bg3); }
+.audit-row.row-expanded { background: var(--bg3); }
+.audit-row.row-expanded td:first-child { border-left: 3px solid var(--accent); }
+
+.row-preview-wrap td { padding: 0 !important; border-top: none !important; }
+.row-preview-td { padding: 0 !important; }
+.row-preview {
+  background: var(--bg2);
+  border-left: 3px solid var(--accent);
+  border-bottom: 2px solid var(--accent-light);
+  padding: 16px 20px;
+  animation: slideDown .18s ease;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.row-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px 20px;
+  margin-bottom: 14px;
+}
+.rp-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rp-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text3);
+  font-weight: 600;
+}
+.rp-val {
+  font-size: 13px;
+  color: var(--text);
+}
+.rp-val a { color: var(--accent); text-decoration: none; }
+.rp-val a:hover { text-decoration: underline; }
+
+.rp-notes {
+  background: var(--bg3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+.rp-notes .rp-label { margin-bottom: 4px; display: block; }
+.rp-notes-text {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.rp-actions {
+  display: flex;
+  gap: 8px;
+}
+.btn-rp-edit {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-rp-edit:hover { background: var(--accent2, #2d3d7a); }
+.btn-rp-close {
+  background: transparent;
+  color: var(--text3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-rp-close:hover { background: var(--bg3); color: var(--text); }
+
 .notes-text {
   color: var(--text);
   font-size: 13px;

@@ -334,21 +334,53 @@ function renderTable() {
     return;
   }
 
-  tbody.innerHTML = filtered.map(a => `
-    <tr onclick="openModal(${a.Id})" ${!a.ImportFile ? 'class="row-manual"' : ""}>
+  const NCOLS = 11; // liczba kolumn tabeli
+  tbody.innerHTML = filtered.map(a => {
+    const rowClass = !a.ImportFile ? "row-manual" : "";
+    const notesSnippet = a.Notes
+      ? `<span class="notes-preview">${a.Notes.length > 50 ? a.Notes.substring(0,50)+'…' : a.Notes}</span>`
+      : '<span class="notes-empty">—</span>';
+    const custodyMark = custodyBadge(a);
+    return `
+    <tr class="audit-row ${rowClass}" data-id="${a.Id}" onclick="toggleRowPreview(${a.Id}, this)">
       <td class="prj-col">${a.ProjectID || "—"}</td>
       <td class="firma-col">${a.Title || "—"}</td>
       <td class="program-col">${programBadge(a.Program)}</td>
       <td>${a.AuditType ? shortType(a.AuditType) : "—"}</td>
       <td class="date-col">${formatDate(a.PlannedCUDate) || "—"}</td>
-      <td class="date-col">${formatDate(a.AuditDateStart)}${custodyBadge(a)}</td>
+      <td class="date-col">${formatDate(a.AuditDateStart)}${custodyMark}</td>
       <td>${a.City || "—"}</td>
       <td class="${a.AuditMode === 'Online' ? 'mode-online' : 'mode-onsite'}">${a.AuditMode === 'Online' ? '💻' : '📍'} ${a.AuditMode || "—"}</td>
       <td>${statusBadge(a.AuditStatus)}</td>
       <td>${proformaBadge(a.Proforma)}</td>
-      <td class="notes-col">${a.Notes ? `<span class="notes-preview" title="${a.Notes.replace(/"/g,'&quot;')}">${a.Notes.length > 60 ? a.Notes.substring(0,60)+'…' : a.Notes}</span>` : '<span class="notes-empty">—</span>'}</td>
+      <td class="notes-col">${notesSnippet}</td>
     </tr>
-  `).join("");
+    <tr class="row-preview-wrap" id="preview-${a.Id}" style="display:none">
+      <td colspan="${NCOLS}" class="row-preview-td">
+        <div class="row-preview">
+          <div class="row-preview-grid">
+            <div class="rp-item"><span class="rp-label">Firma</span><span class="rp-val">${a.Title || "—"}</span></div>
+            <div class="rp-item"><span class="rp-label">PRJ</span><span class="rp-val">${a.ProjectID || "—"}</span></div>
+            <div class="rp-item"><span class="rp-label">Program</span><span class="rp-val">${programBadge(a.Program)}</span></div>
+            <div class="rp-item"><span class="rp-label">Typ</span><span class="rp-val">${a.AuditType || "—"}</span></div>
+            <div class="rp-item"><span class="rp-label">Status</span><span class="rp-val">${statusBadge(a.AuditStatus)}</span></div>
+            <div class="rp-item"><span class="rp-label">Proforma</span><span class="rp-val">${proformaBadge(a.Proforma)}</span></div>
+            <div class="rp-item"><span class="rp-label">Data CU</span><span class="rp-val">${formatDate(a.PlannedCUDate) || "—"}</span></div>
+            <div class="rp-item"><span class="rp-label">Data audytu LF</span><span class="rp-val">${formatDate(a.AuditDateStart) || "—"}${custodyMark}</span></div>
+            <div class="rp-item"><span class="rp-label">Miasto</span><span class="rp-val">${a.City || "—"}</span></div>
+            <div class="rp-item"><span class="rp-label">Tryb</span><span class="rp-val">${a.AuditMode || "—"}</span></div>
+            <div class="rp-item"><span class="rp-label">Audytor</span><span class="rp-val">${a.AuditorName || "—"}</span></div>
+            <div class="rp-item"><span class="rp-label">Email</span><span class="rp-val">${a.Email ? `<a href="mailto:${a.Email}">${a.Email}</a>` : "—"}</span></div>
+          </div>
+          ${a.Notes ? `<div class="rp-notes"><span class="rp-label">Notatki</span><p class="rp-notes-text">${a.Notes.replace(/\n/g,'<br>')}</p></div>` : ""}
+          <div class="rp-actions">
+            <button class="btn-rp-edit" onclick="event.stopPropagation(); openModal(${a.Id})">✏️ Edytuj</button>
+            <button class="btn-rp-close" onclick="event.stopPropagation(); toggleRowPreview(${a.Id})">✕ Zamknij</button>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
 }
 
 // Znacznik kolizji z opieką nad Szymonem — tylko dla audytów Rzeźnik Michał
@@ -1288,6 +1320,25 @@ function shortType(t) {
     "Extension Audit":        "Extension",
   };
   return map[t] || t;
+}
+
+function toggleRowPreview(id, clickedRow) {
+  const preview = document.getElementById(`preview-${id}`);
+  if (!preview) return;
+  const isOpen = preview.style.display !== "none";
+
+  // Zamknij wszystkie inne podglądy
+  document.querySelectorAll(".row-preview-wrap").forEach(el => {
+    el.style.display = "none";
+  });
+  document.querySelectorAll(".audit-row.row-expanded").forEach(el => {
+    el.classList.remove("row-expanded");
+  });
+
+  if (!isOpen) {
+    preview.style.display = "";
+    if (clickedRow) clickedRow.classList.add("row-expanded");
+  }
 }
 
 function programBadge(p) {
