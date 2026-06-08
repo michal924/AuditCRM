@@ -338,48 +338,55 @@ function renderTable() {
   tbody.innerHTML = filtered.map(a => {
     const rowClass = !a.ImportFile ? "row-manual" : "";
     const notesSnippet = a.Notes
-      ? `<span class="notes-preview">${a.Notes.length > 50 ? a.Notes.substring(0,50)+'…' : a.Notes}</span>`
+      ? '<span class="notes-preview">' + escHtml(a.Notes.length > 50 ? a.Notes.substring(0,50)+'…' : a.Notes) + '</span>'
       : '<span class="notes-empty">—</span>';
     const custodyMark = custodyBadge(a);
-    return `
-    <tr class="audit-row ${rowClass}" data-id="${a.Id}" onclick="toggleRowPreview(${a.Id}, this)">
-      <td class="prj-col">${a.ProjectID || "—"}</td>
-      <td class="firma-col">${a.Title || "—"}</td>
-      <td class="program-col">${programBadge(a.Program)}</td>
-      <td>${a.AuditType ? shortType(a.AuditType) : "—"}</td>
-      <td class="date-col">${formatDate(a.PlannedCUDate) || "—"}</td>
-      <td class="date-col">${formatDate(a.AuditDateStart)}${custodyMark}</td>
-      <td>${a.City || "—"}</td>
-      <td class="${a.AuditMode === 'Online' ? 'mode-online' : 'mode-onsite'}">${a.AuditMode === 'Online' ? '💻' : '📍'} ${a.AuditMode || "—"}</td>
-      <td>${statusBadge(a.AuditStatus)}</td>
-      <td>${proformaBadge(a.Proforma)}</td>
-      <td class="notes-col">${notesSnippet}</td>
-    </tr>
-    <tr class="row-preview-wrap" id="preview-${a.Id}" style="display:none">
-      <td colspan="${NCOLS}" class="row-preview-td">
-        <div class="row-preview">
-          <div class="row-preview-grid">
-            <div class="rp-item"><span class="rp-label">Firma</span><span class="rp-val">${a.Title || "—"}</span></div>
-            <div class="rp-item"><span class="rp-label">PRJ</span><span class="rp-val">${a.ProjectID || "—"}</span></div>
-            <div class="rp-item"><span class="rp-label">Program</span><span class="rp-val">${programBadge(a.Program)}</span></div>
-            <div class="rp-item"><span class="rp-label">Typ</span><span class="rp-val">${a.AuditType || "—"}</span></div>
-            <div class="rp-item"><span class="rp-label">Status</span><span class="rp-val">${statusBadge(a.AuditStatus)}</span></div>
-            <div class="rp-item"><span class="rp-label">Proforma</span><span class="rp-val">${proformaBadge(a.Proforma)}</span></div>
-            <div class="rp-item"><span class="rp-label">Data CU</span><span class="rp-val">${formatDate(a.PlannedCUDate) || "—"}</span></div>
-            <div class="rp-item"><span class="rp-label">Data audytu LF</span><span class="rp-val">${formatDate(a.AuditDateStart) || "—"}${custodyMark}</span></div>
-            <div class="rp-item"><span class="rp-label">Miasto</span><span class="rp-val">${a.City || "—"}</span></div>
-            <div class="rp-item"><span class="rp-label">Tryb</span><span class="rp-val">${a.AuditMode || "—"}</span></div>
-            <div class="rp-item"><span class="rp-label">Audytor</span><span class="rp-val">${a.AuditorName || "—"}</span></div>
-            <div class="rp-item"><span class="rp-label">Email</span><span class="rp-val">${a.Email ? `<a href="mailto:${a.Email}">${a.Email}</a>` : "—"}</span></div>
-          </div>
-          ${a.Notes ? `<div class="rp-notes"><span class="rp-label">Notatki</span><p class="rp-notes-text">${a.Notes.replace(/\n/g,'<br>')}</p></div>` : ""}
-          <div class="rp-actions">
-            <button class="btn-rp-edit" onclick="event.stopPropagation(); openModal(${a.Id})">✏️ Edytuj</button>
-            <button class="btn-rp-close" onclick="event.stopPropagation(); toggleRowPreview(${a.Id})">✕ Zamknij</button>
-          </div>
-        </div>
-      </td>
-    </tr>`;
+    const aid = a.Id;
+    const notesBlock = a.Notes
+      ? '<div class="rp-notes"><span class="rp-label">Notatki</span><p class="rp-notes-text">' + escHtml(a.Notes).replace(/\n/g,'<br>') + '</p></div>'
+      : '';
+    const emailBlock = a.Email
+      ? '<a href="mailto:' + escHtml(a.Email) + '">' + escHtml(a.Email) + '</a>'
+      : '—';
+    return '' +
+    '<tr class="audit-row ' + rowClass + '" data-id="' + aid + '" onclick="toggleRowPreview(' + aid + ', this)">' +
+      '<td class="prj-col">' + escHtml(a.ProjectID || '—') + '</td>' +
+      '<td class="firma-col">' + escHtml(a.Title || '—') + '</td>' +
+      '<td class="program-col">' + programBadge(a.Program) + '</td>' +
+      '<td>' + (a.AuditType ? shortType(a.AuditType) : '—') + '</td>' +
+      '<td class="date-col">' + (formatDate(a.PlannedCUDate) || '—') + '</td>' +
+      '<td class="date-col">' + formatDate(a.AuditDateStart) + custodyMark + '</td>' +
+      '<td>' + escHtml(a.City || '—') + '</td>' +
+      '<td class="' + (a.AuditMode === 'Online' ? 'mode-online' : 'mode-onsite') + '">' + (a.AuditMode === 'Online' ? '💻' : '📍') + ' ' + (a.AuditMode || '—') + '</td>' +
+      '<td>' + statusBadge(a.AuditStatus) + '</td>' +
+      '<td>' + proformaBadge(a.Proforma) + '</td>' +
+      '<td class="notes-col">' + notesSnippet + '</td>' +
+    '</tr>' +
+    '<tr class="row-preview-wrap" id="preview-' + aid + '" style="display:none">' +
+      '<td colspan="' + NCOLS + '" class="row-preview-td">' +
+        '<div class="row-preview">' +
+          '<div class="row-preview-grid">' +
+            '<div class="rp-item"><span class="rp-label">Firma</span><span class="rp-val">' + escHtml(a.Title || '—') + '</span></div>' +
+            '<div class="rp-item"><span class="rp-label">PRJ</span><span class="rp-val">' + escHtml(a.ProjectID || '—') + '</span></div>' +
+            '<div class="rp-item"><span class="rp-label">Program</span><span class="rp-val">' + programBadge(a.Program) + '</span></div>' +
+            '<div class="rp-item"><span class="rp-label">Typ</span><span class="rp-val">' + escHtml(a.AuditType || '—') + '</span></div>' +
+            '<div class="rp-item"><span class="rp-label">Status</span><span class="rp-val">' + statusBadge(a.AuditStatus) + '</span></div>' +
+            '<div class="rp-item"><span class="rp-label">Proforma</span><span class="rp-val">' + proformaBadge(a.Proforma) + '</span></div>' +
+            '<div class="rp-item"><span class="rp-label">Data CU</span><span class="rp-val">' + (formatDate(a.PlannedCUDate) || '—') + '</span></div>' +
+            '<div class="rp-item"><span class="rp-label">Data audytu LF</span><span class="rp-val">' + (formatDate(a.AuditDateStart) || '—') + custodyMark + '</span></div>' +
+            '<div class="rp-item"><span class="rp-label">Miasto</span><span class="rp-val">' + escHtml(a.City || '—') + '</span></div>' +
+            '<div class="rp-item"><span class="rp-label">Tryb</span><span class="rp-val">' + escHtml(a.AuditMode || '—') + '</span></div>' +
+            '<div class="rp-item"><span class="rp-label">Audytor</span><span class="rp-val">' + escHtml(a.AuditorName || '—') + '</span></div>' +
+            '<div class="rp-item"><span class="rp-label">Email</span><span class="rp-val">' + emailBlock + '</span></div>' +
+          '</div>' +
+          notesBlock +
+          '<div class="rp-actions">' +
+            '<button class="btn-rp-edit" onclick="event.stopPropagation(); openModal(' + aid + ')">✏️ Edytuj</button>' +
+            '<button class="btn-rp-close" onclick="event.stopPropagation(); toggleRowPreview(' + aid + ')">✕ Zamknij</button>' +
+          '</div>' +
+        '</div>' +
+      '</td>' +
+    '</tr>';
   }).join("");
 }
 
@@ -1322,9 +1329,19 @@ function shortType(t) {
   return map[t] || t;
 }
 
+function escHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function toggleRowPreview(id, clickedRow) {
-  const preview = document.getElementById(`preview-${id}`);
+  const preview = document.getElementById("preview-" + id);
   if (!preview) return;
+
   const isOpen = preview.style.display !== "none";
 
   // Zamknij wszystkie inne podglądy
@@ -1336,8 +1353,9 @@ function toggleRowPreview(id, clickedRow) {
   });
 
   if (!isOpen) {
-    preview.style.display = "";
-    if (clickedRow) clickedRow.classList.add("row-expanded");
+    preview.style.display = "table-row";
+    const tr = clickedRow || document.querySelector(`.audit-row[data-id="${id}"]`);
+    if (tr) tr.classList.add("row-expanded");
   }
 }
 
