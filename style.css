@@ -602,6 +602,28 @@ tbody td.date-col {
 }
 .field-textarea:focus { outline: none; border-color: var(--accent); }
 
+/* ── Kolumna Notatki w tabeli ── */
+.notes-col {
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.notes-preview {
+  display: inline-block;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: default;
+  vertical-align: middle;
+}
+.notes-empty {
+  color: var(--text3);
+  font-size: 12px;
+}
+
 .notes-text {
   color: var(--text);
   font-size: 13px;

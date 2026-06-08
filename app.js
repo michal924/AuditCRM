@@ -346,6 +346,7 @@ function renderTable() {
       <td class="${a.AuditMode === 'Online' ? 'mode-online' : 'mode-onsite'}">${a.AuditMode === 'Online' ? '💻' : '📍'} ${a.AuditMode || "—"}</td>
       <td>${statusBadge(a.AuditStatus)}</td>
       <td>${proformaBadge(a.Proforma)}</td>
+      <td class="notes-col">${a.Notes ? `<span class="notes-preview" title="${a.Notes.replace(/"/g,'&quot;')}">${a.Notes.length > 60 ? a.Notes.substring(0,60)+'…' : a.Notes}</span>` : '<span class="notes-empty">—</span>'}</td>
     </tr>
   `).join("");
 }
