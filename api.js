@@ -123,3 +123,37 @@ async function fetchExistingProjectIds() {
   }
   return ids;
 }
+
+// Pobierz pełne rekordy dla danego Kwartału+Roku które były importowane (ImportFile != null)
+async function fetchImportedForQuarter(quarter, year) {
+  const filter = encodeURIComponent(
+    `Quarter eq '${quarter}' and Year eq '${year}' and ImportFile ne null`
+  );
+  const select = "Id,ProjectID,Year,Program,Title,AuditStatus,AuditDateStart,ImportFile";
+  let items = [];
+  let url = `/_api/lists/getbytitle('Audits')/items?$select=${select}&$filter=${filter}&$top=500`;
+  while (url) {
+    const data = await spGet(url);
+    items = items.concat(data.value || []);
+    url = data["odata.nextLink"]
+      ? data["odata.nextLink"].replace(SITE_URL, "")
+      : null;
+  }
+  return items;
+}
+
+// Usuń rekord audytu
+async function deleteAudit(id) {
+  const token = await getToken();
+  const digest = await getDigest(token);
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('Audits')/items(${id})`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-RequestDigest": digest,
+      "X-HTTP-Method": "DELETE",
+      "IF-MATCH": "*",
+    },
+  });
+  if (!r.ok) throw new Error(`Delete error ${r.status}`);
+}

@@ -851,6 +851,41 @@ tbody td.date-col {
 .result-item.skip    { background: var(--bg3); color: var(--text2); }
 .result-item.error   { background: rgba(192,57,43,0.1); color: var(--red); }
 .result-item.warn    { background: rgba(230,160,0,0.12); color: #9a6700; }
+.result-item.delete  { background: rgba(192,57,43,0.08); color: var(--red); }
+
+/* Re-import diff panel */
+.import-reimport-info {
+  background: rgba(58,77,152,0.08);
+  border: 1.5px solid rgba(58,77,152,0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.reimport-title { font-weight: 600; color: var(--accent); margin-bottom: 8px; }
+.reimport-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.reimport-stat {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.reimport-stat.add     { background: rgba(35,157,70,0.12); color: var(--green); }
+.reimport-stat.skip    { background: var(--bg3); color: var(--text2); }
+.reimport-stat.delete  { background: rgba(192,57,43,0.1); color: var(--red); }
+.reimport-stat.protect { background: rgba(230,160,0,0.12); color: #9a6700; }
+.reimport-delete-list {
+  font-size: 12px;
+  color: var(--red);
+  margin-top: 6px;
+  line-height: 1.6;
+}
+.reimport-protect-note {
+  font-size: 12px;
+  color: #9a6700;
+  margin-top: 6px;
+  line-height: 1.6;
+}
 .import-warning {
   background: rgba(230,160,0,0.12);
   border: 1.5px solid rgba(230,160,0,0.4);

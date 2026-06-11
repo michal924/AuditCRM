@@ -931,9 +931,55 @@ function parseImportRows(rows, filename) {
   return records;
 }
 
+// Wykryj dominujący Kwartał+Rok z parsowanego pliku
+function detectImportQuarterYear() {
+  const counts = {};
+  importParsed.forEach(r => {
+    const k = `${r.Quarter || ""}|${r.Year || ""}`;
+    counts[k] = (counts[k] || 0) + 1;
+  });
+  const best = Object.entries(counts).sort((a,b) => b[1]-a[1])[0];
+  if (!best) return null;
+  const [q, y] = best[0].split("|");
+  return { quarter: q, year: y };
+}
+
+// Oblicz diff między istniejącymi rekordami importowanymi a nowym plikiem
+function computeReimportDiff(existingImported) {
+  const newKeys = new Set(importParsed.map(r => `${r.ProjectID}_${r.Year||""}_${r.Program||""}`));
+
+  const toDelete = [];   // istniejące, których nie ma w nowym pliku — kandydaci do usunięcia
+  const protected_ = []; // istniejące, których nie ma w nowym pliku, ale mają dane ręczne
+
+  existingImported.forEach(ex => {
+    const key = `${parseInt(ex.ProjectID)}_${ex.Year||""}_${ex.Program||""}`;
+    if (!newKeys.has(key)) {
+      const hasManualData = ex.AuditDateStart || (ex.AuditStatus && ex.AuditStatus !== "PLANNED");
+      if (hasManualData) {
+        protected_.push(ex);
+      } else {
+        toDelete.push(ex);
+      }
+    }
+  });
+
+  const existingKeys = new Set(existingImported.map(ex =>
+    `${parseInt(ex.ProjectID)}_${ex.Year||""}_${ex.Program||""}`
+  ));
+  const toAdd = importParsed.filter(r => {
+    const key = `${r.ProjectID}_${r.Year||""}_${r.Program||""}`;
+    return !existingKeys.has(key);
+  });
+
+  return { toDelete, protected_, toAdd };
+}
+
+let reimportDiff = null; // wynik diff przechowywany między preview a startImport
+
 function showImportPreview(filename) {
   hide("import-stage-1");
   show("import-stage-2");
+  reimportDiff = null;
 
   const byAuditor = {};
   importParsed.forEach(r => {
@@ -941,39 +987,70 @@ function showImportPreview(filename) {
     byAuditor[name] = (byAuditor[name] || 0) + 1;
   });
 
-  // Sprawdź czy plik był już importowany
-  const alreadyImported = allAudits.some(a => a.ImportFile === filename);
-  const warningHtml = alreadyImported
-    ? `<div class="import-warning">⚠️ Plik <strong>${filename}</strong> był już wcześniej importowany — większość rekordów zostanie pominięta jako duplikaty.</div>`
-    : "";
-
-  document.getElementById("import-info").innerHTML =
-    `${warningHtml}<p>📄 <strong>${filename}</strong> — znaleziono <strong>${importParsed.length}</strong> rekordów</p>`;
-
   const chips = Object.entries(byAuditor)
     .sort((a,b) => b[1]-a[1])
-    .map(([name, cnt]) => `
-      <span class="auditor-chip ${name === MY_AUDITOR ? 'my-chip' : ''}">
-        ${name === MY_AUDITOR ? '★ ' : ''}${name}: <strong>${cnt}</strong>
-      </span>`)
-    .join("");
+    .map(([name, cnt]) =>
+      '<span class="auditor-chip ' + (name === MY_AUDITOR ? 'my-chip' : '') + '">' +
+      (name === MY_AUDITOR ? '★ ' : '') + escHtml(name) + ': <strong>' + cnt + '</strong></span>'
+    ).join("");
   document.getElementById("import-auditors").innerHTML = chips;
-  document.getElementById("import-count").textContent = importParsed.length;
+
+  // Sprawdź czy to re-import tego samego Q+Y
+  const qy = detectImportQuarterYear();
+  let infoHtml = '<p>📄 <strong>' + escHtml(filename) + '</strong> — znaleziono <strong>' + importParsed.length + '</strong> rekordów</p>';
+
+  if (qy && qy.quarter && qy.year) {
+    const existingForQY = allAudits.filter(a =>
+      a.Quarter === qy.quarter && String(a.Year) === String(qy.year) && a.ImportFile
+    );
+    if (existingForQY.length > 0) {
+      const diff = computeReimportDiff(existingForQY);
+      reimportDiff = diff;
+      const deleteCount = diff.toDelete.length;
+      const protectCount = diff.protected_.length;
+      const addCount = diff.toAdd.length;
+      const skipCount = importParsed.length - addCount;
+
+      infoHtml += '<div class="import-reimport-info">' +
+        '<div class="reimport-title">🔄 Re-import ' + escHtml(qy.quarter) + ' ' + escHtml(qy.year) + ' — wykryto zmiany względem poprzedniego importu:</div>' +
+        '<div class="reimport-stats">' +
+          '<span class="reimport-stat add">➕ Nowe: <strong>' + addCount + '</strong></span>' +
+          '<span class="reimport-stat skip">⏭ Bez zmian: <strong>' + skipCount + '</strong></span>' +
+          (deleteCount ? '<span class="reimport-stat delete">🗑️ Do usunięcia (PLANNED, brak daty): <strong>' + deleteCount + '</strong></span>' : '') +
+          (protectCount ? '<span class="reimport-stat protect">🔒 Chronione (mają dane): <strong>' + protectCount + '</strong></span>' : '') +
+        '</div>' +
+        (deleteCount ? '<div class="reimport-delete-list"><strong>Zostaną usunięte:</strong> ' +
+          diff.toDelete.map(ex => escHtml(ex.Title || ('PRJ '+ex.ProjectID))).join(', ') +
+        '</div>' : '') +
+        (protectCount ? '<div class="reimport-protect-note">⚠️ Poniższe rekordy zniknęły z pliku, ale mają już datę audytu lub inny status — nie zostaną usunięte, sprawdź ręcznie: ' +
+          diff.protected_.map(ex => escHtml(ex.Title || ('PRJ '+ex.ProjectID))).join(', ') +
+        '</div>' : '') +
+      '</div>';
+
+      document.getElementById("import-count").textContent = addCount + ' nowych + usuń ' + deleteCount;
+    } else {
+      document.getElementById("import-count").textContent = importParsed.length;
+    }
+  } else {
+    document.getElementById("import-count").textContent = importParsed.length;
+  }
+
+  document.getElementById("import-info").innerHTML = infoHtml;
 
   const tbody = document.getElementById("import-preview-tbody");
-  tbody.innerHTML = importParsed.slice(0, 20).map(r => `
-    <tr>
-      <td title="${r.Title}">${r.Title || "—"}</td>
-      <td>${programBadge(r.Program)}</td>
-      <td>${r.AuditType ? shortType(r.AuditType) : "—"}</td>
-      <td>${r.AuditDateStart ? r.AuditDateStart.substring(0,10) : "—"}</td>
-      <td>${r.City || "—"}</td>
-      <td>${r.AuditorName || "—"}</td>
-    </tr>
-  `).join("");
+  tbody.innerHTML = importParsed.slice(0, 20).map(r =>
+    '<tr>' +
+      '<td title="' + escHtml(r.Title) + '">' + escHtml(r.Title || '—') + '</td>' +
+      '<td>' + programBadge(r.Program) + '</td>' +
+      '<td>' + (r.AuditType ? shortType(r.AuditType) : '—') + '</td>' +
+      '<td>' + (r.PlannedCUDate ? r.PlannedCUDate.substring(0,10) : '—') + '</td>' +
+      '<td>' + escHtml(r.City || '—') + '</td>' +
+      '<td>' + escHtml(r.AuditorName || '—') + '</td>' +
+    '</tr>'
+  ).join("");
 
   if (importParsed.length > 20) {
-    tbody.innerHTML += `<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:8px">… i ${importParsed.length - 20} więcej</td></tr>`;
+    tbody.innerHTML += '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:8px">… i ' + (importParsed.length - 20) + ' więcej</td></tr>';
   }
 }
 
@@ -985,30 +1062,49 @@ async function startImport() {
 
   try {
     const existingIds = await fetchExistingProjectIds();
-    let imported = 0, skipped = 0, errors = 0;
+    let imported = 0, skipped = 0, deleted = 0, errors = 0;
     let firstError = "";
     const total = importParsed.length;
 
+    // ── Faza 1: usuń osierocone rekordy (re-import tego samego Q+Y) ──
+    if (reimportDiff && reimportDiff.toDelete.length > 0) {
+      const toDelete = reimportDiff.toDelete;
+      for (let i = 0; i < toDelete.length; i++) {
+        document.getElementById("import-progress-text").textContent =
+          "Usuwanie osieroconych rekordów " + (i+1) + "/" + toDelete.length + " — " + (toDelete[i].Title || "");
+        document.getElementById("progress-fill").style.width =
+          Math.round(((i+1) / toDelete.length) * 30) + "%"; // 0-30% na usuwanie
+        try {
+          await deleteAudit(toDelete[i].Id);
+          deleted++;
+        } catch(err) {
+          errors++;
+          if (!firstError) firstError = err.message;
+          console.error("Delete error for", toDelete[i].Title, err.message);
+        }
+      }
+    }
+
+    // ── Faza 2: dodaj nowe rekordy ──
     for (let i = 0; i < total; i++) {
       const rec = importParsed[i];
-      const pct = Math.round(((i + 1) / total) * 100);
+      const pct = 30 + Math.round(((i + 1) / total) * 70); // 30-100%
       document.getElementById("progress-fill").style.width = pct + "%";
       document.getElementById("import-progress-text").textContent =
-        `Importowanie ${i+1}/${total} — ${rec.Title || ""}`;
+        "Importowanie " + (i+1) + "/" + total + " — " + (rec.Title || "");
 
       const dupKey = `${rec.ProjectID}_${rec.Year || ""}_${rec.Program || ""}`;
       if (existingIds.has(dupKey)) { skipped++; continue; }
 
-      // Wyślij tylko pola istniejące w SharePoint
       const spFields = {
         Title:          rec.Title,
         ProjectID:      rec.ProjectID,
         Program:        rec.Program,
         AuditType:      rec.AuditType,
         Standard:       rec.Standard,
-        AuditDateStart: null,               // Data audytu LF — ustawiana ręcznie
+        AuditDateStart: null,
         AuditDateEnd:   null,
-        PlannedCUDate:  rec.PlannedCUDate,  // Data CU — z pliku CUC
+        PlannedCUDate:  rec.PlannedCUDate,
         AuditDays:      rec.AuditDays,
         AuditMode:      rec.AuditMode,
         AuditStatus:    rec.AuditStatus,
@@ -1037,31 +1133,34 @@ async function startImport() {
       }
     }
 
-    // Przeładuj dane z SharePoint
     allAudits = await fetchAllAudits();
+    reimportDiff = null;
 
     hide("import-stage-3");
     show("import-stage-4");
 
-    const alreadyMsg = imported === 0 && skipped > 0
-      ? `<div class="result-item warn">ℹ️ Ten plik był już zaimportowany — wszystkie rekordy istnieją w bazie.</div>`
+    const protectedMsg = reimportDiff && reimportDiff.protected_ && reimportDiff.protected_.length
+      ? '<div class="result-item warn">🔒 Chronione (mają dane ręczne): <strong>' + reimportDiff.protected_.length + '</strong> — sprawdź ręcznie</div>'
       : "";
 
-    document.getElementById("import-results").innerHTML = `
-      <div class="import-result-box">
-        ${alreadyMsg}
-        <div class="result-item success">✅ Zaimportowano: <strong>${imported}</strong></div>
-        <div class="result-item skip">⏭ Pominięto (duplikaty): <strong>${skipped}</strong></div>
-        ${errors ? `<div class="result-item error">❌ Błędy: <strong>${errors}</strong>${firstError ? `<br><small style="font-size:11px;opacity:.8">${firstError}</small>` : ""}</div>` : ""}
-      </div>
-    `;
+    document.getElementById("import-results").innerHTML =
+      '<div class="import-result-box">' +
+        (imported > 0 ? '<div class="result-item success">✅ Dodano: <strong>' + imported + '</strong></div>' : '') +
+        (deleted > 0  ? '<div class="result-item delete">🗑️ Usunięto osierocone: <strong>' + deleted + '</strong></div>' : '') +
+        (skipped > 0  ? '<div class="result-item skip">⏭ Bez zmian: <strong>' + skipped + '</strong></div>' : '') +
+        protectedMsg +
+        (errors > 0   ? '<div class="result-item error">❌ Błędy: <strong>' + errors + '</strong>' + (firstError ? '<br><small>' + escHtml(firstError.substring(0,200)) + '</small>' : '') + '</div>' : '') +
+      '</div>';
 
     renderTable();
     renderAuditorsTable();
-    showToast(`Import zakończony: +${imported} audytów`, imported > 0 ? "success" : "info");
+    const msg = deleted > 0
+      ? "Re-import: +" + imported + " nowych, −" + deleted + " usuniętych"
+      : "Import zakończony: +" + imported + " audytów";
+    showToast(msg, imported > 0 || deleted > 0 ? "success" : "info");
 
   } catch(e) {
-    showToast(`Błąd importu: ${e.message}`, "error");
+    showToast("Błąd importu: " + e.message, "error");
     hide("import-stage-3");
     show("import-stage-2");
   } finally {
