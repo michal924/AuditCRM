@@ -932,27 +932,57 @@ function parseImportRows(rows, filename) {
 }
 
 // Wykryj dominujący Kwartał+Rok z parsowanego pliku
-function detectImportQuarterYear() {
-  const counts = {};
-  importParsed.forEach(r => {
-    const k = `${r.Quarter || ""}|${r.Year || ""}`;
-    counts[k] = (counts[k] || 0) + 1;
+// Znajdź istniejące importowane rekordy które są "poprzednią wersją" nowego pliku.
+// Strategia: nakładanie się ProjectID — jeśli >30% ProjectID z nowego pliku istnieje
+// w bazie jako importowane, to traktujemy je jako poprzednią wersję tego samego planu.
+function findPreviousImportBatch() {
+  const newPrjSet = new Set(importParsed.map(r => parseInt(r.ProjectID)));
+
+  // Wszystkie importowane rekordy (mają ImportFile)
+  const allImported = allAudits.filter(a => a.ImportFile);
+
+  if (!allImported.length || !newPrjSet.size) return [];
+
+  // Grupuj istniejące rekordy wg ImportFile
+  const byFile = {};
+  allImported.forEach(a => {
+    const f = a.ImportFile;
+    if (!byFile[f]) byFile[f] = [];
+    byFile[f].push(a);
   });
-  const best = Object.entries(counts).sort((a,b) => b[1]-a[1])[0];
-  if (!best) return null;
-  const [q, y] = best[0].split("|");
-  return { quarter: q, year: y };
+
+  // Znajdź pliki z największym nakładaniem się na nowy plik
+  let bestFile = null, bestOverlap = 0, bestCount = 0;
+  Object.entries(byFile).forEach(([file, recs]) => {
+    const overlap = recs.filter(r => newPrjSet.has(parseInt(r.ProjectID))).length;
+    const overlapPct = overlap / newPrjSet.size;
+    if (overlapPct > bestOverlap || (overlapPct === bestOverlap && recs.length > bestCount)) {
+      bestOverlap = overlapPct;
+      bestCount = recs.length;
+      bestFile = file;
+    }
+  });
+
+  console.log("[ReImport] Poprzedni plik:", bestFile, "nakładanie:", Math.round(bestOverlap*100) + "%");
+
+  // Minimalny próg: co najmniej 3 wspólne rekordy LUB >20% nakładania
+  if (bestFile && (bestOverlap > 0.2 || (bestOverlap > 0 && byFile[bestFile].length >= 3))) {
+    return byFile[bestFile];
+  }
+  return [];
 }
 
 // Oblicz diff między istniejącymi rekordami importowanymi a nowym plikiem
 function computeReimportDiff(existingImported) {
-  const newKeys = new Set(importParsed.map(r => `${r.ProjectID}_${r.Year||""}_${r.Program||""}`));
+  // Klucz dopasowania: tylko ProjectID+Program (bez Year — Year mógł być błędnie zdekodowany)
+  const newKeys = new Set(importParsed.map(r => `${parseInt(r.ProjectID)}_${r.Program||""}`));
+  const existingKeys = new Set(existingImported.map(ex => `${parseInt(ex.ProjectID)}_${ex.Program||""}`));
 
-  const toDelete = [];   // istniejące, których nie ma w nowym pliku — kandydaci do usunięcia
-  const protected_ = []; // istniejące, których nie ma w nowym pliku, ale mają dane ręczne
+  const toDelete = [];
+  const protected_ = [];
 
   existingImported.forEach(ex => {
-    const key = `${parseInt(ex.ProjectID)}_${ex.Year||""}_${ex.Program||""}`;
+    const key = `${parseInt(ex.ProjectID)}_${ex.Program||""}`;
     if (!newKeys.has(key)) {
       const hasManualData = ex.AuditDateStart || (ex.AuditStatus && ex.AuditStatus !== "PLANNED");
       if (hasManualData) {
@@ -963,18 +993,17 @@ function computeReimportDiff(existingImported) {
     }
   });
 
-  const existingKeys = new Set(existingImported.map(ex =>
-    `${parseInt(ex.ProjectID)}_${ex.Year||""}_${ex.Program||""}`
-  ));
   const toAdd = importParsed.filter(r => {
-    const key = `${r.ProjectID}_${r.Year||""}_${r.Program||""}`;
+    const key = `${parseInt(r.ProjectID)}_${r.Program||""}`;
     return !existingKeys.has(key);
   });
+
+  console.log("[ReImport] toDelete:", toDelete.map(x=>x.Title), "toAdd:", toAdd.map(x=>x.Title));
 
   return { toDelete, protected_, toAdd };
 }
 
-let reimportDiff = null; // wynik diff przechowywany między preview a startImport
+let reimportDiff = null;
 
 function showImportPreview(filename) {
   hide("import-stage-1");
@@ -995,42 +1024,40 @@ function showImportPreview(filename) {
     ).join("");
   document.getElementById("import-auditors").innerHTML = chips;
 
-  // Sprawdź czy to re-import tego samego Q+Y
-  const qy = detectImportQuarterYear();
   let infoHtml = '<p>📄 <strong>' + escHtml(filename) + '</strong> — znaleziono <strong>' + importParsed.length + '</strong> rekordów</p>';
 
-  if (qy && qy.quarter && qy.year) {
-    const existingForQY = allAudits.filter(a =>
-      a.Quarter === qy.quarter && String(a.Year) === String(qy.year) && a.ImportFile
-    );
-    if (existingForQY.length > 0) {
-      const diff = computeReimportDiff(existingForQY);
-      reimportDiff = diff;
-      const deleteCount = diff.toDelete.length;
-      const protectCount = diff.protected_.length;
-      const addCount = diff.toAdd.length;
-      const skipCount = importParsed.length - addCount;
+  // Wykryj poprzednią wersję przez nakładanie ProjectID (niezależnie od Quarter/Year)
+  const prevBatch = findPreviousImportBatch();
 
-      infoHtml += '<div class="import-reimport-info">' +
-        '<div class="reimport-title">🔄 Re-import ' + escHtml(qy.quarter) + ' ' + escHtml(qy.year) + ' — wykryto zmiany względem poprzedniego importu:</div>' +
-        '<div class="reimport-stats">' +
-          '<span class="reimport-stat add">➕ Nowe: <strong>' + addCount + '</strong></span>' +
-          '<span class="reimport-stat skip">⏭ Bez zmian: <strong>' + skipCount + '</strong></span>' +
-          (deleteCount ? '<span class="reimport-stat delete">🗑️ Do usunięcia (PLANNED, brak daty): <strong>' + deleteCount + '</strong></span>' : '') +
-          (protectCount ? '<span class="reimport-stat protect">🔒 Chronione (mają dane): <strong>' + protectCount + '</strong></span>' : '') +
-        '</div>' +
-        (deleteCount ? '<div class="reimport-delete-list"><strong>Zostaną usunięte:</strong> ' +
-          diff.toDelete.map(ex => escHtml(ex.Title || ('PRJ '+ex.ProjectID))).join(', ') +
-        '</div>' : '') +
-        (protectCount ? '<div class="reimport-protect-note">⚠️ Poniższe rekordy zniknęły z pliku, ale mają już datę audytu lub inny status — nie zostaną usunięte, sprawdź ręcznie: ' +
-          diff.protected_.map(ex => escHtml(ex.Title || ('PRJ '+ex.ProjectID))).join(', ') +
-        '</div>' : '') +
-      '</div>';
+  if (prevBatch.length > 0) {
+    const diff = computeReimportDiff(prevBatch);
+    reimportDiff = diff;
+    const deleteCount = diff.toDelete.length;
+    const protectCount = diff.protected_.length;
+    const addCount = diff.toAdd.length;
+    const skipCount = importParsed.length - addCount;
+    const prevFile = prevBatch[0] && prevBatch[0].ImportFile ? prevBatch[0].ImportFile : "poprzedni import";
 
-      document.getElementById("import-count").textContent = addCount + ' nowych + usuń ' + deleteCount;
-    } else {
-      document.getElementById("import-count").textContent = importParsed.length;
-    }
+    infoHtml += '<div class="import-reimport-info">' +
+      '<div class="reimport-title">🔄 Re-import — poprzednia wersja: <em>' + escHtml(prevFile) + '</em></div>' +
+      '<div class="reimport-stats">' +
+        '<span class="reimport-stat add">➕ Nowe: <strong>' + addCount + '</strong></span>' +
+        '<span class="reimport-stat skip">⏭ Bez zmian: <strong>' + skipCount + '</strong></span>' +
+        (deleteCount ? '<span class="reimport-stat delete">🗑️ Do usunięcia: <strong>' + deleteCount + '</strong></span>' : '') +
+        (protectCount ? '<span class="reimport-stat protect">🔒 Chronione: <strong>' + protectCount + '</strong></span>' : '') +
+      '</div>' +
+      (deleteCount ? '<div class="reimport-delete-list"><strong>Zostaną usunięte (PLANNED, brak daty LF):</strong> ' +
+        diff.toDelete.map(ex => escHtml(ex.Title || ('PRJ '+ex.ProjectID))).join(', ') +
+      '</div>' : '') +
+      (protectCount ? '<div class="reimport-protect-note">⚠️ Zniknęły z pliku ale mają dane ręczne — sprawdź: ' +
+        diff.protected_.map(ex => escHtml(ex.Title || ('PRJ '+ex.ProjectID))).join(', ') +
+      '</div>' : '') +
+    '</div>';
+
+    document.getElementById("import-count").textContent =
+      (addCount ? '+' + addCount + ' nowych' : '') +
+      (deleteCount ? (addCount ? ', ' : '') + '−' + deleteCount + ' usuniętych' : '') ||
+      importParsed.length;
   } else {
     document.getElementById("import-count").textContent = importParsed.length;
   }
