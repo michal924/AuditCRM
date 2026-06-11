@@ -1108,82 +1108,118 @@ function showImportPreview(filename) {
   }
 }
 
+// Pola CUC które mogą się zmienić między wersjami planu — aktualizujemy przy re-imporcie.
+// NIE aktualizujemy: AuditStatus, AuditDateStart, AuditDateEnd, Proforma, Notes (ręczne).
+function buildCucFields(rec) {
+  return {
+    Title:         rec.Title,
+    AuditType:     rec.AuditType,
+    Standard:      rec.Standard,
+    PlannedCUDate: rec.PlannedCUDate,
+    AuditDays:     rec.AuditDays,
+    AuditMode:     rec.AuditMode,
+    City:          rec.City,
+    PostalCode:    rec.PostalCode,
+    Address:       rec.Address,
+    Phone:         rec.Phone,
+    Mobile:        rec.Mobile,
+    ClientEmail:   rec.ClientEmail,
+    Quarter:       rec.Quarter,
+    Year:          rec.Year,
+    AuditorName:   rec.AuditorName,
+    ImportFile:    rec.ImportFile,
+  };
+}
+
 async function startImport() {
   if (!importParsed.length) return;
   hide("import-stage-2");
   show("import-stage-3");
   document.getElementById("btn-do-import").disabled = true;
 
+  const isReimport = !!(reimportDiff);
+  const savedDiff = reimportDiff; // zachowaj przed null-owaniem
+
   try {
-    const existingIds = await fetchExistingProjectIds();
-    let imported = 0, skipped = 0, deleted = 0, errors = 0;
+    // Zbuduj mapę istniejących rekordów: klucz ProjectID_Program → {id, rekord}
+    // (używamy allAudits bo mamy pełne dane z ostatniego fetchAllAudits)
+    const existingMap = new Map(); // klucz → {Id, AuditStatus, AuditDateStart}
+    const existingKeySet = new Set(); // klucz Year-based (dla nowych importów)
+    allAudits.forEach(a => {
+      const keyPY = `${parseInt(a.ProjectID)}_${a.Program||""}`;
+      existingMap.set(keyPY, a);
+      const keyFull = `${parseInt(a.ProjectID)}_${a.Year||""}_${a.Program||""}`;
+      existingKeySet.add(keyFull);
+    });
+
+    let imported = 0, updated = 0, skipped = 0, deleted = 0, errors = 0;
     let firstError = "";
     const total = importParsed.length;
 
-    // ── Faza 1: usuń osierocone rekordy (re-import tego samego Q+Y) ──
-    if (reimportDiff && reimportDiff.toDelete.length > 0) {
-      const toDelete = reimportDiff.toDelete;
+    // ── Faza 1: usuń osierocone (tylko gdy checkbox potwierdzony) ──
+    if (savedDiff && savedDiff.toDelete.length > 0) {
+      const toDelete = savedDiff.toDelete;
       for (let i = 0; i < toDelete.length; i++) {
         document.getElementById("import-progress-text").textContent =
-          "Usuwanie osieroconych rekordów " + (i+1) + "/" + toDelete.length + " — " + (toDelete[i].Title || "");
+          "Usuwanie osieroconych " + (i+1) + "/" + toDelete.length + " — " + (toDelete[i].Title || "");
         document.getElementById("progress-fill").style.width =
-          Math.round(((i+1) / toDelete.length) * 30) + "%"; // 0-30% na usuwanie
+          Math.round(((i+1) / toDelete.length) * 20) + "%";
         try {
           await deleteAudit(toDelete[i].Id);
           deleted++;
         } catch(err) {
           errors++;
           if (!firstError) firstError = err.message;
-          console.error("Delete error for", toDelete[i].Title, err.message);
+          console.error("Delete error:", toDelete[i].Title, err.message);
         }
       }
     }
 
-    // ── Faza 2: dodaj nowe rekordy ──
+    // ── Faza 2: aktualizuj istniejące (re-import) lub dodaj nowe ──
     for (let i = 0; i < total; i++) {
       const rec = importParsed[i];
-      const pct = 30 + Math.round(((i + 1) / total) * 70); // 30-100%
+      const pct = 20 + Math.round(((i + 1) / total) * 80);
       document.getElementById("progress-fill").style.width = pct + "%";
       document.getElementById("import-progress-text").textContent =
-        "Importowanie " + (i+1) + "/" + total + " — " + (rec.Title || "");
+        (isReimport ? "Aktualizowanie " : "Importowanie ") + (i+1) + "/" + total + " — " + (rec.Title || "");
 
-      const dupKey = `${rec.ProjectID}_${rec.Year || ""}_${rec.Program || ""}`;
-      if (existingIds.has(dupKey)) { skipped++; continue; }
+      const keyPY = `${parseInt(rec.ProjectID)}_${rec.Program||""}`;
+      const existing = existingMap.get(keyPY);
 
-      const spFields = {
-        Title:          rec.Title,
+      if (existing) {
+        if (isReimport) {
+          // Re-import: aktualizuj pola CUC, zachowaj pola ręczne
+          try {
+            await updateAudit(existing.Id, buildCucFields(rec));
+            updated++;
+          } catch(err) {
+            errors++;
+            if (!firstError) firstError = err.message;
+            console.error("Update error:", rec.Title, err.message);
+          }
+        } else {
+          skipped++; // normalny import — pomiń duplikat
+        }
+        continue;
+      }
+
+      // Nowy rekord — dodaj
+      const spFields = Object.assign(buildCucFields(rec), {
         ProjectID:      rec.ProjectID,
         Program:        rec.Program,
-        AuditType:      rec.AuditType,
-        Standard:       rec.Standard,
         AuditDateStart: null,
         AuditDateEnd:   null,
-        PlannedCUDate:  rec.PlannedCUDate,
-        AuditDays:      rec.AuditDays,
-        AuditMode:      rec.AuditMode,
-        AuditStatus:    rec.AuditStatus,
-        Proforma:       rec.Proforma,
-        City:           rec.City,
-        PostalCode:     rec.PostalCode,
-        Address:        rec.Address,
-        Phone:          rec.Phone,
-        Mobile:         rec.Mobile,
-        ClientEmail:    rec.ClientEmail,
-        Notes:          rec.Notes,
-        Quarter:        rec.Quarter,
-        Year:           rec.Year,
-        AuditorName:    rec.AuditorName,
-        ImportFile:     rec.ImportFile,
-      };
+        AuditStatus:    "PLANNED",
+        Proforma:       "Brak",
+      });
 
       try {
         await addAudit(spFields);
-        existingIds.add(dupKey);
         imported++;
       } catch(err) {
         errors++;
         if (!firstError) firstError = err.message;
-        console.error("Import error for", rec.Title, err.message);
+        console.error("Import error:", rec.Title, err.message);
       }
     }
 
@@ -1193,25 +1229,23 @@ async function startImport() {
     hide("import-stage-3");
     show("import-stage-4");
 
-    const protectedMsg = reimportDiff && reimportDiff.protected_ && reimportDiff.protected_.length
-      ? '<div class="result-item warn">🔒 Chronione (mają dane ręczne): <strong>' + reimportDiff.protected_.length + '</strong> — sprawdź ręcznie</div>'
-      : "";
-
     document.getElementById("import-results").innerHTML =
       '<div class="import-result-box">' +
-        (imported > 0 ? '<div class="result-item success">✅ Dodano: <strong>' + imported + '</strong></div>' : '') +
+        (imported > 0 ? '<div class="result-item success">✅ Dodano nowe: <strong>' + imported + '</strong></div>' : '') +
+        (updated > 0  ? '<div class="result-item success">🔄 Zaktualizowano (audytor, data CU, miasto…): <strong>' + updated + '</strong></div>' : '') +
         (deleted > 0  ? '<div class="result-item delete">🗑️ Usunięto osierocone: <strong>' + deleted + '</strong></div>' : '') +
-        (skipped > 0  ? '<div class="result-item skip">⏭ Bez zmian: <strong>' + skipped + '</strong></div>' : '') +
-        protectedMsg +
+        (skipped > 0  ? '<div class="result-item skip">⏭ Pominięto (duplikaty): <strong>' + skipped + '</strong></div>' : '') +
         (errors > 0   ? '<div class="result-item error">❌ Błędy: <strong>' + errors + '</strong>' + (firstError ? '<br><small>' + escHtml(firstError.substring(0,200)) + '</small>' : '') + '</div>' : '') +
       '</div>';
 
     renderTable();
     renderAuditorsTable();
-    const msg = deleted > 0
-      ? "Re-import: +" + imported + " nowych, −" + deleted + " usuniętych"
-      : "Import zakończony: +" + imported + " audytów";
-    showToast(msg, imported > 0 || deleted > 0 ? "success" : "info");
+    showToast(
+      isReimport
+        ? "Re-import: +" + imported + " nowych, ✏️ " + updated + " zaktualizowanych" + (deleted ? ", −" + deleted + " usuniętych" : "")
+        : "Import: +" + imported + " audytów",
+      imported > 0 || updated > 0 || deleted > 0 ? "success" : "info"
+    );
 
   } catch(e) {
     showToast("Błąd importu: " + e.message, "error");
