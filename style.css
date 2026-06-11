@@ -863,6 +863,19 @@ tbody td.date-col {
   font-size: 13px;
 }
 .reimport-title { font-weight: 600; color: var(--accent); margin-bottom: 8px; }
+.reimport-confirm-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--red);
+  background: rgba(192,57,43,0.07);
+  border: 1.5px solid rgba(192,57,43,0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.reimport-confirm-label input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
 .reimport-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .reimport-stat {
   padding: 4px 10px;

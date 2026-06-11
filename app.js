@@ -972,9 +972,14 @@ function findPreviousImportBatch() {
   return [];
 }
 
-// Oblicz diff między istniejącymi rekordami importowanymi a nowym plikiem
+// Oblicz diff między istniejącymi rekordami importowanymi a nowym plikiem.
+// Kandydaci do usunięcia MUSZĄ mieć ten sam Program co dominujący program w nowym pliku.
 function computeReimportDiff(existingImported) {
-  // Klucz dopasowania: tylko ProjectID+Program (bez Year — Year mógł być błędnie zdekodowany)
+  // Dominujący program w nowym pliku (np. "FSC CoC")
+  const programCounts = {};
+  importParsed.forEach(r => { programCounts[r.Program||""] = (programCounts[r.Program||""] || 0) + 1; });
+  const dominantProgram = Object.entries(programCounts).sort((a,b) => b[1]-a[1])[0]?.[0] || "";
+
   const newKeys = new Set(importParsed.map(r => `${parseInt(r.ProjectID)}_${r.Program||""}`));
   const existingKeys = new Set(existingImported.map(ex => `${parseInt(ex.ProjectID)}_${ex.Program||""}`));
 
@@ -983,22 +988,26 @@ function computeReimportDiff(existingImported) {
 
   existingImported.forEach(ex => {
     const key = `${parseInt(ex.ProjectID)}_${ex.Program||""}`;
-    if (!newKeys.has(key)) {
-      const hasManualData = ex.AuditDateStart || (ex.AuditStatus && ex.AuditStatus !== "PLANNED");
-      if (hasManualData) {
-        protected_.push(ex);
-      } else {
-        toDelete.push(ex);
-      }
+    if (newKeys.has(key)) return; // istnieje w nowym pliku — pomiń
+
+    // Tylko rekordy z tego samego Programu co nowy plik
+    if (dominantProgram && ex.Program !== dominantProgram) return;
+
+    const hasManualData = ex.AuditDateStart || (ex.AuditStatus && ex.AuditStatus !== "PLANNED");
+    if (hasManualData) {
+      protected_.push(ex);
+    } else {
+      toDelete.push(ex);
     }
   });
 
   const toAdd = importParsed.filter(r => {
-    const key = `${parseInt(r.ProjectID)}_${r.Program||""}`;
-    return !existingKeys.has(key);
+    return !existingKeys.has(`${parseInt(r.ProjectID)}_${r.Program||""}`);
   });
 
-  console.log("[ReImport] toDelete:", toDelete.map(x=>x.Title), "toAdd:", toAdd.map(x=>x.Title));
+  console.log("[ReImport] dominantProgram:", dominantProgram,
+    "toDelete:", toDelete.map(x=>x.Title),
+    "toAdd:", toAdd.map(x=>x.Title));
 
   return { toDelete, protected_, toAdd };
 }
@@ -1058,8 +1067,26 @@ function showImportPreview(filename) {
       (addCount ? '+' + addCount + ' nowych' : '') +
       (deleteCount ? (addCount ? ', ' : '') + '−' + deleteCount + ' usuniętych' : '') ||
       importParsed.length;
+
+    // Pokaż checkbox potwierdzenia gdy są rekordy do usunięcia
+    window._reimportHasDeletes = deleteCount > 0;
+    const wrap = document.getElementById("reimport-confirm-wrap");
+    const btn = document.getElementById("btn-do-import");
+    const check = document.getElementById("reimport-confirm-check");
+    if (deleteCount > 0) {
+      document.getElementById("reimport-confirm-count").textContent = deleteCount;
+      wrap.classList.remove("hidden");
+      check.checked = false;
+      btn.disabled = true; // wymaga świadomego potwierdzenia
+    } else {
+      wrap.classList.add("hidden");
+      btn.disabled = false;
+    }
   } else {
     document.getElementById("import-count").textContent = importParsed.length;
+    document.getElementById("reimport-confirm-wrap").classList.add("hidden");
+    document.getElementById("btn-do-import").disabled = false;
+    window._reimportHasDeletes = false;
   }
 
   document.getElementById("import-info").innerHTML = infoHtml;

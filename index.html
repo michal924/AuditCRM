@@ -532,6 +532,12 @@
             <tbody id="import-preview-tbody"></tbody>
           </table>
         </div>
+        <div id="reimport-confirm-wrap" class="hidden" style="margin-top:12px">
+          <label class="reimport-confirm-label">
+            <input type="checkbox" id="reimport-confirm-check" onchange="document.getElementById('btn-do-import').disabled = !this.checked && window._reimportHasDeletes">
+            Tak, usuń <strong id="reimport-confirm-count">0</strong> osieroconych rekordów z poprzedniego importu
+          </label>
+        </div>
         <div class="modal-actions" style="margin-top:16px">
           <button class="btn-ghost" onclick="resetImport()">← Zmień plik</button>
           <button id="btn-do-import" class="btn-primary" style="width:auto">Importuj wszystkie (<span id="import-count">0</span>)</button>
