@@ -659,9 +659,10 @@ async function saveChanges() {
       fields.AuditMode     = document.getElementById("e-mode").value || null;
       fields.PlannedCUDate = cuVal ? safeDate(cuVal) : null;
       fields.Notes         = document.getElementById("e-notes").value.trim()   || null;
-      if (dateVal) {
-        fields.Quarter = detectQuarter(dateVal);
-        fields.Year    = detectYear(dateVal);
+      // Quarter i Year zawsze z daty CU (planowanie CUC), nie z daty audytu LF
+      if (cuVal) {
+        fields.Quarter = detectQuarter(cuVal);
+        fields.Year    = detectYear(cuVal);
       }
     }
 
