@@ -366,25 +366,29 @@ function renderTable() {
     '<tr class="row-preview-wrap" id="preview-' + aid + '" style="display:none">' +
       '<td colspan="' + NCOLS + '" class="row-preview-td">' +
         '<div class="row-preview">' +
-          '<div class="row-preview-grid">' +
-            '<div class="rp-item"><span class="rp-label">Firma</span><span class="rp-val">' + escHtml(a.Title || '—') + '</span></div>' +
-            '<div class="rp-item"><span class="rp-label">PRJ</span><span class="rp-val">' + escHtml(a.ProjectID || '—') + '</span></div>' +
-            '<div class="rp-item"><span class="rp-label">Program</span><span class="rp-val">' + programBadge(a.Program) + '</span></div>' +
-            '<div class="rp-item"><span class="rp-label">Typ</span><span class="rp-val">' + escHtml(a.AuditType || '—') + '</span></div>' +
-            '<div class="rp-item"><span class="rp-label">Status</span><span class="rp-val">' + statusBadge(a.AuditStatus) + '</span></div>' +
-            '<div class="rp-item"><span class="rp-label">Proforma</span><span class="rp-val">' + proformaBadge(a.Proforma) + '</span></div>' +
-            '<div class="rp-item"><span class="rp-label">Data CU</span><span class="rp-val">' + (formatDate(a.PlannedCUDate) || '—') + '</span></div>' +
-            '<div class="rp-item"><span class="rp-label">Data audytu LF</span><span class="rp-val">' + (formatDate(a.AuditDateStart) || '—') + custodyMark + '</span></div>' +
-            '<div class="rp-item"><span class="rp-label">Miasto</span><span class="rp-val">' + escHtml(a.City || '—') + '</span></div>' +
-            '<div class="rp-item"><span class="rp-label">Tryb</span><span class="rp-val">' + escHtml(a.AuditMode || '—') + '</span></div>' +
-            '<div class="rp-item"><span class="rp-label">Audytor</span><span class="rp-val">' + escHtml(a.AuditorName || '—') + '</span></div>' +
-            '<div class="rp-item"><span class="rp-label">Email</span><span class="rp-val">' + emailBlock + '</span></div>' +
+          '<div class="rp-header">' +
+            '<div class="rp-header-left">' +
+              '<span class="rp-company">' + escHtml(a.Title || '—') + '</span>' +
+              '<span class="rp-prj">PRJ ' + escHtml(a.ProjectID || '—') + '</span>' +
+              programBadge(a.Program) +
+            '</div>' +
+            '<div class="rp-header-right">' +
+              '<button class="btn-rp-edit" onclick="event.stopPropagation(); openModal(' + aid + ')">✏️ Edytuj</button>' +
+              '<button class="btn-rp-close" onclick="event.stopPropagation(); toggleRowPreview(' + aid + ')">✕</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="rp-fields">' +
+            '<div class="rp-field"><span class="rp-label">Typ</span><span class="rp-val">' + escHtml(a.AuditType ? shortType(a.AuditType) : '—') + '</span></div>' +
+            '<div class="rp-field"><span class="rp-label">Status</span><span class="rp-val">' + statusBadge(a.AuditStatus) + '</span></div>' +
+            '<div class="rp-field"><span class="rp-label">Proforma</span><span class="rp-val">' + proformaBadge(a.Proforma) + '</span></div>' +
+            '<div class="rp-field"><span class="rp-label">Data CU</span><span class="rp-val">' + (formatDate(a.PlannedCUDate) || '—') + '</span></div>' +
+            '<div class="rp-field"><span class="rp-label">Data audytu LF</span><span class="rp-val">' + (formatDate(a.AuditDateStart) || '—') + custodyMark + '</span></div>' +
+            '<div class="rp-field"><span class="rp-label">Miasto</span><span class="rp-val">' + escHtml(a.City || '—') + '</span></div>' +
+            '<div class="rp-field"><span class="rp-label">Tryb</span><span class="rp-val">' + (a.AuditMode === 'Online' ? '💻 Online' : '📍 On-site') + '</span></div>' +
+            '<div class="rp-field"><span class="rp-label">Audytor</span><span class="rp-val">' + escHtml(a.AuditorName || '—') + '</span></div>' +
+            (a.Email ? '<div class="rp-field"><span class="rp-label">Email</span><span class="rp-val"><a href="mailto:' + escHtml(a.Email) + '">' + escHtml(a.Email) + '</a></span></div>' : '') +
           '</div>' +
           notesBlock +
-          '<div class="rp-actions">' +
-            '<button class="btn-rp-edit" onclick="event.stopPropagation(); openModal(' + aid + ')">✏️ Edytuj</button>' +
-            '<button class="btn-rp-close" onclick="event.stopPropagation(); toggleRowPreview(' + aid + ')">✕ Zamknij</button>' +
-          '</div>' +
         '</div>' +
       '</td>' +
     '</tr>';

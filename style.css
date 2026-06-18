@@ -627,55 +627,97 @@ tbody td.date-col {
 /* ── Podgląd wiersza (accordion) ── */
 .audit-row { cursor: pointer; transition: background .15s; }
 .audit-row:hover { background: var(--bg3); }
-.audit-row.row-expanded { background: var(--bg3); }
+.audit-row.row-expanded td { background: var(--bg3); }
 .audit-row.row-expanded td:first-child { border-left: 3px solid var(--accent); }
 
-.row-preview-wrap td { padding: 0 !important; border-top: none !important; }
+.row-preview-wrap td { padding: 0 !important; border: none !important; }
 .row-preview-td { padding: 0 !important; }
 .row-preview {
-  background: var(--bg2);
+  background: var(--bg);
   border-left: 3px solid var(--accent);
-  border-bottom: 2px solid var(--accent-light);
-  padding: 16px 20px;
-  animation: slideDown .18s ease;
+  border-bottom: 1px solid var(--border);
+  animation: slideDown .15s ease;
 }
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-6px); }
+  from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.row-preview-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px 20px;
-  margin-bottom: 14px;
+/* Nagłówek podglądu */
+.rp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
 }
-.rp-item {
+.rp-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.rp-company {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+.rp-prj {
+  font-size: 12px;
+  color: var(--text3);
+  white-space: nowrap;
+}
+.rp-header-right {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Siatka pól */
+.rp-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 8px 0;
+}
+.rp-field {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: 6px 16px;
+  border-right: 1px solid var(--border);
+  min-width: 100px;
 }
+.rp-field:last-child { border-right: none; }
 .rp-label {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: .06em;
   color: var(--text3);
   font-weight: 600;
+  white-space: nowrap;
 }
 .rp-val {
   font-size: 13px;
   color: var(--text);
+  white-space: nowrap;
 }
 .rp-val a { color: var(--accent); text-decoration: none; }
 .rp-val a:hover { text-decoration: underline; }
 
+/* Notatki */
 .rp-notes {
-  background: var(--bg3);
-  border-radius: 8px;
-  padding: 10px 14px;
-  margin-bottom: 14px;
+  border-top: 1px solid var(--border);
+  padding: 8px 16px 10px;
 }
-.rp-notes .rp-label { margin-bottom: 4px; display: block; }
+.rp-notes .rp-label { display: block; margin-bottom: 4px; }
 .rp-notes-text {
   font-size: 13px;
   color: var(--text);
@@ -684,20 +726,18 @@ tbody td.date-col {
   margin: 0;
 }
 
-.rp-actions {
-  display: flex;
-  gap: 8px;
-}
+/* Przyciski */
 .btn-rp-edit {
   background: var(--accent);
   color: #fff;
   border: none;
   border-radius: 6px;
-  padding: 6px 14px;
-  font-size: 13px;
+  padding: 5px 12px;
+  font-size: 12px;
   font-family: inherit;
   cursor: pointer;
   transition: background .15s;
+  white-space: nowrap;
 }
 .btn-rp-edit:hover { background: var(--accent2, #2d3d7a); }
 .btn-rp-close {
@@ -705,8 +745,8 @@ tbody td.date-col {
   color: var(--text3);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 6px 14px;
-  font-size: 13px;
+  padding: 5px 10px;
+  font-size: 12px;
   font-family: inherit;
   cursor: pointer;
   transition: background .15s;
