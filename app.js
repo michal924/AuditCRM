@@ -153,10 +153,11 @@ function setupNav() {
       const view = btn.dataset.view;
       document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
       document.getElementById(`view-${view}`).classList.remove("hidden");
+      if (view === "myaudits")  { restoreFilters(); renderTable(); }
       if (view === "checkaudit") renderAuditorsTable();
-      if (view === "changes") renderChangesTable();
-      if (view === "opieka") OpiekaModule.render();
-      if (view === "mapa")   MapModule.render();
+      if (view === "changes")    renderChangesTable();
+      if (view === "opieka")     OpiekaModule.render();
+      if (view === "mapa")       MapModule.render();
     };
   });
 }
