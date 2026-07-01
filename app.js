@@ -539,11 +539,11 @@ function setupModal() {
 function updatePlanAuditBtn(dateVal) {
   const btn = document.getElementById("btn-plan-audit");
   if (!btn) return;
-  if (dateVal && dateVal !== originalAuditDate) {
-    btn.classList.add("scheduled");
-    btn.title = `Przy zapisaniu — wyślij zaproszenie (${formatDate(dateVal)}) do kalendarzy office@logisticfit.com i michal@logisticfit.com`;
+  // Nie zmieniamy wyglądu przycisku automatycznie — tylko po świadomym kliknięciu.
+  // Aktualizujemy tylko tytuł (tooltip) z nową datą.
+  if (dateVal) {
+    btn.title = `Kliknij aby zaplanować audyt (${formatDate(dateVal)}) i wysłać zaproszenie do office@logisticfit.com`;
   } else {
-    btn.classList.remove("scheduled");
     btn.title = "Przy zapisaniu daty — wyślij zaproszenie do kalendarzy office@logisticfit.com i michal@logisticfit.com";
   }
 }
