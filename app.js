@@ -675,8 +675,8 @@ async function saveChanges() {
     Object.assign(currentAudit, fields);
     renderTable();
 
-    // ── Integracja kalendarza: TYLKO gdy użytkownik kliknął "Zaplanuj audyt" i status = PLANNED ──
-    if (planAuditRequested && currentStatus === "PLANNED" && currentAudit.AuditDateStart) {
+    // ── Integracja kalendarza: gdy użytkownik kliknął "Zaplanuj audyt" (niezależnie od statusu końcowego) ──
+    if (planAuditRequested && currentAudit.AuditDateStart) {
       try {
         const calResult = await createAuditCalendarEvents(currentAudit);
         const link = calResult?.webLink;
