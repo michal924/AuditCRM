@@ -757,18 +757,27 @@ async function createAuditCalendarEvents(audit) {
   if (!token) throw new Error("Brak tokenu Graph — zaloguj się ponownie");
 
   const dateStr  = audit.AuditDateStart.substring(0, 10);
+  // Liczba dni audytu z pola AuditDays (ceil, min 1). Dla eventu całodniowego w Graph
+  // pole end jest WYŁĄCZAJĄCE, więc N-dniowy audyt = start ... start+N.
+  const days     = Math.max(1, Math.ceil(parseFloat(audit.AuditDays) || 1));
   const nextDate = new Date(dateStr + "T12:00:00");
-  nextDate.setDate(nextDate.getDate() + 1);
-  const nextStr  = nextDate.toISOString().substring(0, 10);
+  nextDate.setDate(nextDate.getDate() + days);
+  const nextStr  = nextDate.toISOString().substring(0, 10); // dzień PO ostatnim dniu audytu (exclusive)
+  // Ostatni dzień audytu (dla czytelnego zakresu w temacie/treści)
+  const lastDate = new Date(dateStr + "T12:00:00");
+  lastDate.setDate(lastDate.getDate() + days - 1);
+  const lastStr  = lastDate.toISOString().substring(0, 10);
 
   const loc  = [audit.Address, audit.City, audit.PostalCode].filter(Boolean).join(", ");
-  const subj = `📅 Audyt ${audit.Program || ""}: ${audit.Title || ""}${audit.City ? " — " + audit.City : ""}`.trim();
+  const rangeLabel = days > 1 ? `${formatDate(dateStr)}–${formatDate(lastStr)}` : formatDate(dateStr);
+  const subj = `📅 Audyt ${audit.Program || ""}: ${audit.Title || ""}${audit.City ? " — " + audit.City : ""}${days > 1 ? ` (${days} dni)` : ""}`.trim();
 
   const bodyText = [
     `PRJ: ${audit.ProjectID || "—"}`,
     `Program: ${audit.Program || "—"}`,
     `Typ: ${audit.AuditType || "—"}`,
     `Audytor: ${audit.AuditorName || "—"}`,
+    `Termin: ${rangeLabel}${days > 1 ? ` (${days} dni)` : ""}`,
     `Adres: ${loc || "—"}`,
     ``,
     `Zaplanowano przez Audit CRM — LogisticFit`,
@@ -790,7 +799,7 @@ async function createAuditCalendarEvents(audit) {
     ],
   };
 
-  console.log("[Calendar] Tworzę event:", subj, dateStr, "→", nextStr);
+  console.log("[Calendar] Tworzę event:", subj, `${dateStr} → ${lastStr} (${days} dni, end exclusive ${nextStr})`);
 
   const r = await fetch("https://graph.microsoft.com/v1.0/me/events", {
     method: "POST",
