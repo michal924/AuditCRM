@@ -113,6 +113,13 @@
           <label class="filter-multi-opt"><input type="checkbox" value="EUDR"> EUDR</label>
         </div>
       </div>
+      <div class="filter-multi-wrap" id="filter-certbody-wrap">
+        <button class="filter-select filter-multi-btn" id="filter-certbody-btn">Jednostka</button>
+        <div class="filter-multi-panel hidden" id="filter-certbody-panel">
+          <label class="filter-multi-opt"><input type="checkbox" value="CUC"> CUC</label>
+          <label class="filter-multi-opt"><input type="checkbox" value="SGS"> SGS</label>
+        </div>
+      </div>
       <div class="filter-multi-wrap" id="filter-status-wrap">
         <button class="filter-select filter-multi-btn" id="filter-status-btn">Status</button>
         <div class="filter-multi-panel hidden" id="filter-status-panel">
@@ -582,6 +589,13 @@
               <input type="text" id="new-title" class="form-input" placeholder="Wpisz 3 litery aby wyszukać..." autocomplete="off">
               <ul id="autocomplete-list" class="autocomplete-list hidden"></ul>
             </div>
+          </div>
+          <div class="form-row">
+            <label>Jednostka certyfikująca *</label>
+            <select id="new-certbody" class="form-input">
+              <option value="CUC">CUC</option>
+              <option value="SGS">SGS</option>
+            </select>
           </div>
           <div class="form-row">
             <label>Program *</label>

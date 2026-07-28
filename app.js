@@ -181,8 +181,11 @@ async function loadAudits() {
 // FILTRY — z persystencją w localStorage
 // ============================================================
 const FILTERS_KEY = "auditFilters_v3";
-const MULTI_KEYS  = ["quarter", "year", "program", "status"];
-const MULTI_LABELS = { quarter: "Kwartał", year: "Rok", program: "Program", status: "Status" };
+const MULTI_KEYS  = ["quarter", "year", "program", "status", "certbody"];
+const MULTI_LABELS = { quarter: "Kwartał", year: "Rok", program: "Program", status: "Status", certbody: "Jednostka" };
+
+// Jednostka certyfikująca. Puste/stare rekordy = CUC (domyślnie), bez potrzeby backfillu.
+function certBodyOf(a) { return (a && a.CertBody) ? a.CertBody : "CUC"; }
 
 function getSelectedMulti(key) {
   return [...document.querySelectorAll(`#filter-${key}-panel input[type=checkbox]:checked`)].map(cb => cb.value);
@@ -268,6 +271,7 @@ function getFilters() {
     years:    getSelectedMulti("year"),
     programs: getSelectedMulti("program"),
     statuses: getSelectedMulti("status"),
+    certbodies: getSelectedMulti("certbody"),
   };
 }
 
@@ -285,6 +289,7 @@ function applyFilters(audits) {
     if (f.years.length > 0    && !f.years.includes(String(a.Year))) return false;
     if (f.programs.length > 0 && !f.programs.some(p => normProgramKey(p) === normProgramKey(a.Program))) return false;
     if (f.statuses.length > 0 && !f.statuses.includes(a.AuditStatus)) return false;
+    if (f.certbodies.length > 0 && !f.certbodies.includes(certBodyOf(a))) return false;
     return true;
   });
 }
@@ -353,7 +358,7 @@ function renderTable() {
     '<tr class="audit-row ' + rowClass + '" data-id="' + aid + '" onclick="toggleRowPreview(' + aid + ', this)">' +
       '<td class="prj-col">' + escHtml(a.ProjectID || '—') + '</td>' +
       '<td class="firma-col">' + escHtml(a.Title || '—') + '</td>' +
-      '<td class="program-col">' + programBadge(a.Program) + '</td>' +
+      '<td class="program-col">' + certBodyBadge(a) + ' ' + programBadge(a.Program) + '</td>' +
       '<td>' + (a.AuditType ? shortType(a.AuditType) : '—') + '</td>' +
       '<td class="date-col">' + (formatDate(a.PlannedCUDate) || '—') + '</td>' +
       '<td class="date-col">' + formatDate(a.AuditDateStart) + custodyMark + '</td>' +
@@ -370,6 +375,7 @@ function renderTable() {
             '<div class="rp-header-left">' +
               '<span class="rp-company">' + escHtml(a.Title || '—') + '</span>' +
               '<span class="rp-prj">PRJ ' + escHtml(a.ProjectID || '—') + '</span>' +
+              certBodyBadge(a) +
               programBadge(a.Program) +
             '</div>' +
             '<div class="rp-header-right">' +
@@ -773,6 +779,7 @@ async function createAuditCalendarEvents(audit) {
   const subj = `📅 Audyt ${audit.Program || ""}: ${audit.Title || ""}${audit.City ? " — " + audit.City : ""}${days > 1 ? ` (${days} dni)` : ""}`.trim();
 
   const bodyText = [
+    `Jednostka: ${certBodyOf(audit)}`,
     `PRJ: ${audit.ProjectID || "—"}`,
     `Program: ${audit.Program || "—"}`,
     `Typ: ${audit.AuditType || "—"}`,
@@ -916,6 +923,7 @@ function parseImportRows(rows, filename) {
     records.push({
       Title:          safeStr(row["Project"] || row["Name"] || row["NAME"] || row["Title"]),
       ProjectID:      Math.round(prj),
+      CertBody:       "CUC", // import zawsze z CUC (SGS dodawane ręcznie)
       Program:        normProgram(row["SPG. Name"] || row["Program"] || row["PROGRAM"]),
       AuditType:      normAuditType(row["Insp. Type"] || row["AuditType"] || row["TYPE"]),
       Standard:       safeStr(row["Insp. Module"] || row["Standard"] || row["STANDARD"]),
@@ -995,14 +1003,14 @@ function computeReimportDiff(existingImported) {
   importParsed.forEach(r => { programCounts[r.Program||""] = (programCounts[r.Program||""] || 0) + 1; });
   const dominantProgram = Object.entries(programCounts).sort((a,b) => b[1]-a[1])[0]?.[0] || "";
 
-  const newKeys = new Set(importParsed.map(r => `${parseInt(r.ProjectID)}_${r.Program||""}`));
-  const existingKeys = new Set(existingImported.map(ex => `${parseInt(ex.ProjectID)}_${ex.Program||""}`));
+  const newKeys = new Set(importParsed.map(r => `${certBodyOf(r)}_${parseInt(r.ProjectID)}_${r.Program||""}`));
+  const existingKeys = new Set(existingImported.map(ex => `${certBodyOf(ex)}_${parseInt(ex.ProjectID)}_${ex.Program||""}`));
 
   const toDelete = [];
   const protected_ = [];
 
   existingImported.forEach(ex => {
-    const key = `${parseInt(ex.ProjectID)}_${ex.Program||""}`;
+    const key = `${certBodyOf(ex)}_${parseInt(ex.ProjectID)}_${ex.Program||""}`;
     if (newKeys.has(key)) return; // istnieje w nowym pliku — pomiń
 
     // Tylko rekordy z tego samego Programu co nowy plik
@@ -1017,7 +1025,7 @@ function computeReimportDiff(existingImported) {
   });
 
   const toAdd = importParsed.filter(r => {
-    return !existingKeys.has(`${parseInt(r.ProjectID)}_${r.Program||""}`);
+    return !existingKeys.has(`${certBodyOf(r)}_${parseInt(r.ProjectID)}_${r.Program||""}`);
   });
 
   console.log("[ReImport] dominantProgram:", dominantProgram,
@@ -1161,9 +1169,9 @@ async function startImport() {
     const existingMap = new Map(); // klucz → {Id, AuditStatus, AuditDateStart}
     const existingKeySet = new Set(); // klucz Year-based (dla nowych importów)
     allAudits.forEach(a => {
-      const keyPY = `${parseInt(a.ProjectID)}_${a.Program||""}`;
+      const keyPY = `${certBodyOf(a)}_${parseInt(a.ProjectID)}_${a.Program||""}`;
       existingMap.set(keyPY, a);
-      const keyFull = `${parseInt(a.ProjectID)}_${a.Year||""}_${a.Program||""}`;
+      const keyFull = `${certBodyOf(a)}_${parseInt(a.ProjectID)}_${a.Year||""}_${a.Program||""}`;
       existingKeySet.add(keyFull);
     });
 
@@ -1198,7 +1206,7 @@ async function startImport() {
       document.getElementById("import-progress-text").textContent =
         (isReimport ? "Aktualizowanie " : "Importowanie ") + (i+1) + "/" + total + " — " + (rec.Title || "");
 
-      const keyPY = `${parseInt(rec.ProjectID)}_${rec.Program||""}`;
+      const keyPY = `${certBodyOf(rec)}_${parseInt(rec.ProjectID)}_${rec.Program||""}`;
       const existing = existingMap.get(keyPY);
 
       if (existing) {
@@ -1473,6 +1481,7 @@ async function saveNewAudit() {
   const g = id => (document.getElementById(id)?.value || "").trim();
   const rec = {
     Title:          title,
+    CertBody:       g("new-certbody") || "CUC",
     Program:        program,
     AuditType:      type,
     Standard:       g("new-standard"),
@@ -1571,6 +1580,12 @@ function programBadge(p) {
   };
   const label = p === "FSC" ? "FSC CoC" : p === "PEFC" ? "PEFC CoC" : (p || "—");
   return `<span class="badge badge-${cls[p] || 'fsc'}">${label}</span>`;
+}
+
+function certBodyBadge(a) {
+  const b = certBodyOf(a);
+  const cls = b === "SGS" ? "sgs" : "cuc";
+  return `<span class="badge badge-body-${cls}">${b}</span>`;
 }
 
 function statusBadge(s) {

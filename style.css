@@ -382,6 +382,10 @@ tbody td.date-col {
 .badge-sure     { background: #ede0fb; color: #6b3ab0; }
 .badge-eudr     { background: #fde0e0; color: #b02020; }
 
+/* Jednostka certyfikująca — wyróżnik obramowany, żeby odróżnić od badge programu */
+.badge-body-cuc { background: #eef1f5; color: #4a5568; border: 1px solid #cbd5e0; }
+.badge-body-sgs { background: #fff2e0; color: #b4520a; border: 1px solid #f0b775; }
+
 .badge-planned  { background: #dce6fb; color: #2d4da0; }
 .badge-done     { background: #d4f0dc; color: #1a7a34; }
 .badge-rejected { background: #fde0e0; color: #b02020; }
