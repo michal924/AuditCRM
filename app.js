@@ -305,8 +305,14 @@ function applyFilters(audits) {
 // ============================================================
 function sortAudits(arr) {
   return [...arr].sort((a, b) => {
-    let va = a[sortCol] ?? "";
-    let vb = b[sortCol] ?? "";
+    let va = a[sortCol];
+    let vb = b[sortCol];
+    // Puste wartości (brak daty itp.) zawsze na koniec — niezależnie od kierunku sortowania
+    const aEmpty = va === null || va === undefined || va === "";
+    const bEmpty = vb === null || vb === undefined || vb === "";
+    if (aEmpty && bEmpty) return 0;
+    if (aEmpty) return 1;
+    if (bEmpty) return -1;
     // Daty: string ISO — porównuj leksykograficznie
     if (typeof va === "string") va = va.toLowerCase();
     if (typeof vb === "string") vb = vb.toLowerCase();
