@@ -321,8 +321,18 @@ tbody tr {
 }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: var(--bg3); }
-tbody tr.row-manual { background: #f5f0ff; }
-tbody tr.row-manual:hover { background: #ede5ff; }
+/* Kolor wiersza: barwa = jednostka certyfikująca, jasność = status audytu */
+tbody tr.audit-row.row-body-cuc.row-st-planned  { background: #cfdcf6; }
+tbody tr.audit-row.row-body-cuc.row-st-change   { background: #dae4f9; }
+tbody tr.audit-row.row-body-cuc.row-st-invoice  { background: #e6edfb; }
+tbody tr.audit-row.row-body-cuc.row-st-done     { background: #eef3fc; }
+tbody tr.audit-row.row-body-cuc.row-st-rejected { background: #f5f8fd; }
+
+tbody tr.audit-row.row-body-sgs.row-st-planned  { background: #ffdcb5; }
+tbody tr.audit-row.row-body-sgs.row-st-change   { background: #ffe5c8; }
+tbody tr.audit-row.row-body-sgs.row-st-invoice  { background: #ffedda; }
+tbody tr.audit-row.row-body-sgs.row-st-done     { background: #fff4ea; }
+tbody tr.audit-row.row-body-sgs.row-st-rejected { background: #fff9f2; }
 td.prj-col { color: var(--text2); font-size: 12px; white-space: nowrap; width: 60px; }
 th[data-sort]:hover { background: var(--bg3); color: var(--accent); }
 
@@ -629,9 +639,10 @@ tbody td.date-col {
 }
 
 /* ── Podgląd wiersza (accordion) ── */
-.audit-row { cursor: pointer; transition: background .15s; }
-.audit-row:hover { background: var(--bg3); }
-.audit-row.row-expanded td { background: var(--bg3); }
+.audit-row { cursor: pointer; transition: filter .15s; }
+/* Hover i rozwinięcie zachowują barwę jednostki, tylko przyciemniają wiersz */
+.audit-row:hover { filter: brightness(0.955); }
+.audit-row.row-expanded { filter: brightness(0.925); }
 .audit-row.row-expanded td:first-child { border-left: 3px solid var(--accent); }
 
 .row-preview-wrap td { padding: 0 !important; border: none !important; }

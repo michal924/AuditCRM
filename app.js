@@ -187,6 +187,12 @@ const MULTI_LABELS = { quarter: "Kwartał", year: "Rok", program: "Program", sta
 // Jednostka certyfikująca. Puste/stare rekordy = CUC (domyślnie), bez potrzeby backfillu.
 function certBodyOf(a) { return (a && a.CertBody) ? a.CertBody : "CUC"; }
 
+// Status → token CSS (gradacja jasności wiersza). Puste = planned (najmocniejszy).
+function statusKey(s) {
+  const map = { PLANNED: "planned", CHANGE: "change", Invoice: "invoice", DONE: "done", REJECTED: "rejected" };
+  return map[s] || "planned";
+}
+
 function getSelectedMulti(key) {
   return [...document.querySelectorAll(`#filter-${key}-panel input[type=checkbox]:checked`)].map(cb => cb.value);
 }
@@ -342,7 +348,10 @@ function renderTable() {
 
   const NCOLS = 11; // liczba kolumn tabeli
   tbody.innerHTML = filtered.map(a => {
-    const rowClass = !a.ImportFile ? "row-manual" : "";
+    // Barwa wiersza = jednostka (CUC niebieski / SGS pomarańcz), jasność = status
+    const bodyCls = certBodyOf(a) === "SGS" ? "row-body-sgs" : "row-body-cuc";
+    const stCls   = "row-st-" + statusKey(a.AuditStatus);
+    const rowClass = bodyCls + " " + stCls;
     const notesSnippet = a.Notes
       ? '<span class="notes-preview">' + escHtml(a.Notes.length > 50 ? a.Notes.substring(0,50)+'…' : a.Notes) + '</span>'
       : '<span class="notes-empty">—</span>';
@@ -564,6 +573,7 @@ function openModal(id) {
   document.getElementById("modal-title").textContent = a.Title || "—";
   document.getElementById("m-prj").textContent       = a.ProjectID || "—";
   document.getElementById("m-program").textContent   = a.Program || "—";
+  document.getElementById("m-certbody").textContent   = certBodyOf(a);
   document.getElementById("m-type").textContent      = a.AuditType || "—";
   document.getElementById("m-standard").textContent  = (a.Standard || "—").replace(/\n/g, " | ");
   document.getElementById("m-address").textContent   = a.Address || "—";
@@ -617,6 +627,7 @@ function enterEditMode() {
   document.getElementById("e-date").value    = originalAuditDate;
   document.getElementById("e-days").value    = a.AuditDays != null ? a.AuditDays : "";
   document.getElementById("e-mode").value    = a.AuditMode || "On-site";
+  document.getElementById("e-certbody").value = certBodyOf(a);
   document.getElementById("e-cu").value      = a.PlannedCUDate ? a.PlannedCUDate.substring(0, 10) : "";
   document.getElementById("e-notes").value   = a.Notes || "";
   document.getElementById("modal-overlay").classList.add("edit-mode");
@@ -668,6 +679,7 @@ async function saveChanges() {
       const daysVal = document.getElementById("e-days").value;
       fields.AuditDays     = daysVal !== "" ? parseFloat(daysVal) : null;
       fields.AuditMode     = document.getElementById("e-mode").value || null;
+      fields.CertBody      = document.getElementById("e-certbody").value || "CUC";
       fields.PlannedCUDate = cuVal ? safeDate(cuVal) : null;
       fields.Notes         = document.getElementById("e-notes").value.trim()   || null;
       // Quarter i Year zawsze z daty CU (planowanie CUC), nie z daty audytu LF
