@@ -54,7 +54,7 @@ async function fetchAllAudits() {
     "AuditDateStart","AuditDateEnd","AuditDays","AuditMode",
     "AuditStatus","Proforma","PlannedCUDate","CertValidTo",
     "City","PostalCode","Address","ClientEmail","Phone","Mobile",
-    "Notes","ProcessingUnits","Quarter","Year","AuditorName","ImportFile"
+    "Notes","ProcessingUnits","Quarter","Year","AuditorName","ImportFile","CertBody"
   ].join(",");
 
   let items = [];
