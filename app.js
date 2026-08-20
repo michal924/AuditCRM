@@ -2997,6 +2997,9 @@ const AuditCalModule = (function () {
   let inited = false;
   let view = "month";                 // month | week | year
   let bodyFilter = "all";             // all | CUC | SGS
+  let outlookOn = true;               // nakładka wydarzeń z Outlooka
+  let outlookMap = {};                // klucz dnia → [wydarzenia Outlook]
+  let outlookRangeKey = null;         // zakres już pobrany/w toku (anty-dubel)
   const now0 = new Date();
   let curY = now0.getFullYear();
   let curM = now0.getMonth();
@@ -3066,8 +3069,11 @@ const AuditCalModule = (function () {
     const isHol = holidays(date.getFullYear()).has(keyOf(date));
     const custody = custodyAt(date);
     const hasAny = !!(allDayAudits && allDayAudits.length);
-    const free = !isWeekend && !isHol && !custody && !hasAny;
-    return { isWeekend, isHol, custody, hasAny, free };
+    const ext = outlookOn ? (outlookMap[keyOf(date)] || null) : null;
+    const extBusy = !!(ext && ext.length);
+    // Wolny = dzień roboczy bez audytu, bez opieki, bez święta i bez spotkania z Outlooka
+    const free = !isWeekend && !isHol && !custody && !hasAny && !extBusy;
+    return { isWeekend, isHol, custody, hasAny, ext, extBusy, free };
   }
 
   function chipEl(item, small) {
@@ -3078,6 +3084,70 @@ const AuditCalModule = (function () {
     el.title = `${a.Title || "—"} (${b} · ${a.Program || "?"})\nStatus: ${a.AuditStatus || "—"}${a.City ? "\n" + a.City : ""}`;
     el.onclick = (ev) => { ev.stopPropagation(); try { openModal(a.Id); } catch {} };
     return el;
+  }
+
+  function extChipEl(ev, small) {
+    const el = document.createElement("div");
+    el.className = "ac-chip ext";
+    const subj = ev.subject || "(bez tytułu)";
+    let timeLbl = "";
+    if (!ev.isAllDay && ev.start && ev.start.dateTime) {
+      const t = new Date(ev.start.dateTime);
+      if (!isNaN(t)) timeLbl = pad(t.getHours()) + ":" + pad(t.getMinutes()) + " ";
+    }
+    el.textContent = "📆 " + timeLbl + subj;
+    el.title = `Outlook: ${subj}` + (ev.isAllDay ? "\n(cały dzień)" : (timeLbl ? `\n${timeLbl.trim()}` : ""));
+    return el;
+  }
+
+  // Rozłóż wydarzenie Outlook na dni które obejmuje
+  function spreadExt(map, ev) {
+    if (!ev.start || !ev.end || !ev.start.dateTime || !ev.end.dateTime) return;
+    const st = new Date(ev.start.dateTime), en = new Date(ev.end.dateTime);
+    if (isNaN(st) || isNaN(en)) return;
+    let d = new Date(st.getFullYear(), st.getMonth(), st.getDate());
+    const last = new Date(en.getFullYear(), en.getMonth(), en.getDate());
+    if (ev.isAllDay) last.setDate(last.getDate() - 1); // Graph: koniec all-day jest wyłączający
+    let guard = 0;
+    while (d <= last && guard++ < 400) { (map[keyOf(d)] ||= []).push(ev); d = addDays(d, 1); }
+  }
+
+  // Pobierz wydarzenia z kalendarza Outlook (Graph) dla widocznego zakresu
+  async function fetchOutlook(startD, endD) {
+    let token;
+    try { token = await getGraphToken(); } catch { return null; }
+    if (!token) return null;
+    const s = new Date(startD.getFullYear(), startD.getMonth(), startD.getDate()).toISOString();
+    const e = new Date(endD.getFullYear(), endD.getMonth(), endD.getDate() + 1).toISOString();
+    let url = `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${s}&endDateTime=${e}` +
+      `&$select=subject,start,end,isAllDay,showAs&$top=200&$orderby=start/dateTime`;
+    const map = {};
+    try {
+      let guard = 0;
+      while (url && guard++ < 10) {
+        const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Prefer: 'outlook.timezone="Europe/Warsaw"' } });
+        if (!r.ok) break;
+        const data = await r.json();
+        (data.value || []).forEach(ev => { if (ev.showAs !== "free") spreadExt(map, ev); });
+        url = data["@odata.nextLink"] || null;
+      }
+    } catch { return null; }
+    return map;
+  }
+
+  function visibleRange() {
+    if (view === "year") return [new Date(curY, 0, 1), new Date(curY, 11, 31)];
+    if (view === "week")  return [curWeekStart, addDays(curWeekStart, 6)];
+    return [new Date(curY, curM, 1), new Date(curY, curM + 1, 0)];
+  }
+
+  function maybeLoadOutlook() {
+    if (!outlookOn) return;
+    const [rs, re] = visibleRange();
+    const rk = keyOf(rs) + "_" + keyOf(re);
+    if (rk === outlookRangeKey) return; // już mamy / w toku
+    outlookRangeKey = rk;
+    fetchOutlook(rs, re).then(map => { if (map) { outlookMap = map; renderCal(); } });
   }
 
   // ---------- widok MIESIĄC ----------
@@ -3113,6 +3183,10 @@ const AuditCalModule = (function () {
       const chips = filtered(all);
       chips.slice(0, 3).forEach(it => cell.appendChild(chipEl(it, false)));
       if (chips.length > 3) { const more = document.createElement("div"); more.className = "ac-more"; more.textContent = `+${chips.length-3} więcej`; cell.appendChild(more); }
+      // Nakładka Outlook
+      const ext = cl.ext || [];
+      ext.slice(0, 2).forEach(ev => cell.appendChild(extChipEl(ev, false)));
+      if (ext.length > 2) { const more = document.createElement("div"); more.className = "ac-more"; more.textContent = `+${ext.length-2} z Outlooka`; cell.appendChild(more); }
       grid.appendChild(cell);
     }
     cont.appendChild(grid); wrap.appendChild(cont);
@@ -3141,7 +3215,8 @@ const AuditCalModule = (function () {
       if (cl.isHol) { const c = document.createElement("div"); c.className = "ac-off-tag"; c.textContent = "Święto"; body.appendChild(c); }
       const chips = filtered(all);
       if (chips.length) chips.forEach(it => body.appendChild(chipEl(it, false)));
-      else if (cl.free) { const f = document.createElement("div"); f.className = "ac-free-tag big"; f.textContent = "✓ wolny dzień"; body.appendChild(f); }
+      (cl.ext || []).forEach(ev => body.appendChild(extChipEl(ev, false)));
+      if (!chips.length && !(cl.ext || []).length && cl.free) { const f = document.createElement("div"); f.className = "ac-free-tag big"; f.textContent = "✓ wolny dzień"; body.appendChild(f); }
       col.appendChild(body); grid.appendChild(col);
     }
     wrap.appendChild(grid);
@@ -3176,7 +3251,9 @@ const AuditCalModule = (function () {
           if (cl.custody) cell.classList.add("ac-conflict");
           cell.title = `${fmtDate(dd)}\n` + chips.map(it => `• ${it.a.Title || "—"} (${bodyOf(it.a)})`).join("\n");
         } else {
-          cell.title = fmtDate(dd) + (cl.free ? "\n✓ wolny" : cl.custody ? "\n👨‍👦 opieka" : "");
+          if (cl.extBusy) cell.classList.add("ac-ext"); // zajęty przez Outlook (bez audytu)
+          const extNames = (cl.ext || []).map(e => `📆 ${e.subject || "(bez tytułu)"}`).join("\n");
+          cell.title = fmtDate(dd) + (cl.extBusy ? "\n" + extNames : cl.free ? "\n✓ wolny" : cl.custody ? "\n👨‍👦 opieka" : "");
         }
         grid.appendChild(cell);
       }
@@ -3193,6 +3270,7 @@ const AuditCalModule = (function () {
 
   function renderCal() {
     updateLabel();
+    maybeLoadOutlook();
     if (view === "year") renderYear();
     else if (view === "week") renderWeek();
     else renderMonth();
@@ -3226,6 +3304,14 @@ const AuditCalModule = (function () {
     $("ac-body-sgs").onclick = () => setBody("sgs");
     $("ac-prev").onclick = () => step(-1);
     $("ac-next").onclick = () => step(1);
+    const ot = $("ac-outlook-toggle");
+    if (ot) ot.onclick = () => {
+      outlookOn = !outlookOn;
+      ot.classList.toggle("active", outlookOn);
+      outlookRangeKey = null; // wymuś ponowne pobranie/odświeżenie
+      if (!outlookOn) outlookMap = {};
+      renderCal();
+    };
   }
   function render() { if (!inited) { setup(); inited = true; } renderCal(); }
 

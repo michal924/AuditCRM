@@ -1354,6 +1354,15 @@ tr.change-row-rzeznik:hover { background: #e0f5e8; }
 .ac-chip.cuc { background: #dce6fb; color: #24417f; border-left-color: #3a4d98; }
 .ac-chip.sgs { background: #ffe6cf; color: #9c4708; border-left-color: #e07b1a; }
 .ac-chip.cont { opacity: .72; font-weight: 600; }
+.ac-chip.ext { background: #eceef2; color: #55606f; border-left-color: #9aa4b2; font-weight: 600; }
+
+/* Przełącznik Outlook — nieaktywny wyszarzony */
+#ac-outlook-toggle { opacity: .5; }
+#ac-outlook-toggle.active { opacity: 1; background: #eef2fb; color: #2d4da0; border-color: #b9c8ee; }
+
+/* Rok — dzień zajęty przez Outlook (bez audytu) */
+.op-day.ac-ext { background: #e3e6ec; color: var(--text2); box-shadow: inset 0 -3px 0 #9aa4b2; }
+.op-sw.ac-sw-ext { background: #9aa4b2; }
 
 /* Tydzień */
 .op-week-col.ac-free    { background: #e9f7ed; border-color: #bfe6cb; }
