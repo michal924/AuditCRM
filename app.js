@@ -3171,8 +3171,8 @@ const AuditCalModule = (function () {
         const chips = filtered(all);
         if (chips.length) {
           const hasC = chips.some(it => bodyOf(it.a) === "CUC"), hasS = chips.some(it => bodyOf(it.a) === "SGS");
-          if (hasC) { const dot = document.createElement("span"); dot.className = "ac-dot cuc"; cell.appendChild(dot); }
-          if (hasS) { const dot = document.createElement("span"); dot.className = "ac-dot sgs" + (hasC ? " second" : ""); cell.appendChild(dot); }
+          // Cała komórka podświetlona kolorem jednostki — dużo lepiej widoczne niż kropka
+          cell.classList.add(hasC && hasS ? "ac-has-both" : hasS ? "ac-has-sgs" : "ac-has-cuc");
           if (cl.custody) cell.classList.add("ac-conflict");
           cell.title = `${fmtDate(dd)}\n` + chips.map(it => `• ${it.a.Title || "—"} (${bodyOf(it.a)})`).join("\n");
         } else {

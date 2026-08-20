@@ -1362,14 +1362,14 @@ tr.change-row-rzeznik:hover { background: #e0f5e8; }
 .op-week-col.ac-conflict.ac-custody { box-shadow: inset 4px 0 0 #8b6bd6, inset 0 0 0 2px var(--red); }
 .ac-week-custody { font-size: 12px; font-weight: 700; color: #6b4bbf; background: #efeaff; border-radius: 5px; padding: 3px 7px; }
 
-/* Rok — kropki jednostek */
+/* Rok — dzień z audytem podświetlony całą komórką (dużo lepiej widoczny niż kropka) */
 .op-day.ac-free { background: #eaf7ee; }
 .op-day.ac-off  { background: #f0f1f5; color: var(--text3); }
 .op-day.ac-custody { box-shadow: inset 3px 0 0 #8b6bd6; }
-.ac-dot { position: absolute; bottom: 2px; right: 2px; width: 6px; height: 6px; border-radius: 50%; }
-.ac-dot.cuc { background: #3a4d98; }
-.ac-dot.sgs { background: #e07b1a; }
-.ac-dot.sgs.second { right: 10px; }
+.op-day.ac-has-cuc  { background: #bcd0f4; color: #22407e; font-weight: 800; }
+.op-day.ac-has-sgs  { background: #ffd2a1; color: #8f4206; font-weight: 800; }
+.op-day.ac-has-both { background: linear-gradient(135deg, #bcd0f4 0 50%, #ffd2a1 50% 100%); color: #2a2a2a; font-weight: 800; }
+.op-day.ac-conflict { outline: 2px solid var(--red); outline-offset: -2px; }
 
 /* Legenda — swatch-e */
 .op-sw.ac-sw-cuc { background: #3a4d98; }
