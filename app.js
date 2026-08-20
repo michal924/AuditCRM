@@ -158,6 +158,7 @@ function setupNav() {
       if (view === "changes")    renderChangesTable();
       if (view === "opieka")     OpiekaModule.render();
       if (view === "mapa")       MapModule.render();
+      if (view === "kalendarz")  AuditCalModule.render();
     };
   });
 }
@@ -2986,3 +2987,248 @@ const OpiekaModule = (function () {
   return { render, dayInfo };
 })();
 window.OpiekaModule = OpiekaModule;
+
+// ============================================================
+// KALENDARZ AUDYTÓW — przegląd terminów CUC/SGS + wolne dni
+// Jeden kalendarz, kolor = jednostka; wolny dzień = dzień roboczy
+// bez audytu, bez opieki, bez święta. Widoki: miesiąc/tydzień/rok.
+// ============================================================
+const AuditCalModule = (function () {
+  let inited = false;
+  let view = "month";                 // month | week | year
+  let bodyFilter = "all";             // all | CUC | SGS
+  const now0 = new Date();
+  let curY = now0.getFullYear();
+  let curM = now0.getMonth();
+  let curWeekStart = mondayOf(now0);
+
+  const $ = id => document.getElementById(id);
+  const MIES = ["stycznia","lutego","marca","kwietnia","maja","czerwca","lipca","sierpnia","września","października","listopada","grudnia"];
+  const MIES_NOM = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
+  const DOW = ["Pn","Wt","Śr","Cz","Pt","So","Nd"];
+  const DOW_FULL = ["Poniedziałek","Wtorek","Środa","Czwartek","Piątek","Sobota","Niedziela"];
+
+  const pad = n => String(n).padStart(2, "0");
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const sameDay = (a, b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  const fmtDate = d => d.toLocaleDateString("pl-PL");
+  function mondayOf(d) { const day = (d.getDay()+6)%7; return new Date(d.getFullYear(), d.getMonth(), d.getDate()-day); }
+
+  // Wielkanoc (algorytm anonimowy gregoriański) → święta ruchome PL
+  function easter(y) {
+    const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),
+      g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,
+      l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+      mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;
+    return new Date(y, mo-1, da);
+  }
+  const _holCache = {};
+  function holidays(y) {
+    if (_holCache[y]) return _holCache[y];
+    const set = new Set();
+    ["01-01","01-06","05-01","05-03","08-15","11-01","11-11","12-25","12-26"].forEach(md => set.add(`${y}-${md}`));
+    const e = easter(y);
+    set.add(keyOf(e));               // Niedziela Wielkanocna
+    set.add(keyOf(addDays(e, 1)));   // Poniedziałek Wielkanocny
+    set.add(keyOf(addDays(e, 49)));  // Zielone Świątki
+    set.add(keyOf(addDays(e, 60)));  // Boże Ciało
+    _holCache[y] = set;
+    return set;
+  }
+
+  const bodyOf = a => (a.CertBody === "SGS") ? "SGS" : "CUC";
+  const ceilDays = a => Math.max(1, Math.ceil(parseFloat(a.AuditDays) || 1));
+
+  // Mapa: klucz dnia → [{a, cont}]; audyt rozciągnięty na AuditDays dni (mój audytor)
+  function dayMap() {
+    const map = {};
+    const list = (typeof allAudits !== "undefined" && Array.isArray(allAudits)) ? allAudits : [];
+    list.forEach(a => {
+      if (a.AuditorName !== MY_AUDITOR || !a.AuditDateStart) return;
+      const start = new Date(String(a.AuditDateStart).substring(0,10) + "T12:00:00");
+      const n = ceilDays(a);
+      for (let i = 0; i < n; i++) (map[keyOf(addDays(start, i))] ||= []).push({ a, cont: i > 0 });
+    });
+    return map;
+  }
+  const filtered = arr => (arr || []).filter(x => bodyFilter === "all" || bodyOf(x.a) === bodyFilter);
+
+  function custodyAt(date) {
+    try { return !!(window.OpiekaModule && OpiekaModule.dayInfo && OpiekaModule.dayInfo(date).father); }
+    catch { return false; }
+  }
+
+  // Klasyfikacja dnia (niezależna od filtra jednostki dla wolne/zajęte)
+  function classify(date, allDayAudits) {
+    const dow = date.getDay();
+    const isWeekend = (dow === 0 || dow === 6);
+    const isHol = holidays(date.getFullYear()).has(keyOf(date));
+    const custody = custodyAt(date);
+    const hasAny = !!(allDayAudits && allDayAudits.length);
+    const free = !isWeekend && !isHol && !custody && !hasAny;
+    return { isWeekend, isHol, custody, hasAny, free };
+  }
+
+  function chipEl(item, small) {
+    const a = item.a, b = bodyOf(a);
+    const el = document.createElement("div");
+    el.className = "ac-chip " + (b === "SGS" ? "sgs" : "cuc") + (item.cont ? " cont" : "");
+    el.textContent = (item.cont ? "↳ " : "") + (a.Title || "Audyt") + (small ? "" : ` · ${a.Program || "?"}`);
+    el.title = `${a.Title || "—"} (${b} · ${a.Program || "?"})\nStatus: ${a.AuditStatus || "—"}${a.City ? "\n" + a.City : ""}`;
+    el.onclick = (ev) => { ev.stopPropagation(); try { openModal(a.Id); } catch {} };
+    return el;
+  }
+
+  // ---------- widok MIESIĄC ----------
+  function renderMonth() {
+    const wrap = $("ac-calendar"); wrap.className = "op-calendar op-calendar-month"; wrap.innerHTML = "";
+    const map = dayMap(); const today = new Date();
+    const cont = document.createElement("div"); cont.className = "op-month-large";
+    const hdr = document.createElement("div"); hdr.className = "op-month-large-header";
+    DOW.forEach(d => { const h = document.createElement("div"); h.className = "op-dow-large"; h.textContent = d; hdr.appendChild(h); });
+    cont.appendChild(hdr);
+    const grid = document.createElement("div"); grid.className = "op-month-large-grid";
+    const first = new Date(curY, curM, 1), lead = (first.getDay()+6)%7;
+    const dim = new Date(curY, curM+1, 0).getDate();
+    for (let i = 0; i < lead; i++) { const e = document.createElement("div"); e.className = "op-day-large op-day-empty"; grid.appendChild(e); }
+    for (let d = 1; d <= dim; d++) {
+      const dd = new Date(curY, curM, d);
+      const all = map[keyOf(dd)]; const cl = classify(dd, all);
+      const cell = document.createElement("div"); cell.className = "op-day-large";
+      if (cl.free) cell.classList.add("ac-free");
+      else if (cl.isWeekend || cl.isHol) cell.classList.add("ac-off");
+      if (cl.custody) cell.classList.add("ac-custody");
+      if (cl.hasAny && cl.custody) cell.classList.add("ac-conflict");
+      if (sameDay(dd, today)) cell.classList.add("is-today");
+
+      const top = document.createElement("div"); top.className = "ac-day-top";
+      const num = document.createElement("div"); num.className = "op-day-large-num"; num.textContent = d; top.appendChild(num);
+      if (cl.custody) { const m = document.createElement("span"); m.className = "ac-custody-mark"; m.textContent = "👨‍👦"; top.appendChild(m); }
+      cell.appendChild(top);
+
+      if (cl.free) { const t = document.createElement("div"); t.className = "ac-free-tag"; t.textContent = "wolny"; cell.appendChild(t); }
+      else if (cl.isHol) { const t = document.createElement("div"); t.className = "ac-off-tag"; t.textContent = "święto"; cell.appendChild(t); }
+
+      const chips = filtered(all);
+      chips.slice(0, 3).forEach(it => cell.appendChild(chipEl(it, false)));
+      if (chips.length > 3) { const more = document.createElement("div"); more.className = "ac-more"; more.textContent = `+${chips.length-3} więcej`; cell.appendChild(more); }
+      grid.appendChild(cell);
+    }
+    cont.appendChild(grid); wrap.appendChild(cont);
+  }
+
+  // ---------- widok TYDZIEŃ ----------
+  function renderWeek() {
+    const wrap = $("ac-calendar"); wrap.className = "op-calendar op-calendar-week"; wrap.innerHTML = "";
+    const map = dayMap(); const today = new Date();
+    const grid = document.createElement("div"); grid.className = "op-week-grid";
+    for (let i = 0; i < 7; i++) {
+      const dd = addDays(curWeekStart, i);
+      const all = map[keyOf(dd)]; const cl = classify(dd, all);
+      const col = document.createElement("div"); col.className = "op-week-col";
+      if (cl.free) col.classList.add("ac-free");
+      else if (cl.isWeekend || cl.isHol) col.classList.add("ac-off");
+      if (cl.custody) col.classList.add("ac-custody");
+      if (cl.hasAny && cl.custody) col.classList.add("ac-conflict");
+      if (sameDay(dd, today)) col.classList.add("is-today");
+
+      const h = document.createElement("div"); h.className = "op-week-col-hdr";
+      h.innerHTML = `<span class="op-week-dow">${DOW_FULL[i]}</span><span class="op-week-date">${dd.getDate()} ${MIES[dd.getMonth()]}</span>`;
+      col.appendChild(h);
+      const body = document.createElement("div"); body.className = "op-week-col-body";
+      if (cl.custody) { const c = document.createElement("div"); c.className = "ac-week-custody"; c.textContent = "👨‍👦 Opieka nad Szymonem"; body.appendChild(c); }
+      if (cl.isHol) { const c = document.createElement("div"); c.className = "ac-off-tag"; c.textContent = "Święto"; body.appendChild(c); }
+      const chips = filtered(all);
+      if (chips.length) chips.forEach(it => body.appendChild(chipEl(it, false)));
+      else if (cl.free) { const f = document.createElement("div"); f.className = "ac-free-tag big"; f.textContent = "✓ wolny dzień"; body.appendChild(f); }
+      col.appendChild(body); grid.appendChild(col);
+    }
+    wrap.appendChild(grid);
+  }
+
+  // ---------- widok ROK ----------
+  function renderYear() {
+    const wrap = $("ac-calendar"); wrap.className = "op-calendar op-calendar-year"; wrap.innerHTML = "";
+    const map = dayMap(); const today = new Date();
+    for (let mo = 0; mo < 12; mo++) {
+      const card = document.createElement("div"); card.className = "op-month";
+      const h = document.createElement("h4"); h.textContent = MIES_NOM[mo]; card.appendChild(h);
+      const grid = document.createElement("div"); grid.className = "op-month-grid";
+      DOW.forEach(d => { const c = document.createElement("div"); c.className = "op-dow"; c.textContent = d; grid.appendChild(c); });
+      const first = new Date(curY, mo, 1), lead = (first.getDay()+6)%7;
+      for (let i = 0; i < lead; i++) grid.appendChild(document.createElement("div"));
+      const dim = new Date(curY, mo+1, 0).getDate();
+      for (let d = 1; d <= dim; d++) {
+        const dd = new Date(curY, mo, d);
+        const all = map[keyOf(dd)]; const cl = classify(dd, all);
+        const cell = document.createElement("div"); cell.className = "op-day";
+        if (cl.free) cell.classList.add("ac-free");
+        else if (cl.isWeekend || cl.isHol) cell.classList.add("ac-off");
+        if (cl.custody) cell.classList.add("ac-custody");
+        if (sameDay(dd, today)) cell.classList.add("is-today");
+        cell.textContent = d;
+        const chips = filtered(all);
+        if (chips.length) {
+          const hasC = chips.some(it => bodyOf(it.a) === "CUC"), hasS = chips.some(it => bodyOf(it.a) === "SGS");
+          if (hasC) { const dot = document.createElement("span"); dot.className = "ac-dot cuc"; cell.appendChild(dot); }
+          if (hasS) { const dot = document.createElement("span"); dot.className = "ac-dot sgs" + (hasC ? " second" : ""); cell.appendChild(dot); }
+          if (cl.custody) cell.classList.add("ac-conflict");
+          cell.title = `${fmtDate(dd)}\n` + chips.map(it => `• ${it.a.Title || "—"} (${bodyOf(it.a)})`).join("\n");
+        } else {
+          cell.title = fmtDate(dd) + (cl.free ? "\n✓ wolny" : cl.custody ? "\n👨‍👦 opieka" : "");
+        }
+        grid.appendChild(cell);
+      }
+      card.appendChild(grid); wrap.appendChild(card);
+    }
+  }
+
+  function updateLabel() {
+    const lbl = $("ac-label");
+    if (view === "year") lbl.textContent = curY;
+    else if (view === "month") lbl.textContent = `${MIES_NOM[curM]} ${curY}`;
+    else { const end = addDays(curWeekStart, 6); const f = d => `${d.getDate()} ${MIES[d.getMonth()].substring(0,3)}`; lbl.textContent = `${f(curWeekStart)}–${f(end)} ${end.getFullYear()}`; }
+  }
+
+  function renderCal() {
+    updateLabel();
+    if (view === "year") renderYear();
+    else if (view === "week") renderWeek();
+    else renderMonth();
+  }
+
+  function setView(v) {
+    if (v === "week" && view !== "week") curWeekStart = mondayOf(view === "month" ? new Date(curY, curM, 1) : new Date());
+    if (v === "month" && view === "week") { curY = curWeekStart.getFullYear(); curM = curWeekStart.getMonth(); }
+    view = v;
+    ["month","week","year"].forEach(x => $(`ac-view-${x}`).classList.toggle("active", x === v));
+    renderCal();
+  }
+  function setBody(b) {
+    bodyFilter = (b === "all") ? "all" : b.toUpperCase(); // "CUC" / "SGS"
+    ["all","cuc","sgs"].forEach(x => $(`ac-body-${x}`).classList.toggle("active", x === b));
+    renderCal();
+  }
+  function step(dir) {
+    if (view === "year") curY += dir;
+    else if (view === "month") { curM += dir; if (curM < 0) { curM = 11; curY--; } else if (curM > 11) { curM = 0; curY++; } }
+    else curWeekStart = addDays(curWeekStart, dir * 7);
+    renderCal();
+  }
+
+  function setup() {
+    $("ac-view-month").onclick = () => setView("month");
+    $("ac-view-week").onclick  = () => setView("week");
+    $("ac-view-year").onclick  = () => setView("year");
+    $("ac-body-all").onclick = () => setBody("all");
+    $("ac-body-cuc").onclick = () => setBody("cuc");
+    $("ac-body-sgs").onclick = () => setBody("sgs");
+    $("ac-prev").onclick = () => step(-1);
+    $("ac-next").onclick = () => step(1);
+  }
+  function render() { if (!inited) { setup(); inited = true; } renderCal(); }
+
+  return { render };
+})();
+window.AuditCalModule = AuditCalModule;

@@ -69,6 +69,7 @@
     </div>
     <div class="nav-links">
       <button class="nav-btn active" data-view="myaudits">📋 Audyty LogisticFit</button>
+      <button class="nav-btn" data-view="kalendarz">📅 Kalendarz</button>
       <button class="nav-btn" data-view="checkaudit">✅ Check Audyt</button>
       <button class="nav-btn" data-view="changes">🔄 Zmiany Audytora</button>
       <button class="nav-btn" data-view="opieka">👨‍👦 Opieka — Szymon</button>
@@ -385,6 +386,41 @@
           </div>
         </div>
         <ul id="map-list" class="map-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- WIDOK: KALENDARZ AUDYTÓW -->
+  <div id="view-kalendarz" class="view hidden">
+    <div class="view-header">
+      <h2>Kalendarz audytów</h2>
+      <div class="header-filters">
+        <div class="op-view-switcher">
+          <button id="ac-view-month" class="op-view-btn active">Miesiąc</button>
+          <button id="ac-view-week"  class="op-view-btn">Tydzień</button>
+          <button id="ac-view-year"  class="op-view-btn">Rok</button>
+        </div>
+        <div class="op-view-switcher ac-body-switcher">
+          <button id="ac-body-all" class="op-view-btn active">Wszystkie</button>
+          <button id="ac-body-cuc" class="op-view-btn">CUC</button>
+          <button id="ac-body-sgs" class="op-view-btn">SGS</button>
+        </div>
+        <button id="ac-prev" class="btn-ghost">‹</button>
+        <span id="ac-label" class="op-year-label">—</span>
+        <button id="ac-next" class="btn-ghost">›</button>
+      </div>
+    </div>
+
+    <div class="op-cal-col">
+      <div id="ac-calendar" class="op-calendar"></div>
+      <div class="op-legend">
+        <span><i class="op-sw ac-sw-cuc"></i> Audyt CUC</span>
+        <span><i class="op-sw ac-sw-sgs"></i> Audyt SGS</span>
+        <span><i class="op-sw ac-sw-free"></i> Wolny dzień</span>
+        <span><i class="op-sw ac-sw-off"></i> Weekend / święto</span>
+        <span><i class="op-sw ac-sw-custody"></i> Opieka (Szymon)</span>
+        <span><i class="op-sw today"></i> Dziś</span>
+        <span><i class="op-sw conflict"></i> Kolizja audyt + opieka</span>
       </div>
     </div>
   </div>
