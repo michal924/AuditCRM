@@ -14,6 +14,7 @@ let sortDir = 1; // 1 = ASC, -1 = DESC
 let isEditMode = false;
 let originalAuditDate = null;  // śledzi oryginał daty AuditDateStart przy wejściu w tryb edycji
 let planAuditRequested = false; // true tylko gdy użytkownik świadomie kliknął "Zaplanuj audyt"
+let calDayFilter = null; // "YYYY-MM-DD" — filtr tabeli do jednego dnia (z bocznego kalendarzyka)
 
 // ============================================================
 // MAPOWANIA (zgodne z 03_Import-QuarterlyPlan.py)
@@ -153,7 +154,7 @@ function setupNav() {
       const view = btn.dataset.view;
       document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
       document.getElementById(`view-${view}`).classList.remove("hidden");
-      if (view === "myaudits")  { restoreFilters(); renderTable(); }
+      if (view === "myaudits")  { restoreFilters(); renderTable(); SideCalModule.render(); }
       if (view === "checkaudit") renderAuditorsTable();
       if (view === "changes")    renderChangesTable();
       if (view === "opieka")     OpiekaModule.render();
@@ -172,6 +173,7 @@ async function loadAudits() {
   try {
     allAudits = await fetchAllAudits();
     renderTable();
+    try { SideCalModule.render(); } catch {}
   } catch (e) {
     document.getElementById("audits-tbody").innerHTML =
       `<tr><td colspan="8" class="loading">Błąd: ${e.message}</td></tr>`;
@@ -263,8 +265,10 @@ function setupFilters() {
       document.querySelectorAll(`#filter-${key}-panel input[type=checkbox]`).forEach(cb => { cb.checked = false; });
       updateMultiBtn(key);
     });
+    calDayFilter = null; // wyczyść też filtr dnia z bocznego kalendarzyka
     saveFilters();
     renderTable();
+    try { SideCalModule.refresh(); } catch {}
   };
 
   document.getElementById("auditors-quarter").addEventListener("change", renderAuditorsTable);
@@ -297,6 +301,7 @@ function applyFilters(audits) {
     if (f.programs.length > 0 && !f.programs.some(p => normProgramKey(p) === normProgramKey(a.Program))) return false;
     if (f.statuses.length > 0 && !f.statuses.includes(a.AuditStatus)) return false;
     if (f.certbodies.length > 0 && !f.certbodies.includes(certBodyOf(a))) return false;
+    if (calDayFilter && String(a.AuditDateStart || "").substring(0,10) !== calDayFilter) return false;
     return true;
   });
 }
@@ -346,6 +351,7 @@ function renderTable() {
   const filtered = sortAudits(applyFilters(myAudits));
   updateStats(filtered);
   renderSortIcons();
+  try { SideCalModule.refresh(); } catch {}
 
   const tbody = document.getElementById("audits-tbody");
   if (!filtered.length) {
@@ -3318,3 +3324,137 @@ const AuditCalModule = (function () {
   return { render };
 })();
 window.AuditCalModule = AuditCalModule;
+
+// ============================================================
+// BOCZNY KALENDARZYK (widok Audyty) — podgląd dni + filtr dnia
+// Klik dnia filtruje tabelę do tego dnia (calDayFilter).
+// ============================================================
+const SideCalModule = (function () {
+  let inited = false, collapsed = false;
+  let sbody = "all"; // all | CUC | SGS
+  const n0 = new Date();
+  let sy = n0.getFullYear(), sm = n0.getMonth();
+  let sOutlookMap = {}, sOutlookRK = null;
+
+  const $ = id => document.getElementById(id);
+  const MIES_NOM = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
+  const DOW = ["Pn","Wt","Śr","Cz","Pt","So","Nd"];
+  const pad = n => String(n).padStart(2, "0");
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+  const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const sameDay = (a, b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  const fmtPL = d => d.toLocaleDateString("pl-PL");
+
+  function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da);}
+  const _hc = {};
+  function holidays(y){ if(_hc[y]) return _hc[y]; const s=new Set(); ["01-01","01-06","05-01","05-03","08-15","11-01","11-11","12-25","12-26"].forEach(md=>s.add(`${y}-${md}`)); const e=easter(y); s.add(keyOf(e)); s.add(keyOf(addDays(e,1))); s.add(keyOf(addDays(e,49))); s.add(keyOf(addDays(e,60))); _hc[y]=s; return s; }
+  const bodyOf = a => (a.CertBody === "SGS") ? "SGS" : "CUC";
+  const ceilDays = a => Math.max(1, Math.ceil(parseFloat(a.AuditDays) || 1));
+  const custodyAt = d => { try { return !!(window.OpiekaModule && OpiekaModule.dayInfo && OpiekaModule.dayInfo(d).father); } catch { return false; } };
+
+  function dayMap(){
+    const map = {}; const list = (typeof allAudits!=="undefined" && Array.isArray(allAudits)) ? allAudits : [];
+    list.forEach(a => { if (a.AuditorName!==MY_AUDITOR || !a.AuditDateStart) return;
+      const start = new Date(String(a.AuditDateStart).substring(0,10)+"T12:00:00"); const n = ceilDays(a);
+      for (let i=0;i<n;i++) (map[keyOf(addDays(start,i))] ||= []).push(a); });
+    return map;
+  }
+  function classify(date, audits){
+    const dow = date.getDay(), isWeekend = (dow===0||dow===6);
+    const isHol = holidays(date.getFullYear()).has(keyOf(date));
+    const custody = custodyAt(date);
+    const hasAny = !!(audits && audits.length);
+    const extBusy = !!(sOutlookMap[keyOf(date)] && sOutlookMap[keyOf(date)].length);
+    const free = !isWeekend && !isHol && !custody && !hasAny && !extBusy;
+    return { isWeekend, isHol, custody, hasAny, extBusy, free };
+  }
+
+  async function fetchOutlook(startD, endD){
+    let token; try { token = await getGraphToken(); } catch { return null; } if (!token) return null;
+    const s = new Date(startD.getFullYear(), startD.getMonth(), startD.getDate()).toISOString();
+    const e = new Date(endD.getFullYear(), endD.getMonth(), endD.getDate()+1).toISOString();
+    let url = `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${s}&endDateTime=${e}&$select=subject,start,end,isAllDay,showAs&$top=200&$orderby=start/dateTime`;
+    const map = {};
+    try { let g=0; while (url && g++<8){ const r = await fetch(url,{headers:{Authorization:`Bearer ${token}`,Prefer:'outlook.timezone="Europe/Warsaw"'}}); if(!r.ok) break; const data = await r.json();
+      (data.value||[]).forEach(ev=>{ if(ev.showAs==="free") return; if(!ev.start||!ev.end||!ev.start.dateTime||!ev.end.dateTime) return;
+        const st=new Date(ev.start.dateTime), en=new Date(ev.end.dateTime); if(isNaN(st)||isNaN(en)) return;
+        let d=new Date(st.getFullYear(),st.getMonth(),st.getDate()); const last=new Date(en.getFullYear(),en.getMonth(),en.getDate()); if(ev.isAllDay) last.setDate(last.getDate()-1);
+        let gg=0; while(d<=last && gg++<40){ (map[keyOf(d)] ||= []).push(ev); d=addDays(d,1); } });
+      url = data["@odata.nextLink"] || null; } } catch { return null; }
+    return map;
+  }
+  function ensureOutlook(){
+    const rs = new Date(sy, sm, 1), re = new Date(sy, sm+1, 0);
+    const rk = keyOf(rs)+"_"+keyOf(re); if (rk === sOutlookRK) return; sOutlookRK = rk;
+    fetchOutlook(rs, re).then(map => { if (map) { sOutlookMap = map; renderGrid(); renderFree(); } });
+  }
+
+  function selectDay(k){
+    calDayFilter = (calDayFilter === k) ? null : k; // toggle
+    if (typeof renderTable === "function") renderTable();
+    renderGrid(); updateActiveDay();
+  }
+
+  function updateActiveDay(){
+    const el = $("scal-activeday"); if (!el) return;
+    if (calDayFilter){ const d = new Date(calDayFilter+"T12:00:00");
+      el.className = "scal-activeday"; el.innerHTML = `Tabela: <strong>${fmtPL(d)}</strong> <button id="scal-clearday" class="scal-clearday" title="Pokaż wszystkie">✕</button>`;
+      const b = $("scal-clearday"); if (b) b.onclick = () => selectDay(calDayFilter);
+    } else { el.className = "scal-activeday hidden"; el.innerHTML = ""; }
+  }
+
+  function renderGrid(){
+    const grid = $("scal-grid"); if (!grid) return;
+    grid.innerHTML = ""; const map = dayMap(); const today = new Date();
+    DOW.forEach(d => { const h=document.createElement("div"); h.className="scal-dow"; h.textContent=d; grid.appendChild(h); });
+    const first = new Date(sy, sm, 1), lead = (first.getDay()+6)%7, dim = new Date(sy, sm+1, 0).getDate();
+    for (let i=0;i<lead;i++) grid.appendChild(document.createElement("div"));
+    for (let d=1; d<=dim; d++){
+      const dd = new Date(sy, sm, d); const k = keyOf(dd);
+      const audits = (map[k]||[]).filter(a => sbody==="all" || bodyOf(a)===sbody);
+      const cl = classify(dd, map[k]);
+      const cell = document.createElement("div"); cell.className = "scal-day";
+      if (audits.length){ const hasC=audits.some(a=>bodyOf(a)==="CUC"), hasS=audits.some(a=>bodyOf(a)==="SGS");
+        cell.classList.add(hasC&&hasS?"has-both":hasS?"has-sgs":"has-cuc"); }
+      else if (cl.free) cell.classList.add("free");
+      else if (cl.isWeekend || cl.isHol) cell.classList.add("off");
+      else if (cl.extBusy) cell.classList.add("off");
+      if (cl.custody) cell.classList.add("custody");
+      if (sameDay(dd, today)) cell.classList.add("today");
+      if (calDayFilter === k) cell.classList.add("sel");
+      cell.textContent = d;
+      const parts = (map[k]||[]).map(a => `• ${a.Title||"—"} (${bodyOf(a)})`);
+      const ext = (sOutlookMap[k]||[]).map(e => `📆 ${e.subject||"(bez tytułu)"}`);
+      cell.title = fmtPL(dd) + (parts.length?`\n`+parts.join("\n"):"") + (ext.length?`\n`+ext.join("\n"):"") + (cl.free&&!parts.length&&!ext.length?`\n✓ wolny`:"") + (cl.custody?`\n👨‍👦 opieka`:"");
+      cell.onclick = () => selectDay(k);
+      grid.appendChild(cell);
+    }
+  }
+
+  function renderFree(){
+    const ul = $("scal-free-list"); if (!ul) return; ul.innerHTML = "";
+    const map = dayMap(); const start = new Date(); start.setHours(0,0,0,0);
+    let found = 0;
+    for (let i=0; i<70 && found<6; i++){ const dd = addDays(start, i); const cl = classify(dd, map[keyOf(dd)]);
+      if (cl.free){ found++; const li=document.createElement("li"); li.className="scal-free-item";
+        li.textContent = dd.toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"short"});
+        li.title = "Pokaż ten dzień w tabeli"; li.onclick = () => { sy=dd.getFullYear(); sm=dd.getMonth(); updateLabel(); ensureOutlook(); renderGrid(); selectDay(keyOf(dd)); };
+        ul.appendChild(li); } }
+    if (!found){ const li=document.createElement("li"); li.className="scal-free-empty"; li.textContent="Brak wolnych w najbliższym czasie"; ul.appendChild(li); }
+  }
+
+  function updateLabel(){ const l=$("scal-label"); if (l) l.textContent = `${MIES_NOM[sm]} ${sy}`; }
+  function step(dir){ sm+=dir; if(sm<0){sm=11;sy--;} else if(sm>11){sm=0;sy++;} updateLabel(); ensureOutlook(); renderGrid(); }
+  function setBody(b){ sbody=(b==="all")?"all":b.toUpperCase(); ["all","cuc","sgs"].forEach(x=>{const el=$(`scal-body-${x}`); if(el) el.classList.toggle("active", x===b);}); renderGrid(); }
+
+  function setup(){
+    const p=$("scal-prev"), n=$("scal-next"); if(p) p.onclick=()=>step(-1); if(n) n.onclick=()=>step(1);
+    ["all","cuc","sgs"].forEach(x=>{ const el=$(`scal-body-${x}`); if(el) el.onclick=()=>setBody(x); });
+    const t=$("scal-toggle"); if(t) t.onclick=()=>{ collapsed=!collapsed; const box=$("myaudits-cal"); if(box) box.classList.toggle("collapsed", collapsed); };
+  }
+  function render(){ if(!inited){ setup(); inited=true; } updateLabel(); ensureOutlook(); renderGrid(); renderFree(); updateActiveDay(); }
+  function refresh(){ if(!inited) return; renderGrid(); renderFree(); updateActiveDay(); }
+
+  return { render, refresh };
+})();
+window.SideCalModule = SideCalModule;

@@ -134,6 +134,9 @@
       <button id="btn-clear-filters" class="btn-ghost">✕ Wyczyść</button>
     </div>
 
+    <div class="myaudits-layout">
+    <div class="myaudits-main">
+
     <div class="stats-bar">
       <div class="stat-card">
         <span class="stat-num" id="stat-total">—</span>
@@ -175,6 +178,41 @@
         </tbody>
       </table>
     </div>
+
+    </div><!-- /myaudits-main -->
+
+    <aside class="myaudits-cal" id="myaudits-cal">
+      <div class="scal-topbar">
+        <button id="scal-toggle" class="scal-toggle" title="Zwiń / rozwiń kalendarz">📅</button>
+        <div class="scal-head">
+          <button id="scal-prev" class="btn-ghost scal-nav">‹</button>
+          <span id="scal-label" class="scal-label">—</span>
+          <button id="scal-next" class="btn-ghost scal-nav">›</button>
+        </div>
+      </div>
+      <div class="scal-inner">
+        <div class="op-view-switcher scal-body-switch">
+          <button id="scal-body-all" class="op-view-btn active">Wsz.</button>
+          <button id="scal-body-cuc" class="op-view-btn">CUC</button>
+          <button id="scal-body-sgs" class="op-view-btn">SGS</button>
+        </div>
+        <div id="scal-activeday" class="scal-activeday hidden"></div>
+        <div id="scal-grid" class="scal-grid"></div>
+        <div class="scal-legend">
+          <span><i class="scal-sw cuc"></i> CUC</span>
+          <span><i class="scal-sw sgs"></i> SGS</span>
+          <span><i class="scal-sw free"></i> wolny</span>
+          <span><i class="scal-sw off"></i> zajęty/wolne od pracy</span>
+          <span><i class="scal-sw custody"></i> opieka</span>
+        </div>
+        <div class="scal-free">
+          <h4>Najbliższe wolne dni</h4>
+          <ul id="scal-free-list" class="scal-free-list"></ul>
+        </div>
+      </div>
+    </aside>
+
+    </div><!-- /myaudits-layout -->
   </div>
 
   <!-- WIDOK: CHECK AUDYT -->

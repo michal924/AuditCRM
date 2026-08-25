@@ -1364,6 +1364,58 @@ tr.change-row-rzeznik:hover { background: #e0f5e8; }
 .op-day.ac-ext { background: #e3e6ec; color: var(--text2); box-shadow: inset 0 -3px 0 #9aa4b2; }
 .op-sw.ac-sw-ext { background: #9aa4b2; }
 
+/* ============================================================
+   BOCZNY KALENDARZYK w widoku Audyty (myaudits-cal)
+   ============================================================ */
+.myaudits-layout { display: flex; gap: 16px; align-items: flex-start; }
+.myaudits-main { flex: 1; min-width: 0; }              /* min-width:0 → tabela może się zwężać/scrollować */
+.myaudits-main .table-wrapper { overflow-x: auto; }
+.myaudits-cal { width: 300px; flex-shrink: 0; position: sticky; top: 12px; background: var(--bg2);
+  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px; }
+.myaudits-cal.collapsed { width: 46px; padding: 8px 6px; overflow: hidden; }
+.myaudits-cal.collapsed .scal-inner, .myaudits-cal.collapsed .scal-head { display: none; }
+.scal-topbar { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.scal-toggle { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 3px 7px; cursor: pointer; font-size: 15px; line-height: 1; }
+.scal-head { display: flex; align-items: center; justify-content: space-between; flex: 1; }
+.scal-nav { padding: 2px 8px; font-size: 18px; }
+.scal-label { font-weight: 800; font-size: 14px; color: var(--text); }
+.scal-body-switch { width: 100%; margin-bottom: 8px; }
+.scal-body-switch .op-view-btn { flex: 1; padding: 4px 6px; font-size: 12px; }
+.scal-activeday { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2);
+  background: #eef2fb; border: 1px solid #c7d5f2; border-radius: 8px; padding: 4px 8px; margin-bottom: 8px; }
+.scal-clearday { margin-left: auto; background: none; border: none; cursor: pointer; color: var(--accent); font-weight: 800; font-size: 13px; }
+.scal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.scal-dow { text-align: center; font-size: 10px; font-weight: 800; color: var(--text3); text-transform: uppercase; padding-bottom: 2px; }
+.scal-day { aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
+  color: var(--text); background: var(--bg3); border-radius: 7px; cursor: pointer; transition: filter .12s, outline .12s; user-select: none; }
+.scal-day:hover { filter: brightness(0.94); }
+.scal-day.free    { background: #d9f2e1; color: #1a7a34; }
+.scal-day.off     { background: #eceef2; color: var(--text3); }
+.scal-day.custody { box-shadow: inset 3px 0 0 #8b6bd6; }
+.scal-day.has-cuc  { background: #bcd0f4; color: #22407e; }
+.scal-day.has-sgs  { background: #ffd2a1; color: #8f4206; }
+.scal-day.has-both { background: linear-gradient(135deg, #bcd0f4 0 50%, #ffd2a1 50% 100%); color: #2a2a2a; }
+.scal-day.today   { outline: 2px solid var(--accent); outline-offset: -2px; }
+.scal-day.sel     { outline: 2px solid var(--text); outline-offset: -2px; box-shadow: 0 0 0 2px rgba(0,0,0,.05); }
+.scal-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 10px 0; font-size: 11px; color: var(--text2); }
+.scal-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.scal-sw { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.scal-sw.cuc { background: #bcd0f4; } .scal-sw.sgs { background: #ffd2a1; }
+.scal-sw.free { background: #d9f2e1; } .scal-sw.off { background: #eceef2; }
+.scal-sw.custody { background: #fff; box-shadow: inset 3px 0 0 #8b6bd6, inset 0 0 0 1px var(--border); }
+.scal-free { border-top: 1px solid var(--border); padding-top: 8px; }
+.scal-free h4 { margin: 0 0 6px; font-size: 12px; font-weight: 800; color: var(--text2); text-transform: uppercase; letter-spacing: .03em; }
+.scal-free-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.scal-free-item { font-size: 12.5px; font-weight: 700; color: #1a7a34; background: #eafaef; border: 1px solid #c9ecd4;
+  border-radius: 7px; padding: 4px 8px; cursor: pointer; }
+.scal-free-item:hover { background: #d9f2e1; }
+.scal-free-empty { font-size: 12px; color: var(--text3); }
+@media (max-width: 1200px) {
+  .myaudits-layout { flex-direction: column; }
+  .myaudits-cal { width: 100%; position: static; }
+  .myaudits-cal.collapsed { width: 100%; }
+}
+
 /* Tydzień */
 .op-week-col.ac-free    { background: #e9f7ed; border-color: #bfe6cb; }
 .op-week-col.ac-off     { background: #f0f1f5; border-color: #e1e4ec; }
