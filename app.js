@@ -3548,9 +3548,10 @@ const SideCalModule = (function () {
       if (audits.length){ const hasC=audits.some(a=>bodyOf(a)==="CUC"), hasS=audits.some(a=>bodyOf(a)==="SGS");
         cell.classList.add(hasC&&hasS?"has-both":hasS?"has-sgs":"has-cuc");
         if (cl.custody) cell.classList.add("conflict-edge"); } // audyt w dzień opieki
-      else if (cl.custody || cl.extBusy) cell.classList.add("busy-other"); // zajęty czymś innym niż audyt → czerwony
+      else if (cl.extBusy) cell.classList.add("busy-other"); // realnie zajęty (spotkanie/szkolenie Outlook) → czerwony
       else if (cl.free) cell.classList.add("free");
       else if (cl.isWeekend || cl.isHol) cell.classList.add("off");
+      if (cl.custody && !audits.length) cell.classList.add("custody"); // opieka = fioletowa krawędź (nie czerwony)
       if (sameDay(dd, today)) cell.classList.add("today");
       if (calDayFilter === k) cell.classList.add("sel");
       cell.textContent = d;
