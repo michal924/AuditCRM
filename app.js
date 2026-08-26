@@ -3471,13 +3471,13 @@ const SideCalModule = (function () {
   function ensureOutlook(){
     const rs = new Date(sy, sm, 1), re = new Date(sy, sm+1, 0);
     const rk = keyOf(rs)+"_"+keyOf(re); if (rk === sOutlookRK) return; sOutlookRK = rk;
-    fetchOutlook(rs, re).then(map => { if (map) { sOutlookMap = map; renderGrid(); renderFree(); } });
+    fetchOutlook(rs, re).then(map => { if (map) { sOutlookMap = map; renderGrid(); renderFree(); renderDayDetail(); } });
   }
 
   function selectDay(k){
     calDayFilter = (calDayFilter === k) ? null : k; // toggle
     if (typeof renderTable === "function") renderTable();
-    renderGrid(); updateActiveDay();
+    renderGrid(); updateActiveDay(); renderDayDetail();
   }
 
   function updateActiveDay(){
@@ -3486,6 +3486,23 @@ const SideCalModule = (function () {
       el.className = "scal-activeday"; el.innerHTML = `Tabela: <strong>${fmtPL(d)}</strong> <button id="scal-clearday" class="scal-clearday" title="Pokaż wszystkie">✕</button>`;
       const b = $("scal-clearday"); if (b) b.onclick = () => selectDay(calDayFilter);
     } else { el.className = "scal-activeday hidden"; el.innerHTML = ""; }
+  }
+
+  // Szczegół wybranego dnia: audyty + spotkania Outlook + opieka
+  function renderDayDetail(){
+    const box = $("scal-daydetail"); if (!box) return;
+    if (!calDayFilter){ box.className = "scal-daydetail hidden"; box.innerHTML = ""; return; }
+    const k = calDayFilter, d = new Date(k+"T12:00:00"), map = dayMap();
+    const audits = map[k] || [];
+    const ext = (sOutlookMap[k] || []).filter(e => e.showAs !== "free");
+    const rows = [];
+    let custody = null;
+    try { if (window.OpiekaModule && OpiekaModule.dayInfo){ const i = OpiekaModule.dayInfo(d); if (i.father) custody = i.reason; } } catch {}
+    if (custody) rows.push(`<div class="db-row db-custody">👨‍👦 Opieka <span class="db-sub">${escHtml(custody)}</span></div>`);
+    audits.forEach(a => { const b = (a.CertBody==="SGS")?"SGS":"CUC"; rows.push(`<div class="db-row db-audit ${b==="SGS"?"sgs":"cuc"}">📋 ${escHtml(a.Title||"Audyt")} <span class="db-sub">${b}</span></div>`); });
+    ext.forEach(e => { let t=""; if (!e.isAllDay && e.start && e.start.dateTime){ const x=new Date(e.start.dateTime); if(!isNaN(x)) t=pad(x.getHours())+":"+pad(x.getMinutes())+" "; } rows.push(`<div class="db-row db-ext">📆 ${t}${escHtml(e.subject||"(bez tytułu)")}</div>`); });
+    if (!rows.length){ const dow = d.getDay(); rows.push(`<div class="db-row db-free">${(dow===0||dow===6)?"Weekend":"✓ Wolny dzień"}</div>`); }
+    box.className = "scal-daydetail"; box.innerHTML = rows.join("");
   }
 
   function renderGrid(){
@@ -3537,8 +3554,8 @@ const SideCalModule = (function () {
     ["all","cuc","sgs"].forEach(x=>{ const el=$(`scal-body-${x}`); if(el) el.onclick=()=>setBody(x); });
     const t=$("scal-toggle"); if(t) t.onclick=()=>{ collapsed=!collapsed; const box=$("myaudits-cal"); if(box) box.classList.toggle("collapsed", collapsed); };
   }
-  function render(){ if(!inited){ setup(); inited=true; } updateLabel(); ensureOutlook(); renderGrid(); renderFree(); updateActiveDay(); }
-  function refresh(){ if(!inited) return; renderGrid(); renderFree(); updateActiveDay(); }
+  function render(){ if(!inited){ setup(); inited=true; } updateLabel(); ensureOutlook(); renderGrid(); renderFree(); updateActiveDay(); renderDayDetail(); }
+  function refresh(){ if(!inited) return; renderGrid(); renderFree(); updateActiveDay(); renderDayDetail(); }
 
   return { render, refresh };
 })();

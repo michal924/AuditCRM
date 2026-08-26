@@ -1398,6 +1398,8 @@ tr.change-row-rzeznik:hover { background: #e0f5e8; }
 .scal-activeday { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2);
   background: #eef2fb; border: 1px solid #c7d5f2; border-radius: 8px; padding: 4px 8px; margin-bottom: 8px; }
 .scal-clearday { margin-left: auto; background: none; border: none; cursor: pointer; color: var(--accent); font-weight: 800; font-size: 13px; }
+.scal-daydetail { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg3); }
+.scal-daydetail .db-row { font-size: 11.5px; padding: 3px 7px; }
 .scal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
 .scal-dow { text-align: center; font-size: 10px; font-weight: 800; color: var(--text3); text-transform: uppercase; padding-bottom: 2px; }
 .scal-day { aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
