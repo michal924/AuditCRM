@@ -354,8 +354,24 @@ function renderTable() {
   try { SideCalModule.refresh(); } catch {}
 
   const tbody = document.getElementById("audits-tbody");
+
+  // Wiersz informacyjny: pozycje spoza audytów dla wybranego dnia (opieka + Outlook)
+  let extrasRow = "";
+  if (calDayFilter) {
+    let ex = null; try { ex = SideCalModule.dayExtras(calDayFilter); } catch {}
+    if (ex && (ex.custody || (ex.outlook && ex.outlook.length))) {
+      const items = [];
+      if (ex.custody) items.push(`<span class="di-item di-custody">👨‍👦 Opieka: ${escHtml(ex.custody)}</span>`);
+      (ex.outlook || []).forEach(o => items.push(`<span class="di-item di-ext">📆 ${o.time ? escHtml(o.time) + " " : ""}${escHtml(o.subject)}</span>`));
+      const dLbl = new Date(calDayFilter + "T12:00:00").toLocaleDateString("pl-PL");
+      extrasRow = `<tr class="day-info-row"><td colspan="11"><div class="day-info"><span class="day-info-title">📅 ${dLbl} — poza audytami:</span>${items.join("")}</div></td></tr>`;
+    }
+  }
+
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="loading">Brak wyników</td></tr>';
+    tbody.innerHTML = extrasRow
+      ? '<tr><td colspan="11" class="loading" style="padding:10px 0 2px">Brak audytów tego dnia — ale masz zaplanowane:</td></tr>' + extrasRow
+      : '<tr><td colspan="11" class="loading">Brak wyników</td></tr>';
     return;
   }
 
@@ -420,7 +436,7 @@ function renderTable() {
         '</div>' +
       '</td>' +
     '</tr>';
-  }).join("");
+  }).join("") + extrasRow;
 }
 
 // Znacznik kolizji z opieką nad Szymonem — tylko dla audytów Rzeźnik Michał
@@ -3471,7 +3487,20 @@ const SideCalModule = (function () {
   function ensureOutlook(){
     const rs = new Date(sy, sm, 1), re = new Date(sy, sm+1, 0);
     const rk = keyOf(rs)+"_"+keyOf(re); if (rk === sOutlookRK) return; sOutlookRK = rk;
-    fetchOutlook(rs, re).then(map => { if (map) { sOutlookMap = map; renderGrid(); renderFree(); renderDayDetail(); } });
+    fetchOutlook(rs, re).then(map => { if (map) { sOutlookMap = map; renderGrid(); renderFree(); renderDayDetail();
+      if (calDayFilter && typeof renderTable === "function") renderTable(); } }); // odśwież wiersz info w tabeli
+  }
+
+  // Pozycje spoza audytów dla danego dnia (opieka + spotkania Outlook) — używane też w tabeli
+  function dayExtras(k){
+    const d = new Date(k+"T12:00:00");
+    let custody = null;
+    try { if (window.OpiekaModule && OpiekaModule.dayInfo){ const i = OpiekaModule.dayInfo(d); if (i.father) custody = i.reason; } } catch {}
+    const outlook = (sOutlookMap[k] || []).filter(e => e.showAs !== "free").map(e => {
+      let t = ""; if (!e.isAllDay && e.start && e.start.dateTime){ const x = new Date(e.start.dateTime); if (!isNaN(x)) t = pad(x.getHours())+":"+pad(x.getMinutes()); }
+      return { time: t, subject: e.subject || "(bez tytułu)" };
+    });
+    return { custody, outlook };
   }
 
   function selectDay(k){
@@ -3517,11 +3546,11 @@ const SideCalModule = (function () {
       const cl = classify(dd, map[k]);
       const cell = document.createElement("div"); cell.className = "scal-day";
       if (audits.length){ const hasC=audits.some(a=>bodyOf(a)==="CUC"), hasS=audits.some(a=>bodyOf(a)==="SGS");
-        cell.classList.add(hasC&&hasS?"has-both":hasS?"has-sgs":"has-cuc"); }
+        cell.classList.add(hasC&&hasS?"has-both":hasS?"has-sgs":"has-cuc");
+        if (cl.custody) cell.classList.add("conflict-edge"); } // audyt w dzień opieki
+      else if (cl.custody || cl.extBusy) cell.classList.add("busy-other"); // zajęty czymś innym niż audyt → czerwony
       else if (cl.free) cell.classList.add("free");
       else if (cl.isWeekend || cl.isHol) cell.classList.add("off");
-      else if (cl.extBusy) cell.classList.add("off");
-      if (cl.custody) cell.classList.add("custody");
       if (sameDay(dd, today)) cell.classList.add("today");
       if (calDayFilter === k) cell.classList.add("sel");
       cell.textContent = d;
@@ -3557,6 +3586,6 @@ const SideCalModule = (function () {
   function render(){ if(!inited){ setup(); inited=true; } updateLabel(); ensureOutlook(); renderGrid(); renderFree(); updateActiveDay(); renderDayDetail(); }
   function refresh(){ if(!inited) return; renderGrid(); renderFree(); updateActiveDay(); renderDayDetail(); }
 
-  return { render, refresh };
+  return { render, refresh, dayExtras };
 })();
 window.SideCalModule = SideCalModule;
