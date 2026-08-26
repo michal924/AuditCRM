@@ -454,6 +454,85 @@ function setDateCustodyIcon(iconId, dateVal, auditorName) {
   }
 }
 
+// ── Podgląd dostępności dnia przy planowaniu audytu (opieka + inne audyty + Outlook) ──
+function sameDayAudits(dateStr) {
+  const out = [];
+  const list = Array.isArray(allAudits) ? allAudits : [];
+  list.forEach(a => {
+    if (a.AuditorName !== MY_AUDITOR || !a.AuditDateStart) return;
+    if (currentAudit && a.Id === currentAudit.Id) return; // pomiń edytowany rekord
+    const start = new Date(String(a.AuditDateStart).substring(0,10) + "T12:00:00");
+    const n = Math.max(1, Math.ceil(parseFloat(a.AuditDays) || 1));
+    for (let i = 0; i < n; i++) {
+      const dd = new Date(start); dd.setDate(dd.getDate() + i);
+      const k = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+      if (k === dateStr) { out.push(a); break; }
+    }
+  });
+  return out;
+}
+
+async function fetchOutlookDay(dateStr) {
+  let token;
+  try { token = await getGraphToken(); } catch { return null; }
+  if (!token) return null;
+  const start = new Date(dateStr + "T00:00:00"); const end = new Date(start); end.setDate(end.getDate() + 1);
+  const url = `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${start.toISOString()}&endDateTime=${end.toISOString()}` +
+    `&$select=subject,start,end,isAllDay,showAs&$top=50&$orderby=start/dateTime`;
+  try {
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Prefer: 'outlook.timezone="Europe/Warsaw"' } });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data.value || [];
+  } catch { return null; }
+}
+
+async function renderDayBusy(boxId, dateStr) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  if (!dateStr) { box.classList.add("hidden"); box.classList.remove("busy"); box.innerHTML = ""; box.dataset.day = ""; return; }
+  box.dataset.day = dateStr;
+  const d = new Date(dateStr + "T12:00:00");
+  const p2 = n => String(n).padStart(2, "0");
+
+  // Część synchroniczna: opieka + inne audyty tego dnia
+  const rows = [];
+  let custody = null;
+  try { if (window.OpiekaModule && OpiekaModule.dayInfo) { const i = OpiekaModule.dayInfo(d); if (i.father) custody = i.reason; } } catch {}
+  if (custody) rows.push(`<div class="db-row db-custody">👨‍👦 Opieka nad Szymonem <span class="db-sub">${escHtml(custody)}</span></div>`);
+  sameDayAudits(dateStr).forEach(a => {
+    const b = (a.CertBody === "SGS") ? "SGS" : "CUC";
+    rows.push(`<div class="db-row db-audit ${b === "SGS" ? "sgs" : "cuc"}">📋 ${escHtml(a.Title || "Audyt")} <span class="db-sub">${b} · ${escHtml(a.Program || "?")}</span></div>`);
+  });
+  const staticHtml = rows.join("");
+  box.classList.remove("hidden");
+  box.innerHTML = staticHtml + `<div class="db-row db-muted">📆 sprawdzam Outlook…</div>`;
+
+  // Część async: Outlook
+  const evs = await fetchOutlookDay(dateStr);
+  if (box.dataset.day !== dateStr) return; // data zmieniona w międzyczasie
+  let extHtml = "";
+  let extBusy = false;
+  if (evs === null) {
+    extHtml = `<div class="db-row db-muted">📆 Outlook — nie udało się sprawdzić</div>`;
+  } else {
+    evs.filter(e => e.showAs !== "free").forEach(e => {
+      extBusy = true;
+      let t = "";
+      if (!e.isAllDay && e.start && e.start.dateTime) { const x = new Date(e.start.dateTime); if (!isNaN(x)) t = p2(x.getHours()) + ":" + p2(x.getMinutes()) + " "; }
+      extHtml += `<div class="db-row db-ext">📆 ${t}${escHtml(e.subject || "(bez tytułu)")}</div>`;
+    });
+  }
+  const anyBusy = rows.length > 0 || extBusy;
+  const dow = d.getDay();
+  let head = "";
+  if (!anyBusy) head = (dow === 0 || dow === 6)
+    ? `<div class="db-row db-free">Weekend — brak zajęć w Outlooku</div>`
+    : `<div class="db-row db-free">✓ Dzień wolny — brak audytów, opieki i spotkań</div>`;
+  box.innerHTML = head + staticHtml + extHtml;
+  box.classList.toggle("busy", anyBusy);
+}
+
 function updateStats(audits) {
   document.getElementById("stat-total").textContent = audits.length;
   document.getElementById("stat-planned").textContent =
@@ -541,6 +620,7 @@ function setupModal() {
       document.getElementById("m-year").textContent    = detectYear(val);
       setDateCustodyIcon("m-date-icon", val, currentAudit ? currentAudit.AuditorName : null);
     }
+    renderDayBusy("e-daybusy", val);
     updatePlanAuditBtn(val);
   });
 
@@ -645,6 +725,7 @@ function enterEditMode() {
   document.getElementById("e-notes").value   = a.Notes || "";
   document.getElementById("modal-overlay").classList.add("edit-mode");
   updatePlanAuditBtn(originalAuditDate);
+  renderDayBusy("e-daybusy", originalAuditDate || "");
 }
 
 function cancelEditMode() {
@@ -658,6 +739,7 @@ function cancelEditMode() {
   }
   const btn = document.getElementById("btn-plan-audit");
   if (btn) btn.classList.remove("scheduled");
+  renderDayBusy("e-daybusy", "");
 }
 
 function closeModal() {
@@ -668,6 +750,7 @@ function closeModal() {
   }
   currentAudit = null;
   planAuditRequested = false; // reset flagi przy zamknięciu modalu (Anuluj / klik poza)
+  renderDayBusy("e-daybusy", "");
 }
 
 async function saveChanges() {
@@ -1322,6 +1405,7 @@ function setupAddAudit() {
       document.getElementById("new-year").value = detectYear(val);
     }
     updateCustodyWarning(val);
+    renderDayBusy("new-daybusy", val);
   });
 
   document.getElementById("new-days").addEventListener("change", e => {
@@ -1482,6 +1566,7 @@ function openAddAuditModal() {
   const banner = document.getElementById("autofill-banner");
   if (banner) banner.classList.add("hidden");
   updateCustodyWarning("");
+  renderDayBusy("new-daybusy", "");
   show("add-audit-overlay");
 }
 
