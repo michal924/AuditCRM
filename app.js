@@ -1424,12 +1424,24 @@ function setupAddAudit() {
     renderDayBusy("new-daybusy", val);
   });
 
+  document.getElementById("new-certbody").addEventListener("change", updateProjectIdLabel);
+
   document.getElementById("new-days").addEventListener("change", e => {
     const days = parseFloat(e.target.value);
     document.getElementById("new-mode").value = (!isNaN(days) && days <= 0.25) ? "Online" : "On-site";
   });
 
   setupFirmaAutocomplete();
+}
+
+// Etykieta pola numeru: CUC → „Nr PRJ", SGS → „Nr klienta"
+function updateProjectIdLabel() {
+  const lbl = document.getElementById("new-projectid-label");
+  const inp = document.getElementById("new-projectid");
+  if (!lbl) return;
+  const body = document.getElementById("new-certbody")?.value || "CUC";
+  if (body === "SGS") { lbl.textContent = "Nr klienta (SGS)"; if (inp) inp.placeholder = "nr klienta SGS"; }
+  else { lbl.textContent = "Nr PRJ (CUC)"; if (inp) inp.placeholder = "np. 884179"; }
 }
 
 // Ostrzeżenie (miękkie) o kolizji z opieką nad Szymonem przy wyborze daty audytu
@@ -1572,6 +1584,9 @@ function openAddAuditModal() {
     if (el) el.value = "";
   });
   document.getElementById("new-program").value  = "";
+  document.getElementById("new-projectid").value = "";
+  document.getElementById("new-certbody").value = "CUC";
+  updateProjectIdLabel();
   document.getElementById("new-type").value     = "";
   document.getElementById("new-date").value     = "";
   document.getElementById("new-days").value     = "1";
@@ -1605,9 +1620,11 @@ async function saveNewAudit() {
   const quarter = document.getElementById("new-quarter").value || detectQuarter(date);
 
   const g = id => (document.getElementById(id)?.value || "").trim();
+  const prjRaw = g("new-projectid");
   const rec = {
     Title:          title,
     CertBody:       g("new-certbody") || "CUC",
+    ProjectID:      prjRaw ? (isNaN(parseInt(prjRaw, 10)) ? null : parseInt(prjRaw, 10)) : null,
     Program:        program,
     AuditType:      type,
     Standard:       g("new-standard"),
