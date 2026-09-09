@@ -797,7 +797,7 @@ tbody td.date-col {
 
 .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
 
-.status-btn, .proforma-btn {
+.status-btn, .proforma-btn, .plan-btn {
   background: var(--bg3);
   border: 1px solid var(--border);
   color: var(--text2);
@@ -809,9 +809,10 @@ tbody td.date-col {
   transition: all 0.2s;
   font-family: var(--font-data);
 }
-.status-btn:hover, .proforma-btn:hover { border-color: var(--accent-light); color: var(--text); }
+.status-btn:hover, .proforma-btn:hover, .plan-btn:hover { border-color: var(--accent-light); color: var(--text); }
 .status-btn.active  { background: var(--accent); border-color: var(--accent); color: white; }
 .proforma-btn.active{ background: var(--green);  border-color: var(--green);  color: white; }
+.plan-btn.active    { background: var(--green);  border-color: var(--green);  color: white; }
 
 #btn-save { margin-left: auto; }
 

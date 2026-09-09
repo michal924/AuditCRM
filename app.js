@@ -8,6 +8,7 @@ let allAudits = [];
 let currentAudit = null;
 let currentStatus = null;
 let currentProforma = null;
+let currentPlanSent = false; // czy plan audytu (zaproszenie) oznaczony jako wysłany
 let importParsed = [];
 let sortCol = "PlannedCUDate";
 let sortDir = 1; // 1 = ASC, -1 = DESC
@@ -633,6 +634,13 @@ function setupModal() {
       currentProforma = btn.dataset.val;
     };
   });
+  document.querySelectorAll(".plan-btn").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(".plan-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentPlanSent = btn.dataset.val === "yes";
+    };
+  });
   document.getElementById("btn-save").onclick = saveChanges;
 
   // Zmiana daty w trybie edycji → aktualizuj kwartał i rok
@@ -685,6 +693,7 @@ function openModal(id) {
   currentAudit = a;
   currentStatus = a.AuditStatus;
   currentProforma = a.Proforma;
+  currentPlanSent = !!a.PlanSentDate;
 
   document.getElementById("modal-title").textContent = a.Title || "—";
   document.getElementById("m-prj").textContent       = a.ProjectID || "—";
@@ -725,6 +734,7 @@ function openModal(id) {
 
   document.querySelectorAll(".status-btn").forEach(b => b.classList.toggle("active", b.dataset.val === a.AuditStatus));
   document.querySelectorAll(".proforma-btn").forEach(b => b.classList.toggle("active", b.dataset.val === a.Proforma));
+  document.querySelectorAll(".plan-btn").forEach(b => b.classList.toggle("active", b.dataset.val === (a.PlanSentDate ? "yes" : "no")));
 
   show("modal-overlay");
 }
@@ -784,6 +794,8 @@ async function saveChanges() {
   try {
     const prevStatus = currentAudit.AuditStatus;
     const fields = { AuditStatus: currentStatus, Proforma: currentProforma };
+    // Plan audytu (ręczne oznaczenie wysłania) — ustaw datę lub wyczyść
+    fields.PlanSentDate = currentPlanSent ? (currentAudit.PlanSentDate || new Date().toISOString()) : null;
 
     if (isEditMode) {
       const dateVal = document.getElementById("e-date").value;
@@ -817,12 +829,6 @@ async function saveChanges() {
       try {
         const calResult = await createAuditCalendarEvents(currentAudit);
         const link = calResult?.webLink;
-        // Zapamiętaj, że plan audytu (zaproszenie) został wysłany — do kolumny "Plan audytu"
-        try {
-          const sentIso = new Date().toISOString();
-          await updateAudit(currentAudit.Id, { PlanSentDate: sentIso });
-          currentAudit.PlanSentDate = sentIso;
-        } catch (psErr) { console.error("Nie zapisano PlanSentDate:", psErr); }
         showToast("💾 Zapisano + 📅 Zaproszenie wysłane!" + (link ? " (sprawdź konsolę F12)" : ""), "success");
         if (link) console.log("[Calendar] Otwórz event:", link);
       } catch (calErr) {
