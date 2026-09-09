@@ -389,9 +389,6 @@ function renderTable() {
     const notesBlock = a.Notes
       ? '<div class="rp-notes"><span class="rp-label">Notatki</span><p class="rp-notes-text">' + escHtml(a.Notes).replace(/\n/g,'<br>') + '</p></div>'
       : '';
-    const emailBlock = a.Email
-      ? '<a href="mailto:' + escHtml(a.Email) + '">' + escHtml(a.Email) + '</a>'
-      : '—';
     return '' +
     '<tr class="audit-row ' + rowClass + '" data-id="' + aid + '" onclick="toggleRowPreview(' + aid + ', this)">' +
       '<td class="prj-col">' + escHtml(a.ProjectID || '—') + '</td>' +
@@ -430,7 +427,10 @@ function renderTable() {
             '<div class="rp-field"><span class="rp-label">Miasto</span><span class="rp-val">' + escHtml(a.City || '—') + '</span></div>' +
             '<div class="rp-field"><span class="rp-label">Tryb</span><span class="rp-val">' + (a.AuditMode === 'Online' ? '💻 Online' : '📍 On-site') + '</span></div>' +
             '<div class="rp-field"><span class="rp-label">Audytor</span><span class="rp-val">' + escHtml(a.AuditorName || '—') + '</span></div>' +
-            (a.Email ? '<div class="rp-field"><span class="rp-label">Email</span><span class="rp-val"><a href="mailto:' + escHtml(a.Email) + '">' + escHtml(a.Email) + '</a></span></div>' : '') +
+            '<div class="rp-field rp-field-wide"><span class="rp-label">Adres</span><span class="rp-val">' + escHtml([a.Address, a.PostalCode, a.City].filter(Boolean).join(', ') || '—') + '</span></div>' +
+            '<div class="rp-field"><span class="rp-label">Telefon</span><span class="rp-val">' + (a.Phone ? '<a href="tel:' + escHtml(a.Phone) + '">' + escHtml(a.Phone) + '</a>' : '—') + '</span></div>' +
+            '<div class="rp-field"><span class="rp-label">Komórka</span><span class="rp-val">' + (a.Mobile ? '<a href="tel:' + escHtml(a.Mobile) + '">' + escHtml(a.Mobile) + '</a>' : '—') + '</span></div>' +
+            '<div class="rp-field rp-field-wide"><span class="rp-label">Email</span><span class="rp-val">' + (a.ClientEmail ? '<a href="mailto:' + escHtml(a.ClientEmail) + '">' + escHtml(a.ClientEmail) + '</a>' : '—') + '</span></div>' +
           '</div>' +
           notesBlock +
         '</div>' +

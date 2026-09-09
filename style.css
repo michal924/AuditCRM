@@ -711,6 +711,9 @@ tbody td.date-col {
   min-width: 100px;
 }
 .rp-field:last-child { border-right: none; }
+.rp-field-wide { min-width: 220px; }
+.rp-field .rp-val a { color: var(--accent); text-decoration: none; }
+.rp-field .rp-val a:hover { text-decoration: underline; }
 .rp-label {
   font-size: 10px;
   text-transform: uppercase;
