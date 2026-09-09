@@ -596,9 +596,12 @@
         </div>
         <div class="action-group">
           <label>Plan audytu</label>
-          <div class="btn-group" id="plan-buttons">
-            <button class="plan-btn" data-val="no">Niewysłany</button>
-            <button class="plan-btn" data-val="yes">📅 Wysłany</button>
+          <div class="plan-row">
+            <div class="btn-group" id="plan-buttons">
+              <button class="plan-btn" data-val="no">Niewysłany</button>
+              <button class="plan-btn" data-val="yes">📅 Wysłany</button>
+            </div>
+            <input type="date" id="plan-sent-date" class="field-input field-input-sm plan-date hidden" title="Data wysłania planu">
           </div>
         </div>
         <button id="btn-save" class="btn-primary">💾 Zapisz zmiany</button>

@@ -813,6 +813,8 @@ tbody td.date-col {
 .status-btn.active  { background: var(--accent); border-color: var(--accent); color: white; }
 .proforma-btn.active{ background: var(--green);  border-color: var(--green);  color: white; }
 .plan-btn.active    { background: var(--green);  border-color: var(--green);  color: white; }
+.plan-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.plan-date { max-width: 160px; }
 
 #btn-save { margin-left: auto; }
 

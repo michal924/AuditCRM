@@ -9,6 +9,7 @@ let currentAudit = null;
 let currentStatus = null;
 let currentProforma = null;
 let currentPlanSent = false; // czy plan audytu (zaproszenie) oznaczony jako wysłany
+let currentPlanSentDate = null; // wybrana data wysłania (YYYY-MM-DD)
 let importParsed = [];
 let sortCol = "PlannedCUDate";
 let sortDir = 1; // 1 = ASC, -1 = DESC
@@ -639,7 +640,21 @@ function setupModal() {
       document.querySelectorAll(".plan-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       currentPlanSent = btn.dataset.val === "yes";
+      const di = document.getElementById("plan-sent-date");
+      if (currentPlanSent) {
+        // Domyślnie: istniejąca data wysłania, inaczej dziś — z możliwością zmiany
+        const existing = currentAudit && currentAudit.PlanSentDate ? currentAudit.PlanSentDate.substring(0,10) : "";
+        di.value = di.value || existing || new Date().toISOString().substring(0,10);
+        currentPlanSentDate = di.value;
+        di.classList.remove("hidden");
+      } else {
+        currentPlanSentDate = null;
+        di.classList.add("hidden");
+      }
     };
+  });
+  document.getElementById("plan-sent-date").addEventListener("change", e => {
+    currentPlanSentDate = e.target.value || null;
   });
   document.getElementById("btn-save").onclick = saveChanges;
 
@@ -735,6 +750,11 @@ function openModal(id) {
   document.querySelectorAll(".status-btn").forEach(b => b.classList.toggle("active", b.dataset.val === a.AuditStatus));
   document.querySelectorAll(".proforma-btn").forEach(b => b.classList.toggle("active", b.dataset.val === a.Proforma));
   document.querySelectorAll(".plan-btn").forEach(b => b.classList.toggle("active", b.dataset.val === (a.PlanSentDate ? "yes" : "no")));
+  const psDate = a.PlanSentDate ? a.PlanSentDate.substring(0,10) : "";
+  const planDateEl = document.getElementById("plan-sent-date");
+  planDateEl.value = psDate;
+  planDateEl.classList.toggle("hidden", !a.PlanSentDate);
+  currentPlanSentDate = a.PlanSentDate ? psDate : null;
 
   show("modal-overlay");
 }
@@ -794,8 +814,10 @@ async function saveChanges() {
   try {
     const prevStatus = currentAudit.AuditStatus;
     const fields = { AuditStatus: currentStatus, Proforma: currentProforma };
-    // Plan audytu (ręczne oznaczenie wysłania) — ustaw datę lub wyczyść
-    fields.PlanSentDate = currentPlanSent ? (currentAudit.PlanSentDate || new Date().toISOString()) : null;
+    // Plan audytu (ręczne oznaczenie wysłania) — użyj wybranej daty, inaczej wyczyść
+    fields.PlanSentDate = currentPlanSent
+      ? safeDate(currentPlanSentDate || new Date().toISOString().substring(0,10))
+      : null;
 
     if (isEditMode) {
       const dateVal = document.getElementById("e-date").value;
