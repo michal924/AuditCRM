@@ -184,8 +184,8 @@ async function loadAudits() {
 // FILTRY — z persystencją w localStorage
 // ============================================================
 const FILTERS_KEY = "auditFilters_v3";
-const MULTI_KEYS  = ["quarter", "year", "program", "status", "certbody"];
-const MULTI_LABELS = { quarter: "Kwartał", year: "Rok", program: "Program", status: "Status", certbody: "Jednostka" };
+const MULTI_KEYS  = ["quarter", "year", "program", "status", "certbody", "plan"];
+const MULTI_LABELS = { quarter: "Kwartał", year: "Rok", program: "Program", status: "Status", certbody: "Jednostka", plan: "Plan audytu" };
 
 // Jednostka certyfikująca. Puste/stare rekordy = CUC (domyślnie), bez potrzeby backfillu.
 function certBodyOf(a) { return (a && a.CertBody) ? a.CertBody : "CUC"; }
@@ -283,6 +283,7 @@ function getFilters() {
     programs: getSelectedMulti("program"),
     statuses: getSelectedMulti("status"),
     certbodies: getSelectedMulti("certbody"),
+    plans: getSelectedMulti("plan"),
   };
 }
 
@@ -301,6 +302,11 @@ function applyFilters(audits) {
     if (f.programs.length > 0 && !f.programs.some(p => normProgramKey(p) === normProgramKey(a.Program))) return false;
     if (f.statuses.length > 0 && !f.statuses.includes(a.AuditStatus)) return false;
     if (f.certbodies.length > 0 && !f.certbodies.includes(certBodyOf(a))) return false;
+    if (f.plans.length > 0) {
+      const sent = !!a.PlanSentDate;
+      const ok = (sent && f.plans.includes("Wysłany")) || (!sent && f.plans.includes("Niewysłany"));
+      if (!ok) return false;
+    }
     if (calDayFilter && String(a.AuditDateStart || "").substring(0,10) !== calDayFilter) return false;
     return true;
   });
