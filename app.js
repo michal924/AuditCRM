@@ -169,14 +169,14 @@ function setupNav() {
 // ============================================================
 async function loadAudits() {
   document.getElementById("audits-tbody").innerHTML =
-    '<tr><td colspan="10" class="loading">Ładowanie danych...</td></tr>';
+    '<tr><td colspan="12" class="loading">Ładowanie danych...</td></tr>';
   try {
     allAudits = await fetchAllAudits();
     renderTable();
     try { SideCalModule.render(); } catch {}
   } catch (e) {
     document.getElementById("audits-tbody").innerHTML =
-      `<tr><td colspan="8" class="loading">Błąd: ${e.message}</td></tr>`;
+      `<tr><td colspan="12" class="loading">Błąd: ${e.message}</td></tr>`;
   }
 }
 
@@ -364,18 +364,18 @@ function renderTable() {
       if (ex.custody) items.push(`<span class="di-item di-custody">👨‍👦 Opieka: ${escHtml(ex.custody)}</span>`);
       (ex.outlook || []).forEach(o => items.push(`<span class="di-item di-ext">📆 ${o.time ? escHtml(o.time) + " " : ""}${escHtml(o.subject)}</span>`));
       const dLbl = new Date(calDayFilter + "T12:00:00").toLocaleDateString("pl-PL");
-      extrasRow = `<tr class="day-info-row"><td colspan="11"><div class="day-info"><span class="day-info-title">📅 ${dLbl} — poza audytami:</span>${items.join("")}</div></td></tr>`;
+      extrasRow = `<tr class="day-info-row"><td colspan="12"><div class="day-info"><span class="day-info-title">📅 ${dLbl} — poza audytami:</span>${items.join("")}</div></td></tr>`;
     }
   }
 
   if (!filtered.length) {
     tbody.innerHTML = extrasRow
-      ? '<tr><td colspan="11" class="loading" style="padding:10px 0 2px">Brak audytów tego dnia — ale masz zaplanowane:</td></tr>' + extrasRow
-      : '<tr><td colspan="11" class="loading">Brak wyników</td></tr>';
+      ? '<tr><td colspan="12" class="loading" style="padding:10px 0 2px">Brak audytów tego dnia — ale masz zaplanowane:</td></tr>' + extrasRow
+      : '<tr><td colspan="12" class="loading">Brak wyników</td></tr>';
     return;
   }
 
-  const NCOLS = 11; // liczba kolumn tabeli
+  const NCOLS = 12; // liczba kolumn tabeli
   tbody.innerHTML = filtered.map(a => {
     // Barwa wiersza = jednostka (CUC niebieski / SGS pomarańcz), jasność = status
     const bodyCls = certBodyOf(a) === "SGS" ? "row-body-sgs" : "row-body-cuc";
@@ -401,6 +401,7 @@ function renderTable() {
       '<td class="' + (a.AuditMode === 'Online' ? 'mode-online' : 'mode-onsite') + '">' + (a.AuditMode === 'Online' ? '💻' : '📍') + ' ' + (a.AuditMode || '—') + '</td>' +
       '<td>' + statusBadge(a.AuditStatus) + '</td>' +
       '<td>' + proformaBadge(a.Proforma) + '</td>' +
+      '<td class="plan-col">' + (a.PlanSentDate ? '<span class="plan-sent" title="Zaproszenie wysłane ' + escHtml(formatDate(a.PlanSentDate)) + '">✅ ' + escHtml(formatDate(a.PlanSentDate)) + '</span>' : '') + '</td>' +
       '<td class="notes-col">' + notesSnippet + '</td>' +
     '</tr>' +
     '<tr class="row-preview-wrap" id="preview-' + aid + '" style="display:none">' +
@@ -810,6 +811,12 @@ async function saveChanges() {
       try {
         const calResult = await createAuditCalendarEvents(currentAudit);
         const link = calResult?.webLink;
+        // Zapamiętaj, że plan audytu (zaproszenie) został wysłany — do kolumny "Plan audytu"
+        try {
+          const sentIso = new Date().toISOString();
+          await updateAudit(currentAudit.Id, { PlanSentDate: sentIso });
+          currentAudit.PlanSentDate = sentIso;
+        } catch (psErr) { console.error("Nie zapisano PlanSentDate:", psErr); }
         showToast("💾 Zapisano + 📅 Zaproszenie wysłane!" + (link ? " (sprawdź konsolę F12)" : ""), "success");
         if (link) console.log("[Calendar] Otwórz event:", link);
       } catch (calErr) {
