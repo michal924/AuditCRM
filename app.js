@@ -3684,7 +3684,13 @@ const DevModule = (function () {
     ul.innerHTML = '<li class="dev-empty">Ładowanie…</li>';
     let items = [];
     try { items = await fetchDevRequests(); }
-    catch (e) { ul.innerHTML = '<li class="dev-empty">Nie udało się wczytać (czy lista „DevRequests" istnieje w SharePoint?)</li>'; return; }
+    catch (e) {
+      const msg = /404/.test(e.message || "")
+        ? 'Lista „DevRequests" jeszcze nie istnieje w SharePoint — utwórz ją, aby zgłoszenia się zapisywały.'
+        : 'Nie udało się wczytać zgłoszeń (' + escHtml((e.message || "").substring(0, 80)) + ').';
+      ul.innerHTML = '<li class="dev-empty">' + msg + '</li>';
+      return;
+    }
     if (!items.length) { ul.innerHTML = '<li class="dev-empty">Brak zgłoszeń — dodaj pierwsze powyżej.</li>'; return; }
     ul.innerHTML = items.map(it => {
       const st = it.ReqStatus || "Nowe";

@@ -106,7 +106,8 @@ async function addAudit(fields) {
 
 // ── Zgłoszenia rozwoju aplikacji (lista DevRequests) ──
 async function fetchDevRequests() {
-  const data = await spGet("/_api/lists/getbytitle('DevRequests')/items?$select=Id,Title,Description,ReqStatus,Created&$top=200&$orderby=Created desc");
+  // Bez $select pól niestandardowych — dzięki temu ew. inna nazwa kolumny nie wywala odczytu (400)
+  const data = await spGet("/_api/lists/getbytitle('DevRequests')/items?$top=200&$orderby=Created desc");
   return data.value || [];
 }
 async function addDevRequest(fields) {
