@@ -1501,3 +1501,31 @@ tr.change-row-rzeznik:hover { background: #e0f5e8; }
 .map-dot.rejected { background: #dc3545; }
 .map-dot.other    { background: #8a93ad; }
 @media (max-width: 900px) { #map-container { grid-template-columns: 1fr; grid-template-rows: 60% 40%; } }
+
+/* ============================================================
+   ZGŁOSZENIA ROZWOJU (pływający przycisk + panel)
+   ============================================================ */
+.dev-fab {
+  position: fixed; right: 22px; bottom: 22px; z-index: 900;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--accent); color: #fff; border: none; cursor: pointer;
+  font-size: 24px; line-height: 1; box-shadow: 0 4px 14px rgba(58,77,152,.4);
+  transition: transform .12s, box-shadow .12s;
+}
+.dev-fab:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 6px 20px rgba(58,77,152,.5); }
+.dev-modal { max-width: 620px; }
+.dev-hint { font-size: 13px; color: var(--text2); margin: 0 0 12px; line-height: 1.4; }
+.dev-list-title { font-size: 13px; font-weight: 800; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; margin: 22px 0 10px; border-top: 1px solid var(--border); padding-top: 16px; }
+.dev-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.dev-empty { font-size: 13px; color: var(--text3); padding: 8px 0; }
+.dev-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--bg2); }
+.dev-item-head { display: flex; align-items: center; gap: 10px; }
+.dev-item-title { font-weight: 700; font-size: 14px; color: var(--text); flex: 1; }
+.dev-item-date { font-size: 11.5px; color: var(--text3); white-space: nowrap; }
+.dev-item-desc { margin: 6px 0 0; font-size: 13px; color: var(--text2); line-height: 1.4; }
+.dev-status { font-size: 11px; font-weight: 800; border-radius: 20px; padding: 2px 9px; white-space: nowrap; }
+.dev-status.new  { background: #dce6fb; color: #2d4da0; }
+.dev-status.prog { background: #fdefd4; color: #a05c00; }
+.dev-status.done { background: #d4f0dc; color: #1a7a34; }
+.dev-item-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--text3); }
+.dev-status-sel { font-family: inherit; font-size: 12px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg3); color: var(--text); }

@@ -475,6 +475,9 @@
     </div>
   </div>
 
+  <!-- PŁYWAJĄCY PRZYCISK: zgłoszenie rozwoju -->
+  <button id="btn-dev-request" class="dev-fab" title="Zgłoś rozwój aplikacji do dewelopera">💡</button>
+
 </div><!-- /page-app -->
 
 <!-- MODAL: SZCZEGÓŁY AUDYTU -->
@@ -804,6 +807,31 @@
         <button class="btn-ghost" onclick="closeAddAudit()">Anuluj</button>
         <button id="btn-save-new-audit" class="btn-primary" style="width:auto">💾 Zapisz audyt</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ZGŁOSZENIE ROZWOJU -->
+<div id="dev-overlay" class="modal-overlay hidden">
+  <div class="modal dev-modal">
+    <div class="modal-header">
+      <h2>💡 Zgłoszenia rozwoju</h2>
+      <button id="dev-close" class="btn-ghost">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="dev-hint">Opisz co dodać lub poprawić w aplikacji. Zgłoszenie trafia do dewelopera.</p>
+      <div class="form-row">
+        <label>Tytuł *</label>
+        <input type="text" id="dev-title" class="form-input" placeholder="Krótko: czego dotyczy" maxlength="140">
+      </div>
+      <div class="form-row">
+        <label>Opis</label>
+        <textarea id="dev-desc" class="form-input form-textarea" placeholder="Szczegóły: co, gdzie, jak ma działać..."></textarea>
+      </div>
+      <button id="dev-submit" class="btn-primary" style="width:auto">📨 Wyślij zgłoszenie</button>
+
+      <h3 class="dev-list-title">Twoje zgłoszenia</h3>
+      <ul id="dev-list" class="dev-list"><li class="dev-empty">Ładowanie…</li></ul>
     </div>
   </div>
 </div>

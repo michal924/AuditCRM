@@ -104,6 +104,31 @@ async function addAudit(fields) {
   return r.json();
 }
 
+// ── Zgłoszenia rozwoju aplikacji (lista DevRequests) ──
+async function fetchDevRequests() {
+  const data = await spGet("/_api/lists/getbytitle('DevRequests')/items?$select=Id,Title,Description,ReqStatus,Created&$top=200&$orderby=Created desc");
+  return data.value || [];
+}
+async function addDevRequest(fields) {
+  const token = await getToken();
+  const digest = await getDigest(token);
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('DevRequests')/items`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json;odata=nometadata",
+      "Content-Type": "application/json;odata=nometadata",
+      "X-RequestDigest": digest,
+    },
+    body: JSON.stringify(fields),
+  });
+  if (!r.ok) { const txt = await r.text().catch(() => ""); throw new Error(`Add DevRequest ${r.status}: ${txt.substring(0, 200)}`); }
+  return r.json();
+}
+async function updateDevRequest(id, fields) {
+  await spPatch(`/_api/lists/getbytitle('DevRequests')/items(${id})`, fields);
+}
+
 // Pobierz istniejące klucze ProjectID+Year+Program (do wykrycia duplikatów przy imporcie)
 // Klucz: "ProjectID_Year_Program" np. "12345_2025_FSC"
 async function fetchExistingProjectIds() {

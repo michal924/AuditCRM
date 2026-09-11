@@ -141,6 +141,7 @@ async function init() {
   setupImport();
   setupAddAudit();
   setupChanges();
+  DevModule.setup();
 
   await loadAudits();
 }
@@ -3648,3 +3649,74 @@ const SideCalModule = (function () {
   return { render, refresh, dayExtras };
 })();
 window.SideCalModule = SideCalModule;
+
+// ============================================================
+// ZGŁOSZENIA ROZWOJU — panel "do dewelopera" (lista DevRequests)
+// ============================================================
+const DevModule = (function () {
+  const $ = id => document.getElementById(id);
+  const STAT = ["Nowe", "W realizacji", "Zrobione"];
+
+  function open() { show("dev-overlay"); renderList(); }
+  function close() { hide("dev-overlay"); }
+
+  async function submit() {
+    const title = ($("dev-title").value || "").trim();
+    const desc  = ($("dev-desc").value || "").trim();
+    if (!title) { showToast("Podaj tytuł zgłoszenia", "warn"); $("dev-title").focus(); return; }
+    const btn = $("dev-submit"); btn.disabled = true; btn.textContent = "Wysyłanie…";
+    try {
+      await addDevRequest({ Title: title, Description: desc || null, ReqStatus: "Nowe" });
+      $("dev-title").value = ""; $("dev-desc").value = "";
+      showToast("💡 Zgłoszenie wysłane — dzięki!", "success");
+      renderList();
+    } catch (e) {
+      showToast("Błąd wysyłania: " + (e.message || "").substring(0, 80), "error");
+    } finally { btn.disabled = false; btn.textContent = "📨 Wyślij zgłoszenie"; }
+  }
+
+  function badgeClass(s) {
+    return s === "Zrobione" ? "done" : s === "W realizacji" ? "prog" : "new";
+  }
+
+  async function renderList() {
+    const ul = $("dev-list");
+    ul.innerHTML = '<li class="dev-empty">Ładowanie…</li>';
+    let items = [];
+    try { items = await fetchDevRequests(); }
+    catch (e) { ul.innerHTML = '<li class="dev-empty">Nie udało się wczytać (czy lista „DevRequests" istnieje w SharePoint?)</li>'; return; }
+    if (!items.length) { ul.innerHTML = '<li class="dev-empty">Brak zgłoszeń — dodaj pierwsze powyżej.</li>'; return; }
+    ul.innerHTML = items.map(it => {
+      const st = it.ReqStatus || "Nowe";
+      const date = it.Created ? new Date(it.Created).toLocaleDateString("pl-PL") : "";
+      const opts = STAT.map(s => '<option value="' + s + '"' + (s === st ? " selected" : "") + '>' + s + '</option>').join("");
+      return '<li class="dev-item">' +
+        '<div class="dev-item-head">' +
+          '<span class="dev-status ' + badgeClass(st) + '">' + escHtml(st) + '</span>' +
+          '<span class="dev-item-title">' + escHtml(it.Title || "—") + '</span>' +
+          '<span class="dev-item-date">' + escHtml(date) + '</span>' +
+        '</div>' +
+        (it.Description ? '<p class="dev-item-desc">' + escHtml(it.Description).replace(/\n/g, "<br>") + '</p>' : '') +
+        '<div class="dev-item-actions"><label>Status:</label>' +
+          '<select class="dev-status-sel" data-id="' + it.Id + '">' + opts + '</select></div>' +
+      '</li>';
+    }).join("");
+    ul.querySelectorAll(".dev-status-sel").forEach(sel => {
+      sel.onchange = async () => {
+        const id = parseInt(sel.dataset.id);
+        try { await updateDevRequest(id, { ReqStatus: sel.value }); showToast("Zaktualizowano status", "success"); renderList(); }
+        catch (e) { showToast("Błąd zmiany statusu", "error"); }
+      };
+    });
+  }
+
+  function setup() {
+    const fab = $("btn-dev-request"); if (fab) fab.onclick = open;
+    const c = $("dev-close"); if (c) c.onclick = close;
+    const ov = $("dev-overlay"); if (ov) ov.onclick = e => { if (e.target === ov) close(); };
+    const s = $("dev-submit"); if (s) s.onclick = submit;
+  }
+
+  return { setup, open };
+})();
+window.DevModule = DevModule;
