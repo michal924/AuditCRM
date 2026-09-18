@@ -300,6 +300,8 @@ td.date-col,
 }
 
 table { width: 100%; border-collapse: collapse; }
+/* Tabela audytów: minimalna szerokość — zamiast ściskać kolumny, przewija się w poziomie */
+#audits-table { min-width: 1240px; }
 
 thead th {
   background: var(--bg3);
@@ -345,27 +347,30 @@ tbody td {
   text-overflow: ellipsis;
 }
 
-/* Kolumna Firma — zawijanie tekstu */
+/* Kolumna Firma — zawija po słowach, nie łamie w środku wyrazu; nie zapada się */
 tbody td.firma-col {
   white-space: normal;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: break-word;
+  min-width: 200px;
   max-width: 280px;
-  overflow: visible;
+  overflow: hidden;
   text-overflow: unset;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
-/* Kolumna Program — zawijanie badge'ów */
+/* Kolumna Program — badge'y w pionie, ale każdy w całości (bez łamania "KZR INiG") */
 tbody td.program-col {
   white-space: normal;
+  min-width: 96px;
   max-width: 120px;
   overflow: hidden;
-  line-height: 1.8;
-  word-break: break-word;
+  line-height: 1.6;
+  word-break: normal;
 }
 tbody td.program-col .badge {
-  white-space: normal;
-  word-break: break-word;
+  white-space: nowrap;
+  word-break: normal;
   display: inline-block;
 }
 
