@@ -10,6 +10,8 @@ let currentStatus = null;
 let currentProforma = null;
 let currentPlanSent = false; // czy plan audytu (zaproszenie) oznaczony jako wysłany
 let currentPlanSentDate = null; // wybrana data wysłania (YYYY-MM-DD)
+let currentSettleStatus = "Nierozliczony"; // status rozliczenia w modalu
+let currentSettleDate = null;   // data rozliczenia (YYYY-MM-DD) gdy Rozliczony
 let importParsed = [];
 let sortCol = "PlannedCUDate";
 let sortDir = 1; // 1 = ASC, -1 = DESC
@@ -142,6 +144,7 @@ async function init() {
   setupAddAudit();
   setupChanges();
   DevModule.setup();
+  SettleModule.setup();
 
   await loadAudits();
 }
@@ -172,14 +175,14 @@ function setupNav() {
 // ============================================================
 async function loadAudits() {
   document.getElementById("audits-tbody").innerHTML =
-    '<tr><td colspan="12" class="loading">Ładowanie danych...</td></tr>';
+    '<tr><td colspan="13" class="loading">Ładowanie danych...</td></tr>';
   try {
     allAudits = await fetchAllAudits();
     renderTable();
     try { SideCalModule.render(); } catch {}
   } catch (e) {
     document.getElementById("audits-tbody").innerHTML =
-      `<tr><td colspan="12" class="loading">Błąd: ${e.message}</td></tr>`;
+      `<tr><td colspan="13" class="loading">Błąd: ${e.message}</td></tr>`;
   }
 }
 
@@ -187,8 +190,8 @@ async function loadAudits() {
 // FILTRY — z persystencją w localStorage
 // ============================================================
 const FILTERS_KEY = "auditFilters_v3";
-const MULTI_KEYS  = ["quarter", "year", "program", "status", "certbody", "plan"];
-const MULTI_LABELS = { quarter: "Kwartał", year: "Rok", program: "Program", status: "Status", certbody: "Jednostka", plan: "Plan audytu" };
+const MULTI_KEYS  = ["quarter", "year", "program", "status", "certbody", "plan", "settle"];
+const MULTI_LABELS = { quarter: "Kwartał", year: "Rok", program: "Program", status: "Status", certbody: "Jednostka", plan: "Plan audytu", settle: "Rozliczenie" };
 
 // Jednostka certyfikująca. Puste/stare rekordy = CUC (domyślnie), bez potrzeby backfillu.
 function certBodyOf(a) { return (a && a.CertBody) ? a.CertBody : "CUC"; }
@@ -197,6 +200,55 @@ function certBodyOf(a) { return (a && a.CertBody) ? a.CertBody : "CUC"; }
 function statusKey(s) {
   const map = { PLANNED: "planned", CHANGE: "change", Invoice: "invoice", DONE: "done", REJECTED: "rejected" };
   return map[s] || "planned";
+}
+
+// ── ROZLICZENIE — helpery (koszty + wynagrodzenie) ──
+function settleStatusOf(a) { return (a && a.SettleStatus) ? a.SettleStatus : "Nierozliczony"; }
+function settleNum(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function settleCalc(a) {
+  const km = settleNum(a.SettleKm);
+  const rate = (a.SettleKmRate != null && a.SettleKmRate !== "") ? settleNum(a.SettleKmRate) : 1.15;
+  const r2 = x => Math.round(x * 100) / 100;
+  const kmCost = r2(km * rate);
+  const costs = r2(kmCost + settleNum(a.SettleHotel) + settleNum(a.SettleHighway) + settleNum(a.SettleOther) + settleNum(a.SettleTickets));
+  const fee = settleNum(a.SettleFee);
+  return { km, rate, kmCost, costs, fee, total: r2(costs + fee) };
+}
+function fmtPLN(n) {
+  return (Math.round((n || 0) * 100) / 100).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " zł";
+}
+function settleBadge(a) {
+  const s = settleStatusOf(a);
+  const cls = s === "Rozliczony" ? "done" : s === "Wysłany do CU" ? "sent" : "open";
+  return '<span class="settle-badge ' + cls + '">' + escHtml(s) + '</span>';
+}
+function settleSetText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+function renderSettleView(a) {
+  const c = settleCalc(a);
+  const has = v => v != null && v !== "";
+  settleSetText("m-s-route",   a.SettleRoute || "—");
+  settleSetText("m-s-km",      has(a.SettleKm) ? String(a.SettleKm) : "—");
+  settleSetText("m-s-rate",    c.rate.toFixed(2));
+  settleSetText("m-s-kmcost",  c.km ? fmtPLN(c.kmCost) : "—");
+  settleSetText("m-s-hotel",   has(a.SettleHotel)   ? fmtPLN(a.SettleHotel)   : "—");
+  settleSetText("m-s-highway", has(a.SettleHighway) ? fmtPLN(a.SettleHighway) : "—");
+  settleSetText("m-s-other",   has(a.SettleOther)   ? fmtPLN(a.SettleOther)   : "—");
+  settleSetText("m-s-tickets", has(a.SettleTickets) ? fmtPLN(a.SettleTickets) : "—");
+  settleSetText("m-s-fee",     has(a.SettleFee)     ? fmtPLN(a.SettleFee)     : "—");
+  settleSetText("m-s-basis",   a.SettleFeeBasis || "—");
+  settleSetText("m-s-note",    a.SettleNote || "—");
+  settleSetText("m-s-costs",   fmtPLN(c.costs));
+  settleSetText("m-s-total",   fmtPLN(c.total));
+}
+// Przeliczenie na żywo w trybie edycji
+function updateSettleCalcFromInputs() {
+  const g = id => { const el = document.getElementById(id); return el ? el.value : ""; };
+  const tmp = { SettleKm: g("e-s-km"), SettleKmRate: g("e-s-rate"), SettleHotel: g("e-s-hotel"),
+    SettleHighway: g("e-s-highway"), SettleOther: g("e-s-other"), SettleTickets: g("e-s-tickets"), SettleFee: g("e-s-fee") };
+  const c = settleCalc(tmp);
+  settleSetText("m-s-kmcost", c.km ? fmtPLN(c.kmCost) : "—");
+  settleSetText("m-s-costs",  fmtPLN(c.costs));
+  settleSetText("m-s-total",  fmtPLN(c.total));
 }
 
 function getSelectedMulti(key) {
@@ -287,6 +339,7 @@ function getFilters() {
     statuses: getSelectedMulti("status"),
     certbodies: getSelectedMulti("certbody"),
     plans: getSelectedMulti("plan"),
+    settles: getSelectedMulti("settle"),
   };
 }
 
@@ -310,6 +363,7 @@ function applyFilters(audits) {
       const ok = (sent && f.plans.includes("Wysłany")) || (!sent && f.plans.includes("Niewysłany"));
       if (!ok) return false;
     }
+    if (f.settles.length > 0 && !f.settles.includes(settleStatusOf(a))) return false;
     if (calDayFilter && String(a.AuditDateStart || "").substring(0,10) !== calDayFilter) return false;
     return true;
   });
@@ -373,18 +427,18 @@ function renderTable() {
       if (ex.custody) items.push(`<span class="di-item di-custody">👨‍👦 Opieka: ${escHtml(ex.custody)}</span>`);
       (ex.outlook || []).forEach(o => items.push(`<span class="di-item di-ext">📆 ${o.time ? escHtml(o.time) + " " : ""}${escHtml(o.subject)}</span>`));
       const dLbl = new Date(calDayFilter + "T12:00:00").toLocaleDateString("pl-PL");
-      extrasRow = `<tr class="day-info-row"><td colspan="12"><div class="day-info"><span class="day-info-title">📅 ${dLbl} — poza audytami:</span>${items.join("")}</div></td></tr>`;
+      extrasRow = `<tr class="day-info-row"><td colspan="13"><div class="day-info"><span class="day-info-title">📅 ${dLbl} — poza audytami:</span>${items.join("")}</div></td></tr>`;
     }
   }
 
   if (!filtered.length) {
     tbody.innerHTML = extrasRow
-      ? '<tr><td colspan="12" class="loading" style="padding:10px 0 2px">Brak audytów tego dnia — ale masz zaplanowane:</td></tr>' + extrasRow
-      : '<tr><td colspan="12" class="loading">Brak wyników</td></tr>';
+      ? '<tr><td colspan="13" class="loading" style="padding:10px 0 2px">Brak audytów tego dnia — ale masz zaplanowane:</td></tr>' + extrasRow
+      : '<tr><td colspan="13" class="loading">Brak wyników</td></tr>';
     return;
   }
 
-  const NCOLS = 12; // liczba kolumn tabeli
+  const NCOLS = 13; // liczba kolumn tabeli
   tbody.innerHTML = filtered.map(a => {
     // Barwa wiersza = jednostka (CUC niebieski / SGS pomarańcz), jasność = status
     const bodyCls = certBodyOf(a) === "SGS" ? "row-body-sgs" : "row-body-cuc";
@@ -398,6 +452,30 @@ function renderTable() {
     const notesBlock = a.Notes
       ? '<div class="rp-notes"><span class="rp-label">Notatki</span><p class="rp-notes-text">' + escHtml(a.Notes).replace(/\n/g,'<br>') + '</p></div>'
       : '';
+    // Blok "Rozliczenie" — status + kwoty (podgląd pod audytem)
+    const sc = settleCalc(a);
+    const hasSettle = [a.SettleRoute, a.SettleKm, a.SettleHotel, a.SettleHighway, a.SettleOther, a.SettleTickets, a.SettleFee, a.SettleFeeBasis, a.SettleNote]
+      .some(v => v != null && v !== "");
+    const sv = (label, val) => '<span class="rp-sv"><b>' + label + ':</b> ' + val + '</span>';
+    const settleBlock =
+      '<div class="rp-settle"><span class="rp-label">Rozliczenie</span> ' + settleBadge(a) +
+      (a.SettleDate ? ' <span class="rp-settle-date">' + escHtml(formatDate(a.SettleDate)) + '</span>' : '') +
+      (hasSettle
+        ? '<div class="rp-settle-vals">' +
+            (a.SettleRoute ? sv('Trasa', escHtml(a.SettleRoute)) : '') +
+            (sc.km ? sv('Km', sc.km + ' → ' + fmtPLN(sc.kmCost)) : '') +
+            (settleNum(a.SettleHotel)   ? sv('Hotel', fmtPLN(a.SettleHotel)) : '') +
+            (settleNum(a.SettleHighway) ? sv('Autostrada', fmtPLN(a.SettleHighway)) : '') +
+            (settleNum(a.SettleOther)   ? sv('Inne', fmtPLN(a.SettleOther)) : '') +
+            (settleNum(a.SettleTickets) ? sv('Bilety', fmtPLN(a.SettleTickets)) : '') +
+            sv('Koszty', fmtPLN(sc.costs)) +
+            (sc.fee ? sv('Wynagr.', fmtPLN(sc.fee)) : '') +
+            '<span class="rp-sv rp-sv-total"><b>Razem:</b> ' + fmtPLN(sc.total) + '</span>' +
+            (a.SettleFeeBasis ? sv('Obrót/opłata', escHtml(a.SettleFeeBasis)) : '') +
+            (a.SettleNote ? '<span class="rp-sv rp-sv-note">' + escHtml(a.SettleNote) + '</span>' : '') +
+          '</div>'
+        : '') +
+      '</div>';
     return '' +
     '<tr class="audit-row ' + rowClass + '" data-id="' + aid + '" onclick="toggleRowPreview(' + aid + ', this)">' +
       '<td class="prj-col">' + escHtml(a.ProjectID || '—') + '</td>' +
@@ -411,6 +489,7 @@ function renderTable() {
       '<td>' + statusBadge(a.AuditStatus) + '</td>' +
       '<td>' + proformaBadge(a.Proforma) + '</td>' +
       '<td class="plan-col">' + (a.PlanSentDate ? '<span class="plan-sent" title="Zaproszenie wysłane ' + escHtml(formatDate(a.PlanSentDate)) + '">✅ ' + escHtml(formatDate(a.PlanSentDate)) + '</span>' : '') + '</td>' +
+      '<td class="settle-col">' + settleBadge(a) + '</td>' +
       '<td class="notes-col">' + notesSnippet + '</td>' +
     '</tr>' +
     '<tr class="row-preview-wrap" id="preview-' + aid + '" style="display:none">' +
@@ -442,6 +521,7 @@ function renderTable() {
             '<div class="rp-field"><span class="rp-label">Komórka</span><span class="rp-val">' + (a.Mobile ? '<a href="tel:' + escHtml(a.Mobile) + '">' + escHtml(a.Mobile) + '</a>' : '—') + '</span></div>' +
             '<div class="rp-field rp-field-wide"><span class="rp-label">Email</span><span class="rp-val">' + (a.ClientEmail ? '<a href="mailto:' + escHtml(a.ClientEmail) + '">' + escHtml(a.ClientEmail) + '</a>' : '—') + '</span></div>' +
           '</div>' +
+          settleBlock +
           notesBlock +
         '</div>' +
       '</td>' +
@@ -657,6 +737,28 @@ function setupModal() {
   document.getElementById("plan-sent-date").addEventListener("change", e => {
     currentPlanSentDate = e.target.value || null;
   });
+  // Rozliczenie — status (3 stany) + data przy "Rozliczony" + przeliczanie na żywo
+  document.querySelectorAll(".settle-btn").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(".settle-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentSettleStatus = btn.dataset.val;
+      const sd = document.getElementById("settle-date");
+      if (currentSettleStatus === "Rozliczony") {
+        const existing = currentAudit && currentAudit.SettleDate ? String(currentAudit.SettleDate).substring(0, 10) : "";
+        sd.value = sd.value || existing || new Date().toISOString().substring(0, 10);
+        currentSettleDate = sd.value;
+        sd.classList.remove("hidden");
+      } else {
+        currentSettleDate = null;
+        sd.classList.add("hidden");
+      }
+    };
+  });
+  document.getElementById("settle-date").addEventListener("change", e => { currentSettleDate = e.target.value || null; });
+  ["e-s-km", "e-s-rate", "e-s-hotel", "e-s-highway", "e-s-other", "e-s-tickets", "e-s-fee"].forEach(id => {
+    document.getElementById(id).addEventListener("input", updateSettleCalcFromInputs);
+  });
   document.getElementById("btn-save").onclick = saveChanges;
 
   // Zmiana daty w trybie edycji → aktualizuj kwartał i rok
@@ -748,6 +850,15 @@ function openModal(id) {
   document.getElementById("m-certvalid").textContent = formatDate(a.CertValidTo);
   document.getElementById("m-notes").textContent     = a.Notes || "—";
 
+  // Rozliczenie — widok + status
+  renderSettleView(a);
+  currentSettleStatus = settleStatusOf(a);
+  currentSettleDate = a.SettleDate ? String(a.SettleDate).substring(0, 10) : null;
+  document.querySelectorAll(".settle-btn").forEach(b => b.classList.toggle("active", b.dataset.val === currentSettleStatus));
+  const settleDateEl = document.getElementById("settle-date");
+  settleDateEl.value = currentSettleDate || "";
+  settleDateEl.classList.toggle("hidden", currentSettleStatus !== "Rozliczony");
+
   document.querySelectorAll(".status-btn").forEach(b => b.classList.toggle("active", b.dataset.val === a.AuditStatus));
   document.querySelectorAll(".proforma-btn").forEach(b => b.classList.toggle("active", b.dataset.val === a.Proforma));
   document.querySelectorAll(".plan-btn").forEach(b => b.classList.toggle("active", b.dataset.val === (a.PlanSentDate ? "yes" : "no")));
@@ -777,6 +888,19 @@ function enterEditMode() {
   document.getElementById("e-certbody").value = certBodyOf(a);
   document.getElementById("e-cu").value      = a.PlannedCUDate ? a.PlannedCUDate.substring(0, 10) : "";
   document.getElementById("e-notes").value   = a.Notes || "";
+  // Rozliczenie — pola edycji
+  const hv = v => (v != null && v !== "") ? v : "";
+  document.getElementById("e-s-route").value   = a.SettleRoute || "";
+  document.getElementById("e-s-km").value      = hv(a.SettleKm);
+  document.getElementById("e-s-rate").value    = (a.SettleKmRate != null && a.SettleKmRate !== "") ? a.SettleKmRate : "1.15";
+  document.getElementById("e-s-hotel").value   = hv(a.SettleHotel);
+  document.getElementById("e-s-highway").value = hv(a.SettleHighway);
+  document.getElementById("e-s-other").value   = hv(a.SettleOther);
+  document.getElementById("e-s-tickets").value = hv(a.SettleTickets);
+  document.getElementById("e-s-fee").value     = hv(a.SettleFee);
+  document.getElementById("e-s-basis").value   = a.SettleFeeBasis || "";
+  document.getElementById("e-s-note").value    = a.SettleNote || "";
+  updateSettleCalcFromInputs();
   document.getElementById("modal-overlay").classList.add("edit-mode");
   updatePlanAuditBtn(originalAuditDate);
   renderDayBusy("e-daybusy", originalAuditDate || "");
@@ -819,6 +943,13 @@ async function saveChanges() {
     fields.PlanSentDate = currentPlanSent
       ? safeDate(currentPlanSentDate || new Date().toISOString().substring(0,10))
       : null;
+    // Status rozliczenia + data (gdy Rozliczony) — tylko gdy kolumny istnieją
+    if (!window.settleFieldsMissing) {
+      fields.SettleStatus = currentSettleStatus || "Nierozliczony";
+      fields.SettleDate = currentSettleStatus === "Rozliczony"
+        ? safeDate(currentSettleDate || new Date().toISOString().substring(0,10))
+        : null;
+    }
 
     if (isEditMode) {
       const dateVal = document.getElementById("e-date").value;
@@ -836,6 +967,21 @@ async function saveChanges() {
       fields.CertBody      = document.getElementById("e-certbody").value || "CUC";
       fields.PlannedCUDate = cuVal ? safeDate(cuVal) : null;
       fields.Notes         = document.getElementById("e-notes").value.trim()   || null;
+      // Rozliczenie — tylko gdy kolumny istnieją (inaczej PATCH by się wysypał)
+      if (!window.settleFieldsMissing) {
+        const gs  = id => (document.getElementById(id).value || "");
+        const num = id => { const v = gs(id); if (v === "") return null; const n = parseFloat(v); return isNaN(n) ? null : n; };
+        fields.SettleRoute    = gs("e-s-route").trim() || null;
+        fields.SettleKm       = num("e-s-km");
+        fields.SettleKmRate   = num("e-s-rate");
+        fields.SettleHotel    = num("e-s-hotel");
+        fields.SettleHighway  = num("e-s-highway");
+        fields.SettleOther    = num("e-s-other");
+        fields.SettleTickets  = num("e-s-tickets");
+        fields.SettleFee      = num("e-s-fee");
+        fields.SettleFeeBasis = gs("e-s-basis").trim() || null;
+        fields.SettleNote     = gs("e-s-note").trim() || null;
+      }
       // Quarter i Year zawsze z daty CU (planowanie CUC), nie z daty audytu LF
       if (cuVal) {
         fields.Quarter = detectQuarter(cuVal);
@@ -3726,3 +3872,185 @@ const DevModule = (function () {
   return { setup, open };
 })();
 window.DevModule = DevModule;
+
+// ============================================================
+// ROZLICZENIE CU — eksport miesięczny .xlsx (układ 1:1 z pliku) + raporty
+// ============================================================
+const SettleModule = (function () {
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2, "0");
+  const r2 = x => Math.round((x || 0) * 100) / 100;
+
+  function myRows() {
+    return (Array.isArray(allAudits) ? allAudits : []).filter(a => a.AuditorName === MY_AUDITOR);
+  }
+  function bodyFilter() { return $("settle-body") ? $("settle-body").value : "CUC"; }
+  function rowsByBody() {
+    const b = bodyFilter();
+    return myRows().filter(a => b === "all" || certBodyOf(a) === b);
+  }
+  function monthKeyOf(a) { return a.AuditDateStart ? String(a.AuditDateStart).substring(0, 7) : null; }
+  function monthRows() {
+    const m = $("settle-month").value; if (!m) return [];
+    return rowsByBody().filter(a => monthKeyOf(a) === m).sort((x, y) => String(x.AuditDateStart).localeCompare(String(y.AuditDateStart)));
+  }
+  function openRows() {
+    return rowsByBody().filter(a => a.AuditDateStart && settleStatusOf(a) !== "Rozliczony")
+      .sort((x, y) => String(x.AuditDateStart).localeCompare(String(y.AuditDateStart)));
+  }
+
+  // ── Arkusz w układzie pliku "Rozliczenie audytów" (kolumny A–O jak w oryginale + P–R) ──
+  function buildWorkbook(rows, sheetName) {
+    const hdr1 = ["DATA AUDYTU", "Klient", "PRJ", "SYSTEM", "liczba dni audytowych", "Obrót AAF / inny rodzaj opłat",
+      "Typ audytu / uwagi", "KOSZTY AUDYTU", "", "", "", "", "", "", "", "Wynagrodzenie", "Razem", "Status rozliczenia"];
+    const hdr2 = ["", "", "", "", "", "", "", "Trasa", "Km", "KM calc (km*stawka)", "KM calc office", "Hotel", "Highway", "other costs", "Bilety PKP, LOT", "", "", ""];
+    const aoa = [hdr1, hdr2];
+    const sums = { I: 0, J: 0, L: 0, M: 0, N: 0, O: 0, P: 0, Q: 0 };
+    rows.forEach(a => {
+      const c = settleCalc(a);
+      const d = a.AuditDateStart ? new Date(String(a.AuditDateStart).substring(0, 10) + "T12:00:00") : null;
+      const typ = [a.AuditType || "", a.SettleNote || ""].filter(Boolean).join(" — ");
+      const km = a.SettleKm != null && a.SettleKm !== "" ? settleNum(a.SettleKm) : null;
+      const n = v => (v != null && v !== "") ? settleNum(v) : null;
+      aoa.push([d, a.Title || "", a.ProjectID || "", a.Program || "", a.AuditDays != null ? a.AuditDays : "",
+        a.SettleFeeBasis || "", typ, a.SettleRoute || "", km, km != null ? c.kmCost : null, "",
+        n(a.SettleHotel), n(a.SettleHighway), n(a.SettleOther), n(a.SettleTickets),
+        n(a.SettleFee), c.total, settleStatusOf(a)]);
+      sums.I += km || 0; sums.J += km != null ? c.kmCost : 0; sums.L += settleNum(a.SettleHotel); sums.M += settleNum(a.SettleHighway);
+      sums.N += settleNum(a.SettleOther); sums.O += settleNum(a.SettleTickets); sums.P += settleNum(a.SettleFee); sums.Q += c.total;
+    });
+    aoa.push(["SUMA", "", "", "", "", "", "", "", r2(sums.I), r2(sums.J), "", r2(sums.L), r2(sums.M), r2(sums.N), r2(sums.O), r2(sums.P), r2(sums.Q), ""]);
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true });
+    ws["!merges"] = [
+      { s: { r: 0, c: 7 }, e: { r: 0, c: 14 } }, // KOSZTY AUDYTU H1:O1
+      ...[0, 1, 2, 3, 4, 5, 6, 15, 16, 17].map(c => ({ s: { r: 0, c }, e: { r: 1, c } })),
+    ];
+    ws["!cols"] = [12, 34, 10, 10, 8, 16, 34, 34, 7, 12, 10, 9, 9, 10, 12, 13, 11, 16].map(w => ({ wch: w }));
+    // Formaty: daty i kwoty
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for (let R = 2; R <= range.e.r; R++) {
+      const dc = ws[XLSX.utils.encode_cell({ r: R, c: 0 })]; if (dc && dc.v instanceof Date) dc.z = "dd.mm.yyyy";
+      [9, 11, 12, 13, 14, 15, 16].forEach(C => { const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })]; if (cell && typeof cell.v === "number") cell.z = "#,##0.00"; });
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
+    return wb;
+  }
+
+  function exportMonth() {
+    const m = $("settle-month").value;
+    if (!m) { showToast("Wybierz miesiąc", "warn"); return; }
+    const rows = monthRows();
+    if (!rows.length) { showToast("Brak audytów w tym miesiącu dla wybranej jednostki", "warn"); return; }
+    const wb = buildWorkbook(rows, "Audyty " + m);
+    XLSX.writeFile(wb, `Rozliczenie_${bodyFilter()}_${m}.xlsx`);
+    showToast(`⬇ Wyeksportowano ${rows.length} audytów (${m})`, "success");
+  }
+  function exportOpen() {
+    const rows = openRows();
+    if (!rows.length) { showToast("Brak nierozliczonych audytów", "warn"); return; }
+    const today = new Date().toISOString().substring(0, 10);
+    const wb = buildWorkbook(rows, "Nierozliczone");
+    XLSX.writeFile(wb, `Rozliczenie_${bodyFilter()}_nierozliczone_${today}.xlsx`);
+    showToast(`⬇ Wyeksportowano ${rows.length} nierozliczonych`, "success");
+  }
+
+  // ── Podsumowanie wybranego miesiąca ──
+  function renderMonthSummary() {
+    const box = $("settle-month-summary"); if (!box) return;
+    const rows = monthRows();
+    if (!rows.length) { box.innerHTML = '<div class="settle-empty">Brak audytów w wybranym miesiącu.</div>'; return; }
+    let costs = 0, fee = 0, total = 0; const byStatus = {};
+    rows.forEach(a => { const c = settleCalc(a); costs += c.costs; fee += c.fee; total += c.total; const s = settleStatusOf(a); byStatus[s] = (byStatus[s] || 0) + 1; });
+    box.innerHTML =
+      '<div class="settle-kpis">' +
+        kpi("Audyty", rows.length) + kpi("Koszty", fmtPLN(costs)) + kpi("Wynagrodzenie", fmtPLN(fee)) + kpi("Razem", fmtPLN(total)) +
+      '</div>' +
+      '<div class="settle-statusline">' + ["Nierozliczony", "Wysłany do CU", "Rozliczony"].map(s =>
+        '<span class="settle-badge ' + (s === "Rozliczony" ? "done" : s === "Wysłany do CU" ? "sent" : "open") + '">' + s + ': ' + (byStatus[s] || 0) + '</span>').join(" ") + '</div>';
+  }
+  function kpi(label, val) { return '<div class="settle-kpi"><span class="settle-kpi-val">' + val + '</span><span class="settle-kpi-label">' + label + '</span></div>'; }
+
+  // ── Raporty: per klient / per miesiąc / per status (wybrany rok i jednostka) ──
+  function renderReports() {
+    const box = $("settle-reports"); if (!box) return;
+    const year = $("settle-year").value;
+    const rows = rowsByBody().filter(a => a.AuditDateStart && String(a.AuditDateStart).substring(0, 4) === year);
+    if (!rows.length) { box.innerHTML = '<div class="settle-empty">Brak audytów w ' + escHtml(year) + '.</div>'; return; }
+    const agg = (keyFn) => { const m = {}; rows.forEach(a => { const k = keyFn(a); const c = settleCalc(a);
+      const o = (m[k] = m[k] || { n: 0, costs: 0, fee: 0, total: 0, open: 0 }); o.n++; o.costs += c.costs; o.fee += c.fee; o.total += c.total; if (settleStatusOf(a) !== "Rozliczony") o.open++; }); return m; };
+    const table = (title, m, keyLabel, sortByKey) => {
+      const keys = Object.keys(m).sort(sortByKey ? undefined : (x, y) => m[y].total - m[x].total);
+      let tc = 0, tf = 0, tt = 0, tn = 0, to = 0;
+      const body = keys.map(k => { const o = m[k]; tc += o.costs; tf += o.fee; tt += o.total; tn += o.n; to += o.open;
+        return '<tr><td>' + escHtml(k) + '</td><td class="num">' + o.n + '</td><td class="num">' + fmtPLN(o.costs) + '</td><td class="num">' + fmtPLN(o.fee) + '</td><td class="num"><strong>' + fmtPLN(o.total) + '</strong></td><td class="num">' + (o.open ? '<span class="settle-badge open">' + o.open + '</span>' : '—') + '</td></tr>'; }).join("");
+      return '<h4 class="settle-h4">' + title + '</h4><div class="table-wrapper settle-table-wrap"><table class="settle-table"><thead><tr><th>' + keyLabel +
+        '</th><th class="num">Audyty</th><th class="num">Koszty</th><th class="num">Wynagr.</th><th class="num">Razem</th><th class="num">Nierozl.</th></tr></thead><tbody>' + body +
+        '<tr class="settle-sum"><td>SUMA</td><td class="num">' + tn + '</td><td class="num">' + fmtPLN(tc) + '</td><td class="num">' + fmtPLN(tf) + '</td><td class="num"><strong>' + fmtPLN(tt) + '</strong></td><td class="num">' + to + '</td></tr></tbody></table></div>';
+    };
+    const MIES = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
+    const byMonth = agg(a => { const mo = parseInt(String(a.AuditDateStart).substring(5, 7)) - 1; return pad(mo + 1) + " " + MIES[mo]; });
+    box.innerHTML =
+      table("Wg klienta", agg(a => a.Title || "—"), "Klient", false) +
+      table("Wg miesiąca", byMonth, "Miesiąc", true) +
+      table("Wg statusu rozliczenia", agg(a => settleStatusOf(a)), "Status", true);
+  }
+
+  function fillYears() {
+    const sel = $("settle-year"); if (!sel) return;
+    const years = new Set([new Date().getFullYear()]);
+    myRows().forEach(a => { if (a.AuditDateStart) years.add(parseInt(String(a.AuditDateStart).substring(0, 4))); });
+    const cur = sel.value;
+    sel.innerHTML = [...years].filter(y => !isNaN(y)).sort((a, b) => b - a).map(y => '<option value="' + y + '">' + y + '</option>').join("");
+    sel.value = cur && [...years].includes(parseInt(cur)) ? cur : String(new Date().getFullYear());
+  }
+
+  // ── Konfiguracja kolumn w SharePoint (jednym klikiem) ──
+  async function runSetup() {
+    const btn = $("settle-setup-btn"), out = $("settle-setup-result");
+    btn.disabled = true; btn.textContent = "Tworzę kolumny…"; out.textContent = "";
+    try {
+      const res = await ensureSettleFields();
+      const parts = [];
+      if (res.created.length)  parts.push("✅ Utworzono: " + res.created.join(", "));
+      if (res.existing.length) parts.push("ℹ️ Już były: " + res.existing.join(", "));
+      if (res.errors.length)   parts.push("⚠️ Błędy: " + res.errors.join(" | "));
+      out.innerHTML = parts.map(p => "<div>" + escHtml(p) + "</div>").join("");
+      if (!res.errors.length) {
+        showToast("Kolumny rozliczeń gotowe — przeładowuję dane", "success");
+        allAudits = await fetchAllAudits();
+        renderTable();
+        refreshSetupBox(); renderMonthSummary(); renderReports();
+      } else {
+        showToast("Część kolumn się nie utworzyła — szczegóły w panelu", "warn");
+      }
+    } catch (e) {
+      out.textContent = "Błąd: " + (e.message || e);
+      showToast("Nie udało się utworzyć kolumn: " + (e.message || "").substring(0, 80), "error");
+    } finally { btn.disabled = false; btn.textContent = "⚙️ Skonfiguruj kolumny rozliczeń"; }
+  }
+  function refreshSetupBox() { const b = $("settle-setup-box"); if (b) b.classList.toggle("hidden", !window.settleFieldsMissing); }
+
+  function open() {
+    show("settle-overlay");
+    const m = $("settle-month"); if (m && !m.value) { const d = new Date(); m.value = d.getFullYear() + "-" + pad(d.getMonth() + 1); }
+    fillYears(); refreshSetupBox(); renderMonthSummary(); renderReports();
+  }
+  function close() { hide("settle-overlay"); }
+
+  function setup() {
+    const b = $("btn-settle"); if (b) b.onclick = open;
+    const c = $("settle-close"); if (c) c.onclick = close;
+    const ov = $("settle-overlay"); if (ov) ov.onclick = e => { if (e.target === ov) close(); };
+    const sb = $("settle-setup-btn"); if (sb) sb.onclick = runSetup;
+    const ex = $("settle-export-btn"); if (ex) ex.onclick = exportMonth;
+    const eo = $("settle-export-open-btn"); if (eo) eo.onclick = exportOpen;
+    const mo = $("settle-month"); if (mo) mo.onchange = renderMonthSummary;
+    const bd = $("settle-body"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
+    const yr = $("settle-year"); if (yr) yr.onchange = renderReports;
+  }
+
+  return { setup, open };
+})();
+window.SettleModule = SettleModule;

@@ -47,27 +47,111 @@ async function getDigest(token) {
   return data.FormDigestValue;
 }
 
-// Pobierz wszystkie audyty (stronicowanie)
-async function fetchAllAudits() {
-  const select = [
-    "Id","Title","ProjectID","Program","AuditType","Standard",
-    "AuditDateStart","AuditDateEnd","AuditDays","AuditMode",
-    "AuditStatus","Proforma","PlannedCUDate","CertValidTo",
-    "City","PostalCode","Address","ClientEmail","Phone","Mobile",
-    "Notes","ProcessingUnits","Quarter","Year","AuditorName","ImportFile","CertBody","PlanSentDate"
-  ].join(",");
+// ── Pola ROZLICZENIA audytu (koszty + wynagrodzenie) — tworzone automatycznie z apki ──
+// Kolejność i nazwy wewnętrzne są źródłem prawdy dla $select, zapisu i eksportu.
+const SETTLE_FIELDS = [
+  { name: "SettleRoute",    label: "Trasa",               type: "Text" },
+  { name: "SettleKm",       label: "Km",                  type: "Number" },
+  { name: "SettleKmRate",   label: "Stawka km",           type: "Number" },
+  { name: "SettleHotel",    label: "Hotel",               type: "Number" },
+  { name: "SettleHighway",  label: "Autostrada",          type: "Number" },
+  { name: "SettleOther",    label: "Inne koszty",         type: "Number" },
+  { name: "SettleTickets",  label: "Bilety PKP/LOT",      type: "Number" },
+  { name: "SettleFee",      label: "Wynagrodzenie",       type: "Number" },
+  { name: "SettleFeeBasis", label: "Obrót AAF / opłata",  type: "Text" },
+  { name: "SettleNote",     label: "Uwagi rozliczenia",   type: "Note" },
+  { name: "SettleStatus",   label: "Status rozliczenia",  type: "Choice",
+    choices: ["Nierozliczony", "Wysłany do CU", "Rozliczony"], defaultValue: "Nierozliczony" },
+  { name: "SettleDate",     label: "Data rozliczenia",    type: "DateTime" },
+];
+const SETTLE_FIELD_NAMES = SETTLE_FIELDS.map(f => f.name);
+// true gdy lista nie ma jeszcze kolumn rozliczeń → UI pokaże przycisk konfiguracji, zapis pomija te pola
+window.settleFieldsMissing = false;
 
+const BASE_AUDIT_SELECT = [
+  "Id","Title","ProjectID","Program","AuditType","Standard",
+  "AuditDateStart","AuditDateEnd","AuditDays","AuditMode",
+  "AuditStatus","Proforma","PlannedCUDate","CertValidTo",
+  "City","PostalCode","Address","ClientEmail","Phone","Mobile",
+  "Notes","ProcessingUnits","Quarter","Year","AuditorName","ImportFile","CertBody","PlanSentDate"
+];
+
+async function fetchAuditsWithSelect(selectArr) {
+  const select = selectArr.join(",");
   let items = [];
   let url = `/_api/lists/getbytitle('Audits')/items?$select=${select}&$top=500&$orderby=AuditDateStart`;
-
   while (url) {
     const data = await spGet(url);
     items = items.concat(data.value || []);
-    url = data["odata.nextLink"]
-      ? data["odata.nextLink"].replace(SITE_URL, "")
-      : null;
+    url = data["odata.nextLink"] ? data["odata.nextLink"].replace(SITE_URL, "") : null;
   }
   return items;
+}
+
+// Pobierz wszystkie audyty (stronicowanie). Najpierw z polami rozliczeń;
+// gdy kolumn jeszcze nie ma (400), wraca do zestawu bazowego — apka działa dalej.
+async function fetchAllAudits() {
+  try {
+    const items = await fetchAuditsWithSelect(BASE_AUDIT_SELECT.concat(SETTLE_FIELD_NAMES));
+    window.settleFieldsMissing = false;
+    return items;
+  } catch (e) {
+    console.warn("[Settle] Kolumny rozliczeń niedostępne — odczyt bazowy.", e.message);
+    window.settleFieldsMissing = true;
+    return fetchAuditsWithSelect(BASE_AUDIT_SELECT);
+  }
+}
+
+// Nazwy wewnętrzne kolumn istniejących na liście Audits
+async function fetchAuditFieldNames() {
+  const data = await spGet("/_api/lists/getbytitle('Audits')/fields?$select=InternalName&$top=1000");
+  return new Set((data.value || []).map(f => f.InternalName));
+}
+
+function settleFieldSchemaXml(f) {
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  const common = `DisplayName="${esc(f.label)}" Name="${f.name}" StaticName="${f.name}"`;
+  switch (f.type) {
+    case "Number":   return `<Field Type="Number" ${common} Decimals="2" />`;
+    case "Note":     return `<Field Type="Note" ${common} NumLines="4" RichText="FALSE" />`;
+    case "DateTime": return `<Field Type="DateTime" ${common} Format="DateOnly" />`;
+    case "Choice":   return `<Field Type="Choice" ${common} Format="Dropdown"><Default>${esc(f.defaultValue)}</Default>` +
+                            `<CHOICES>${f.choices.map(c => `<CHOICE>${esc(c)}</CHOICE>`).join("")}</CHOICES></Field>`;
+    default:         return `<Field Type="Text" ${common} MaxLength="255" />`;
+  }
+}
+
+// Utwórz jedną kolumnę przez createfieldasxml (Options 12 = AddFieldInternalNameHint + AddToDefaultContentType)
+async function createAuditField(f) {
+  const token = await getToken();
+  const digest = await getDigest(token);
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('Audits')/fields/createfieldasxml`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json;odata=verbose",
+      "Content-Type": "application/json;odata=verbose",
+      "X-RequestDigest": digest,
+    },
+    body: JSON.stringify({ parameters: {
+      __metadata: { type: "SP.XmlSchemaFieldCreationInformation" },
+      SchemaXml: settleFieldSchemaXml(f),
+      Options: 12,
+    }}),
+  });
+  if (!r.ok) { const txt = await r.text().catch(() => ""); throw new Error(`${f.name}: ${r.status} ${txt.substring(0, 160)}`); }
+}
+
+// Dodaj brakujące kolumny rozliczeń. Zwraca {created, existing, errors}.
+async function ensureSettleFields() {
+  const existing = await fetchAuditFieldNames();
+  const created = [], skipped = [], errors = [];
+  for (const f of SETTLE_FIELDS) {
+    if (existing.has(f.name)) { skipped.push(f.name); continue; }
+    try { await createAuditField(f); created.push(f.name); }
+    catch (e) { errors.push(e.message); }
+  }
+  return { created, existing: skipped, errors };
 }
 
 // Pobierz audytorów

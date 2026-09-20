@@ -1534,3 +1534,66 @@ tr.change-row-rzeznik:hover { background: #e0f5e8; }
 .dev-status.done { background: #d4f0dc; color: #1a7a34; }
 .dev-item-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--text3); }
 .dev-status-sel { font-family: inherit; font-size: 12px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg3); color: var(--text); }
+
+/* ============================================================
+   ROZLICZENIE (koszty + wynagrodzenie) — modal, tabela, podgląd, panel
+   ============================================================ */
+/* badge statusu rozliczenia */
+.settle-badge { display: inline-block; font-size: 11px; font-weight: 800; border-radius: 20px; padding: 2px 9px; white-space: nowrap; }
+.settle-badge.open { background: #eceef2; color: #55606f; }
+.settle-badge.sent { background: #fdefd4; color: #a05c00; }
+.settle-badge.done { background: #d4f0dc; color: #1a7a34; }
+.settle-col { white-space: nowrap; }
+
+/* sekcja w modalu */
+.settle-section { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 8px; }
+.settle-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 14px; }
+.settle-grid .field-row { flex-direction: column; align-items: flex-start; gap: 3px; }
+.settle-grid .field-row label { min-width: 0; font-size: 11px; }
+.settle-grid .field-input-sm { width: 100%; max-width: 140px; }
+.settle-wide { grid-column: span 2; }
+.settle-wide .field-input, .settle-wide .field-textarea { width: 100%; }
+.settle-calc { font-weight: 800; color: var(--accent); }
+.settle-totals { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 10px 0 8px; padding: 8px 12px; background: var(--bg3); border-radius: 8px; font-size: 13px; color: var(--text2); }
+.settle-totals strong { color: var(--text); font-size: 14px; }
+.settle-status-group { margin-top: 4px; }
+.settle-btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; font-family: var(--font-data); }
+.settle-btn:hover { border-color: var(--accent-light); color: var(--text); }
+.settle-btn.active[data-val="Nierozliczony"] { background: #6b7280; border-color: #6b7280; color: #fff; }
+.settle-btn.active[data-val="Wysłany do CU"] { background: var(--orange); border-color: var(--orange); color: #fff; }
+.settle-btn.active[data-val="Rozliczony"]    { background: var(--green);  border-color: var(--green);  color: #fff; }
+@media (max-width: 900px) { .settle-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* podgląd wiersza */
+.rp-settle { border-top: 1px solid var(--border); padding: 8px 16px 10px; font-size: 12.5px; color: var(--text2); }
+.rp-settle .rp-label { margin-right: 6px; }
+.rp-settle-date { font-size: 11.5px; color: var(--text3); margin-left: 4px; }
+.rp-settle-vals { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; }
+.rp-sv b { color: var(--text3); font-weight: 700; }
+.rp-sv-total { color: var(--text); font-weight: 700; }
+.rp-sv-note { color: var(--text3); font-style: italic; flex-basis: 100%; }
+
+/* panel Rozliczenie CU */
+.settle-modal { max-width: 900px; }
+.settle-setup { background: #fff8ec; border: 1px solid #f0c27a; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; color: #7a4a00; }
+.settle-setup p { margin: 6px 0 10px; }
+.settle-setup-result { margin-top: 8px; font-size: 12.5px; line-height: 1.5; }
+.settle-toolbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; margin-bottom: 12px; }
+.settle-toolbar .form-row { margin: 0; min-width: 180px; }
+.settle-toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.settle-summary { margin-bottom: 8px; }
+.settle-kpis { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.settle-kpi { flex: 1 1 140px; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.settle-kpi-val { font-size: 18px; font-weight: 800; color: var(--text); }
+.settle-kpi-label { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; }
+.settle-statusline { display: flex; gap: 8px; flex-wrap: wrap; }
+.settle-h { font-size: 13px; font-weight: 800; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 8px; border-top: 1px solid var(--border); padding-top: 14px; }
+.settle-h4 { font-size: 13px; font-weight: 800; color: var(--text); margin: 14px 0 6px; }
+.settle-table-wrap { margin-bottom: 6px; }
+.settle-table { min-width: 0; }
+.settle-table td, .settle-table th { padding: 7px 10px; font-size: 12.5px; }
+.settle-table .num { text-align: right; white-space: nowrap; }
+.settle-table tbody tr { cursor: default; }
+.settle-table tbody tr:hover { background: var(--bg3); }
+.settle-sum td { font-weight: 800; background: var(--bg3); }
+.settle-empty { font-size: 13px; color: var(--text3); padding: 8px 0; }

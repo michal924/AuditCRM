@@ -77,6 +77,7 @@
     </div>
     <div class="nav-right">
       <button id="btn-import" class="btn-action" title="Importuj kwartalny plan z CUC">⬆ Import CUC</button>
+      <button id="btn-settle" class="btn-action" title="Rozliczenie audytów CU — eksport miesięczny i raporty">📊 Rozliczenie CU</button>
       <button id="btn-add-audit" class="btn-action btn-action-green" title="Dodaj nieplanowany audyt">＋ Dodaj audyt</button>
       <span id="nav-user"></span>
       <button id="btn-logout" class="btn-ghost">Wyloguj</button>
@@ -138,6 +139,14 @@
           <label class="filter-multi-opt"><input type="checkbox" value="Niewysłany"> Niewysłany</label>
         </div>
       </div>
+      <div class="filter-multi-wrap" id="filter-settle-wrap">
+        <button class="filter-select filter-multi-btn" id="filter-settle-btn">Rozliczenie</button>
+        <div class="filter-multi-panel hidden" id="filter-settle-panel">
+          <label class="filter-multi-opt"><input type="checkbox" value="Nierozliczony"> Nierozliczony</label>
+          <label class="filter-multi-opt"><input type="checkbox" value="Wysłany do CU"> Wysłany do CU</label>
+          <label class="filter-multi-opt"><input type="checkbox" value="Rozliczony"> Rozliczony</label>
+        </div>
+      </div>
       <button id="btn-clear-filters" class="btn-ghost">✕ Wyczyść</button>
     </div>
 
@@ -178,6 +187,7 @@
             <th data-sort="AuditStatus"    data-label="Status"        onclick="setSort('AuditStatus')"     style="cursor:pointer">Status</th>
             <th data-sort="Proforma"       data-label="Proforma"      onclick="setSort('Proforma')"        style="cursor:pointer">Proforma</th>
             <th data-sort="PlanSentDate"   data-label="Plan audytu"   onclick="setSort('PlanSentDate')"    style="cursor:pointer">Plan audytu</th>
+            <th data-sort="SettleStatus"   data-label="Rozliczenie"   onclick="setSort('SettleStatus')"    style="cursor:pointer">Rozliczenie</th>
             <th data-sort="Notes"          data-label="Notatki"       onclick="setSort('Notes')"           style="cursor:pointer">Notatki</th>
           </tr>
         </thead>
@@ -578,6 +588,55 @@
         <p id="m-notes" class="notes-text view-val">—</p>
         <textarea id="e-notes" class="edit-val field-textarea" rows="3" placeholder="Notatki..."></textarea>
       </div>
+
+      <!-- ROZLICZENIE (koszty + wynagrodzenie) -->
+      <div class="modal-section full settle-section">
+        <h3>Rozliczenie</h3>
+        <div class="settle-grid">
+          <div class="field-row settle-wide">
+            <label>Trasa</label>
+            <span id="m-s-route" class="view-val">—</span>
+            <input id="e-s-route" type="text" class="edit-val field-input" placeholder="np. Warszawa - Brzozów - Warszawa">
+          </div>
+          <div class="field-row">
+            <label>Km</label>
+            <span id="m-s-km" class="view-val">—</span>
+            <input id="e-s-km" type="number" step="1" min="0" class="edit-val field-input field-input-sm" placeholder="0">
+          </div>
+          <div class="field-row">
+            <label>Stawka km</label>
+            <span id="m-s-rate" class="view-val">—</span>
+            <input id="e-s-rate" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="1.15">
+          </div>
+          <div class="field-row">
+            <label>Koszt km</label>
+            <span id="m-s-kmcost" class="settle-calc">—</span>
+          </div>
+          <div class="field-row"><label>Hotel</label><span id="m-s-hotel" class="view-val">—</span><input id="e-s-hotel" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="0"></div>
+          <div class="field-row"><label>Autostrada</label><span id="m-s-highway" class="view-val">—</span><input id="e-s-highway" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="0"></div>
+          <div class="field-row"><label>Inne koszty</label><span id="m-s-other" class="view-val">—</span><input id="e-s-other" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="0"></div>
+          <div class="field-row"><label>Bilety PKP/LOT</label><span id="m-s-tickets" class="view-val">—</span><input id="e-s-tickets" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="0"></div>
+          <div class="field-row"><label>Wynagrodzenie</label><span id="m-s-fee" class="view-val">—</span><input id="e-s-fee" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="0"></div>
+          <div class="field-row"><label>Obrót AAF / opłata</label><span id="m-s-basis" class="view-val">—</span><input id="e-s-basis" type="text" class="edit-val field-input" placeholder="np. AAF, 2168888.16"></div>
+          <div class="field-row settle-wide"><label>Uwagi</label><span id="m-s-note" class="view-val">—</span><textarea id="e-s-note" class="edit-val field-textarea" rows="2" placeholder="np. 1/2 kosztów dojazdu, koszty odniesione do PRJ…"></textarea></div>
+        </div>
+        <div class="settle-totals">
+          <span>Suma kosztów: <strong id="m-s-costs">—</strong></span>
+          <span>Razem (koszty + wynagrodzenie): <strong id="m-s-total">—</strong></span>
+        </div>
+        <div class="action-group settle-status-group">
+          <label>Status rozliczenia</label>
+          <div class="plan-row">
+            <div class="btn-group" id="settle-buttons">
+              <button class="settle-btn" data-val="Nierozliczony">Nierozliczony</button>
+              <button class="settle-btn" data-val="Wysłany do CU">📤 Wysłany do CU</button>
+              <button class="settle-btn" data-val="Rozliczony">✅ Rozliczony</button>
+            </div>
+            <input type="date" id="settle-date" class="field-input field-input-sm plan-date hidden" title="Data rozliczenia">
+          </div>
+        </div>
+      </div>
+
       <div class="modal-actions">
         <div class="action-group">
           <label>Status</label>
@@ -832,6 +891,55 @@
 
       <h3 class="dev-list-title">Twoje zgłoszenia</h3>
       <ul id="dev-list" class="dev-list"><li class="dev-empty">Ładowanie…</li></ul>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ROZLICZENIE CU — eksport miesięczny + raporty -->
+<div id="settle-overlay" class="modal-overlay hidden">
+  <div class="modal settle-modal">
+    <div class="modal-header">
+      <h2>📊 Rozliczenie audytów — CU</h2>
+      <button id="settle-close" class="btn-ghost">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div id="settle-setup-box" class="settle-setup hidden">
+        <strong>Kolumny rozliczeń nie są jeszcze utworzone w SharePoint.</strong>
+        <p>Kliknij, aby dodać je automatycznie na liście „Audits" (12 kolumn: trasa, km, stawka, hotel, autostrada, inne, bilety, wynagrodzenie, obrót/opłata, uwagi, status, data).</p>
+        <button id="settle-setup-btn" class="btn-primary" style="width:auto">⚙️ Skonfiguruj kolumny rozliczeń</button>
+        <div id="settle-setup-result" class="settle-setup-result"></div>
+      </div>
+
+      <div class="settle-toolbar">
+        <div class="form-row">
+          <label>Miesiąc (data audytu LF)</label>
+          <input type="month" id="settle-month" class="form-input">
+        </div>
+        <div class="form-row">
+          <label>Jednostka</label>
+          <select id="settle-body" class="form-input">
+            <option value="CUC">CUC (Control Union)</option>
+            <option value="SGS">SGS</option>
+            <option value="all">Wszystkie</option>
+          </select>
+        </div>
+        <div class="settle-toolbar-actions">
+          <button id="settle-export-btn" class="btn-primary" style="width:auto">⬇ Eksport .xlsx (miesiąc)</button>
+          <button id="settle-export-open-btn" class="btn-action" title="Wszystkie audyty wybranej jednostki ze statusem innym niż Rozliczony">⬇ Eksport nierozliczonych</button>
+        </div>
+      </div>
+
+      <div id="settle-month-summary" class="settle-summary"></div>
+
+      <h3 class="settle-h">Raporty</h3>
+      <div class="settle-toolbar">
+        <div class="form-row">
+          <label>Rok</label>
+          <select id="settle-year" class="form-input"></select>
+        </div>
+      </div>
+      <div id="settle-reports"></div>
     </div>
   </div>
 </div>
