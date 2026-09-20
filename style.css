@@ -1597,3 +1597,11 @@ tr.change-row-rzeznik:hover { background: #e0f5e8; }
 .settle-table tbody tr:hover { background: var(--bg3); }
 .settle-sum td { font-weight: 800; background: var(--bg3); }
 .settle-empty { font-size: 13px; color: var(--text3); padding: 8px 0; }
+
+/* Rozliczenie — kompaktowy nagłówek sekcji + przycisk "Rozlicz audyt" */
+.settle-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 8px; }
+.settle-head-total { font-size: 13px; color: var(--text2); }
+.settle-head-total strong { color: var(--text); font-size: 14px; }
+.btn-settle-audit { margin-left: auto; background: var(--green); color: #fff; border: none; border-radius: 8px; padding: 7px 14px;
+  font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; box-shadow: 0 1px 4px rgba(35,157,70,.3); transition: filter .12s, transform .12s; }
+.btn-settle-audit:hover { filter: brightness(1.06); transform: translateY(-1px); }

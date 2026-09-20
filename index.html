@@ -592,6 +592,12 @@
       <!-- ROZLICZENIE (koszty + wynagrodzenie) -->
       <div class="modal-section full settle-section">
         <h3>Rozliczenie</h3>
+        <div class="settle-head">
+          <span id="settle-head-status" class="settle-badge open">Nierozliczony</span>
+          <span class="settle-head-total">Razem: <strong id="settle-head-total">—</strong></span>
+          <button id="btn-settle-audit" type="button" class="btn-settle-audit">💰 Rozlicz audyt</button>
+        </div>
+        <div id="settle-body" class="hidden">
         <div class="settle-grid">
           <div class="field-row settle-wide">
             <label>Trasa</label>
@@ -635,6 +641,7 @@
             <input type="date" id="settle-date" class="field-input field-input-sm plan-date hidden" title="Data rozliczenia">
           </div>
         </div>
+        </div><!-- /settle-body -->
       </div>
 
       <div class="modal-actions">

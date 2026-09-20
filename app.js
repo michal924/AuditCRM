@@ -240,6 +240,13 @@ function renderSettleView(a) {
   settleSetText("m-s-costs",   fmtPLN(c.costs));
   settleSetText("m-s-total",   fmtPLN(c.total));
 }
+// Kompaktowy nagłówek sekcji Rozliczenie (status + Razem) — widoczny gdy sekcja zwinięta
+function updateSettleHead(a) {
+  const s = settleStatusOf(a), c = settleCalc(a);
+  const st = document.getElementById("settle-head-status");
+  if (st) { st.textContent = s; st.className = "settle-badge " + (s === "Rozliczony" ? "done" : s === "Wysłany do CU" ? "sent" : "open"); }
+  settleSetText("settle-head-total", (c.total || c.costs) ? fmtPLN(c.total) : "—");
+}
 // Przeliczenie na żywo w trybie edycji
 function updateSettleCalcFromInputs() {
   const g = id => { const el = document.getElementById(id); return el ? el.value : ""; };
@@ -249,6 +256,7 @@ function updateSettleCalcFromInputs() {
   settleSetText("m-s-kmcost", c.km ? fmtPLN(c.kmCost) : "—");
   settleSetText("m-s-costs",  fmtPLN(c.costs));
   settleSetText("m-s-total",  fmtPLN(c.total));
+  settleSetText("settle-head-total", (c.total || c.costs) ? fmtPLN(c.total) : "—");
 }
 
 function getSelectedMulti(key) {
@@ -477,7 +485,7 @@ function renderTable() {
         : '') +
       '</div>';
     return '' +
-    '<tr class="audit-row ' + rowClass + '" data-id="' + aid + '" onclick="toggleRowPreview(' + aid + ', this)">' +
+    '<tr class="audit-row ' + rowClass + '" data-id="' + aid + '" onclick="openModal(' + aid + ')">' +
       '<td class="prj-col">' + escHtml(a.ProjectID || '—') + '</td>' +
       '<td class="firma-col">' + escHtml(a.Title || '—') + '</td>' +
       '<td class="program-col">' + certBodyBadge(a) + ' ' + programBadge(a.Program) + '</td>' +
@@ -759,6 +767,19 @@ function setupModal() {
   ["e-s-km", "e-s-rate", "e-s-hotel", "e-s-highway", "e-s-other", "e-s-tickets", "e-s-fee"].forEach(id => {
     document.getElementById(id).addEventListener("input", updateSettleCalcFromInputs);
   });
+  // "Rozlicz audyt" — rozwija sekcję rozliczenia, włącza edycję i ustawia kursor w pierwszym polu
+  document.getElementById("btn-settle-audit").addEventListener("click", () => {
+    if (!currentAudit) return;
+    if (window.settleFieldsMissing) {
+      showToast("Najpierw skonfiguruj kolumny rozliczeń (📊 Rozliczenie CU → ⚙️)", "warn");
+      return;
+    }
+    const body = document.getElementById("settle-body");
+    body.classList.remove("hidden");
+    if (!isEditMode) enterEditMode();
+    body.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => { const f = document.getElementById("e-s-route"); if (f) f.focus(); }, 250);
+  });
   document.getElementById("btn-save").onclick = saveChanges;
 
   // Zmiana daty w trybie edycji → aktualizuj kwartał i rok
@@ -858,6 +879,9 @@ function openModal(id) {
   const settleDateEl = document.getElementById("settle-date");
   settleDateEl.value = currentSettleDate || "";
   settleDateEl.classList.toggle("hidden", currentSettleStatus !== "Rozliczony");
+  // Kompaktowy nagłówek rozliczenia (sekcja domyślnie zwinięta — rozwija ją "Rozlicz audyt")
+  updateSettleHead(a);
+  document.getElementById("settle-body").classList.add("hidden");
 
   document.querySelectorAll(".status-btn").forEach(b => b.classList.toggle("active", b.dataset.val === a.AuditStatus));
   document.querySelectorAll(".proforma-btn").forEach(b => b.classList.toggle("active", b.dataset.val === a.Proforma));
@@ -918,6 +942,8 @@ function cancelEditMode() {
   const btn = document.getElementById("btn-plan-audit");
   if (btn) btn.classList.remove("scheduled");
   renderDayBusy("e-daybusy", "");
+  const sb = document.getElementById("settle-body"); if (sb) sb.classList.add("hidden");
+  if (currentAudit) updateSettleHead(currentAudit);
 }
 
 function closeModal() {
