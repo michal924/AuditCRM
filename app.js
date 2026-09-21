@@ -1160,7 +1160,7 @@ async function createAuditCalendarEvents(audit) {
     `Termin: ${rangeLabel}${days > 1 ? ` (${days} dni)` : ""}`,
     `Adres: ${loc || "—"}`,
     ``,
-    `Zaplanowano przez AuditCRM — LF Assurance`,
+    `Zaplanowano przez LF Assurance Audit System`,
   ].join("\n");
 
   const event = {
@@ -2517,7 +2517,7 @@ async function generatePdfRzeznik() {
       doc.line(14, 283, 196, 283);
       doc.setFontSize(6.5); doc.setFont(F, "normal");
       doc.setTextColor(...S500);
-      doc.text("LF Assurance  ·  AuditCRM  ·  Dokument poufny  ·  " + dateStr, 14, 288.5);
+      doc.text("LF Assurance Audit System  ·  Dokument poufny  ·  " + dateStr, 14, 288.5);
       doc.text(pageNum + " / " + totalPages, 196, 288.5, { align: "right" });
     }
 
@@ -2839,7 +2839,7 @@ const MapModule = (function () {
       const city = geocodeQueue.shift();
       if (status) status.textContent = `Geokodowanie: ${city} (${++done}/${total})…`;
       fetch(`https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(city)}&country=Poland&format=json&limit=1`, {
-        headers: { "Accept-Language": "pl", "User-Agent": "LogisticFit-AuditCRM/1.0" }
+        headers: { "Accept-Language": "pl", "User-Agent": "LFAssurance-AuditSystem/1.0" }
       })
       .then(r => r.json())
       .then(data => {
