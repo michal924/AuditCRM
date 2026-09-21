@@ -1,6 +1,6 @@
 # Komponenty AuditCRM (LF Assurance)
 
-AuditCRM to vanilla JS, więc „komponent" = **klasa CSS `.lfa-*` w `style.css` + wzór HTML opisany tutaj**. Ekrany składają te klasy; nie tworzą własnych przycisków, kart ani pól. Brakuje wariantu → najpierw dopisz go tu i w `style.css`, dopiero potem użyj.
+AuditCRM to vanilla JS, więc „komponent" = **klasa CSS `.lfa-*` w `design/components.css` + wzór HTML opisany tutaj**. `style.css` zostaje tylko na układ ekranów (siatki, pozycje) i też używa wyłącznie tokenów. Ekrany składają te klasy; nie tworzą własnych przycisków, kart ani pól. Brakuje wariantu → najpierw dopisz go tu i w `style.css`, dopiero potem użyj.
 
 Wszystkie kolory, fonty, odstępy, promienie: tylko tokeny `--lfa-*`. Każdy komponent działa w trybie jasnym i ciemnym oraz od 360 px.
 
