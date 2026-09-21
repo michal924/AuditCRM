@@ -4131,6 +4131,110 @@ const SettleModule = (function () {
       showToast("Nie udało się utworzyć kolumn: " + (e.message || "").substring(0, 80), "error");
     } finally { btn.disabled = false; btn.textContent = "⚙️ Skonfiguruj kolumny rozliczeń"; }
   }
+  // ── Import historycznych rozliczeń z pliku Excel „Rozliczenie audytów" (arkusz „Audyty", kolumny A–P) ──
+  let importRows = null, importPlan = null;
+  // Daty w pliku bywają tekstem: "22-23.10.2024", "7/14.04.2025", "16.02/05.03.2026", "22.05.2025; 29.05.2025" → bierzemy pierwszy dzień
+  function parseExcelDate(v) {
+    if (v instanceof Date) return isNaN(v) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());
+    if (typeof v === "number") { const d = XLSX.SSF.parse_date_code(v); return d ? new Date(d.y, d.m - 1, d.d) : null; }
+    const s = String(v || ""); const y = s.match(/20\d{2}/); if (!y) return null;
+    const nums = s.substring(0, y.index).match(/\d{1,2}/g); if (!nums || nums.length < 2) return null;
+    const day = parseInt(nums[0]), month = parseInt(nums.length % 2 === 0 ? nums[1] : nums[nums.length - 1]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    return new Date(parseInt(y[0]), month - 1, day);
+  }
+  function parseSettleSheet(wb) {
+    const ws = wb.Sheets["Audyty"] || wb.Sheets[wb.SheetNames[0]];
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, cellDates: true, defval: null });
+    const num = v => typeof v === "number" ? r2(v) : (typeof v === "string" && /^\s*[\d.,]+\s*$/.test(v)) ? r2(parseFloat(v.replace(",", "."))) : null;
+    const txt = v => v == null ? "" : String(v).trim();
+    const out = [];
+    for (let i = 2; i < aoa.length; i++) {
+      const r = aoa[i]; if (!r || !txt(r[1])) continue;
+      const notes = [];
+      const km = num(r[8]); if (km == null && txt(r[8])) notes.push(txt(r[8]));     // np. "koszty odniesione do PRJ 902516"
+      if (txt(r[6])) notes.push(txt(r[6]));                                          // typ audytu / uwagi
+      if (txt(r[15])) notes.push(txt(r[15]));                                        // kolumna P (np. "Rozliczone w miesiącu…")
+      const other = r2((num(r[13]) || 0) + (num(r[10]) || 0));                      // other costs + KM calc office
+      out.push({ line: i + 1, date: parseExcelDate(r[0]), client: txt(r[1]), prj: txt(r[2]).replace(/\.0$/, ""), program: txt(r[3]),
+        basis: txt(r[5]), route: txt(r[7]), km, hotel: num(r[11]), highway: num(r[12]), other: other || null, tickets: num(r[14]), note: notes.join(" — ") });
+    }
+    return out;
+  }
+  const normName = s => String(s || "").toLowerCase().replace(/sp\.? ?z ?o\.? ?o\.?|s\.a\.|sp\. ?k\.|sp\. ?j\./g, "").replace(/[^a-z0-9ąćęłńóśźż]/g, "");
+  function auditDate(a) { return a.AuditDateStart ? new Date(String(a.AuditDateStart).substring(0, 10) + "T12:00:00") : null; }
+  function hasSettleData(a) {
+    return ["SettleKm", "SettleHotel", "SettleHighway", "SettleOther", "SettleTickets", "SettleRoute", "SettleFee"].some(k => a[k] != null && a[k] !== "") || settleStatusOf(a) === "Rozliczony";
+  }
+  // Dopasowanie: PRJ + data (±60 dni, najbliższy termin) → nazwa klienta + data (±14 dni). Każdy audyt użyty raz.
+  function findAudit(row, pool, used) {
+    const cands = pool.filter(a => !used.has(a.Id) && auditDate(a));
+    const pick = (list, maxDays) => { let best = null, bd = Infinity; list.forEach(a => { const d = row.date ? Math.abs((auditDate(a) - row.date) / 86400000) : 0; if (d <= maxDays && d < bd) { best = a; bd = d; } }); return best; };
+    let hit = row.prj ? pick(cands.filter(a => String(a.ProjectID || "").trim() === row.prj), 60) : null;
+    if (!hit && row.date) { const n = normName(row.client); if (n.length >= 3) hit = pick(cands.filter(a => { const t = normName(a.Title); return t && (t.includes(n) || n.includes(t)); }), 14); }
+    return hit;
+  }
+  function buildImportPlan(rows) {
+    const pool = myRows().filter(a => certBodyOf(a) === "CUC");                     // plik dotyczy tylko CU
+    const used = new Set(), curYear = new Date().getFullYear(), mark = $("settle-import-mark").checked;
+    return rows.map(row => {
+      const a = findAudit(row, pool, used);
+      if (!a) return { row, kind: "missing" };
+      used.add(a.Id);
+      if (hasSettleData(a)) return { row, audit: a, kind: "skip" };
+      const y = row.date ? row.date.getFullYear() : curYear;
+      const settled = (mark && y < curYear) || /rozliczon/i.test(row.note);
+      const fields = { SettleRoute: row.route || null, SettleKm: row.km, SettleKmRate: row.km != null ? 1.15 : null, SettleHotel: row.hotel, SettleHighway: row.highway,
+        SettleOther: row.other, SettleTickets: row.tickets, SettleFeeBasis: row.basis || null, SettleNote: row.note || null };
+      if (settled) fields.SettleStatus = "Rozliczony";
+      return { row, audit: a, kind: "write", fields, settled };
+    });
+  }
+  function renderImportPlan(plan) {
+    const box = $("settle-import-result"), save = $("settle-import-save");
+    const cnt = k => plan.filter(p => p.kind === k).length;
+    const fmtD = d => d ? pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "." + d.getFullYear() : "?";
+    const badge = p => p.kind === "write" ? '<span class="settle-badge ' + (p.settled ? "done" : "open") + '">' + (p.settled ? "zapis → Rozliczony" : "zapis (koszty)") + '</span>'
+      : p.kind === "skip" ? '<span class="settle-badge sent">pominięty — ma już dane</span>' : '<span class="settle-badge open">brak audytu w CRM</span>';
+    const rowsHtml = plan.map(p => { const c = p.kind === "write" ? settleCalc(p.fields) : null;
+      return '<tr class="imp-' + p.kind + '"><td class="num">' + p.row.line + '</td><td>' + fmtD(p.row.date) + '</td><td>' + escHtml(p.row.client) + '</td><td>' + escHtml(p.row.prj) + '</td><td>' +
+        (p.audit ? escHtml(p.audit.Title || "") + ' <span class="settle-import-meta">' + String(p.audit.AuditDateStart || "").substring(0, 10) + '</span>' : "—") +
+        '</td><td class="num">' + (c ? fmtPLN(c.costs) : "—") + '</td><td>' + badge(p) + '</td></tr>'; }).join("");
+    box.innerHTML = '<div class="settle-statusline"><span class="settle-badge done">do zapisu: ' + cnt("write") + '</span> <span class="settle-badge sent">pominięte (mają dane): ' + cnt("skip") +
+      '</span> <span class="settle-badge open">bez dopasowania: ' + cnt("missing") + '</span></div>' +
+      '<div class="table-wrapper settle-table-wrap settle-import-wrap"><table class="settle-table"><thead><tr><th>Wiersz</th><th>Data</th><th>Klient (Excel)</th><th>PRJ</th><th>Audyt w CRM</th><th class="num">Koszty</th><th>Wynik</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
+    save.classList.toggle("hidden", !cnt("write")); save.disabled = false; save.textContent = "💾 Zapisz " + cnt("write") + " rozliczeń";
+  }
+  function onImportFile(e) {
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    if (window.settleFieldsMissing) { showToast("Najpierw skonfiguruj kolumny rozliczeń", "warn"); e.target.value = ""; return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: "array", cellDates: true });
+        importRows = parseSettleSheet(wb);
+        if (!importRows.length) { showToast("Nie znalazłem wierszy w arkuszu „Audyty”", "warn"); return; }
+        importPlan = buildImportPlan(importRows); renderImportPlan(importPlan);
+      } catch (err) { showToast("Nie udało się odczytać pliku: " + (err.message || err), "error"); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  async function saveImport() {
+    const todo = (importPlan || []).filter(p => p.kind === "write"); if (!todo.length) return;
+    const btn = $("settle-import-save"); btn.disabled = true;
+    let ok = 0; const fail = [];
+    for (let i = 0; i < todo.length; i++) {
+      btn.textContent = "Zapisuję " + (i + 1) + "/" + todo.length + "…";
+      try { await updateAudit(todo[i].audit.Id, todo[i].fields); ok++; }
+      catch (err) { fail.push(todo[i].row.client + ": " + String(err.message || err).substring(0, 80)); }
+    }
+    btn.classList.add("hidden");
+    showToast("✅ Zapisano " + ok + " rozliczeń" + (fail.length ? ", błędy: " + fail.length : ""), fail.length ? "warn" : "success");
+    if (fail.length) $("settle-import-result").insertAdjacentHTML("afterbegin", '<div class="settle-setup">Błędy zapisu:<br>' + fail.map(escHtml).join("<br>") + '</div>');
+    importPlan = null; importRows = null; $("settle-import-file").value = "";
+    allAudits = await fetchAllAudits(); renderTable(); renderMonthSummary(); renderReports();
+  }
+
   function refreshSetupBox() { const b = $("settle-setup-box"); if (b) b.classList.toggle("hidden", !window.settleFieldsMissing); }
 
   function open() {
@@ -4150,6 +4254,10 @@ const SettleModule = (function () {
     const mo = $("settle-month"); if (mo) mo.onchange = renderMonthSummary;
     const bd = $("settle-body"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
     const yr = $("settle-year"); if (yr) yr.onchange = renderReports;
+    const imf = $("settle-import-file"); if (imf) imf.onchange = onImportFile;
+    const ims = $("settle-import-save"); if (ims) ims.onclick = saveImport;
+    const imm = $("settle-import-mark"); if (imm) imm.onchange = () => { if (importRows) { importPlan = buildImportPlan(importRows); renderImportPlan(importPlan); } };
+    const imy = $("settle-import-year"); if (imy) imy.textContent = String(new Date().getFullYear());
   }
 
   return { setup, open };

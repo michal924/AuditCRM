@@ -1592,3 +1592,11 @@ tr.change-row-rzeznik:hover { background: var(--lfa-info-bg); }
 .lfa-map-muted { color: var(--lfa-text-muted); }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--lfa-surface); color: var(--lfa-text); }
 #btn-theme { font-size: 16px; padding: 4px 8px; }
+
+/* Import historycznych rozliczeń */
+.settle-import-hint { font-size: 12.5px; color: var(--lfa-text-muted); margin: 0 0 10px; line-height: 1.5; }
+.settle-import-opt { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--lfa-text); align-self: flex-end; padding-bottom: 6px; }
+.settle-import-wrap { max-height: 420px; overflow: auto; margin-top: 10px; }
+.settle-import-meta { font-family: var(--lfa-font-data); font-size: 11px; color: var(--lfa-text-muted); margin-left: 4px; }
+tr.imp-missing td { color: var(--lfa-text-muted); }
+tr.imp-write td { background: var(--lfa-success-bg); }

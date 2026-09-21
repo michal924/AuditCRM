@@ -938,6 +938,22 @@
 
       <div id="settle-month-summary" class="settle-summary"></div>
 
+      <h3 class="settle-h">Import historycznych rozliczeń (Excel)</h3>
+      <div class="settle-import">
+        <p class="settle-import-hint">Plik „Rozliczenie audytów" (arkusz „Audyty", kolumny A–P, tylko CU). Wiersze dopasowuję do audytów po PRJ i dacie, a bez PRJ — po nazwie klienta i dacie. Audyty, które już mają wpisane koszty lub status „Rozliczony", pomijam. Najpierw pokazuję podgląd, zapis dopiero po kliknięciu.</p>
+        <div class="settle-toolbar">
+          <div class="form-row">
+            <label>Plik .xlsx</label>
+            <input type="file" id="settle-import-file" accept=".xlsx,.xls" class="form-input">
+          </div>
+          <label class="settle-import-opt"><input type="checkbox" id="settle-import-mark" checked> Audyty sprzed roku <span id="settle-import-year"></span> oznacz jako „Rozliczony"</label>
+          <div class="settle-toolbar-actions">
+            <button id="settle-import-save" class="btn-primary hidden" style="width:auto">💾 Zapisz rozliczenia</button>
+          </div>
+        </div>
+        <div id="settle-import-result"></div>
+      </div>
+
       <h3 class="settle-h">Raporty</h3>
       <div class="settle-toolbar">
         <div class="form-row">
