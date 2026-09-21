@@ -247,11 +247,31 @@ function renderSettleView(a) {
   settleSetText("m-s-total",   fmtPLN(c.total));
 }
 // Kompaktowy nagłówek sekcji Rozliczenie (status + Razem) — widoczny gdy sekcja zwinięta
+// Rozbicie kosztów (chipy) — widoczne w zwiniętej sekcji bez klikania "Rozlicz audyt"
+function settleBreakHtml(obj) {
+  const c = settleCalc(obj);
+  const item = (label, val, cls) => '<span class="sb-item' + (cls ? " " + cls : "") + '"><span class="sb-l">' + label + '</span><span class="sb-v">' + val + '</span></span>';
+  const parts = [];
+  if (obj.SettleRoute) parts.push(item("Trasa", escHtml(obj.SettleRoute), "sb-wide"));
+  if (c.km) parts.push(item("Km", c.km + " × " + c.rate.toFixed(2) + " = " + fmtPLN(c.kmCost)));
+  if (settleNum(obj.SettleHotel))   parts.push(item("Hotel", fmtPLN(obj.SettleHotel)));
+  if (settleNum(obj.SettleHighway)) parts.push(item("Autostrada", fmtPLN(obj.SettleHighway)));
+  if (settleNum(obj.SettleOther))   parts.push(item("Inne", fmtPLN(obj.SettleOther)));
+  if (settleNum(obj.SettleTickets)) parts.push(item("Bilety", fmtPLN(obj.SettleTickets)));
+  parts.push(item("Koszty", fmtPLN(c.costs), "sb-sum"));
+  if (c.fee) parts.push(item("Wynagrodzenie", fmtPLN(c.fee)));
+  parts.push(item("Razem", fmtPLN(c.total), "sb-total"));
+  if (obj.SettleFeeBasis) parts.push(item("Obrót / opłata", escHtml(obj.SettleFeeBasis)));
+  if (obj.SettleNote) parts.push('<span class="sb-item sb-note">' + escHtml(obj.SettleNote) + '</span>');
+  const hasAny = !!(c.km || c.costs || c.fee || obj.SettleRoute || obj.SettleFeeBasis || obj.SettleNote);
+  return hasAny ? parts.join("") : '<span class="sb-empty">Brak wpisanych kosztów — kliknij „Rozlicz audyt".</span>';
+}
 function updateSettleHead(a) {
   const s = settleStatusOf(a), c = settleCalc(a);
   const st = document.getElementById("settle-head-status");
   if (st) { st.textContent = settleStatusLabel(a); st.className = "settle-badge " + (s === "Rozliczony" ? "done" : s === "Wysłany do CU" ? "sent" : "open"); }
   settleSetText("settle-head-total", (c.total || c.costs) ? fmtPLN(c.total) : "—");
+  const br = document.getElementById("settle-head-break"); if (br) br.innerHTML = settleBreakHtml(a);
 }
 // Przeliczenie na żywo w trybie edycji
 function updateSettleCalcFromInputs() {
@@ -263,6 +283,9 @@ function updateSettleCalcFromInputs() {
   settleSetText("m-s-costs",  fmtPLN(c.costs));
   settleSetText("m-s-total",  fmtPLN(c.total));
   settleSetText("settle-head-total", (c.total || c.costs) ? fmtPLN(c.total) : "—");
+  // Rozbicie w nagłówku odświeżane na żywo podczas edycji (z tekstem trasy/uwag z pól)
+  const br = document.getElementById("settle-head-break");
+  if (br) br.innerHTML = settleBreakHtml(Object.assign({}, tmp, { SettleRoute: g("e-s-route"), SettleFeeBasis: g("e-s-basis"), SettleNote: g("e-s-note") }));
 }
 
 function getSelectedMulti(key) {

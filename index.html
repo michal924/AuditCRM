@@ -597,6 +597,7 @@
           <span class="settle-head-total">Razem: <strong id="settle-head-total">—</strong></span>
           <button id="btn-settle-audit" type="button" class="btn-settle-audit">💰 Rozlicz audyt</button>
         </div>
+        <div id="settle-head-break" class="settle-head-break"></div>
         <div id="settle-body" class="hidden">
         <div class="settle-grid">
           <div class="field-row settle-wide">
@@ -926,9 +927,9 @@
         <div class="form-row">
           <label>Jednostka</label>
           <select id="settle-body" class="form-input">
+            <option value="all" selected>Wszystkie (CU + SGS)</option>
             <option value="CUC">CUC (Control Union)</option>
             <option value="SGS">SGS</option>
-            <option value="all">Wszystkie</option>
           </select>
         </div>
         <div class="settle-toolbar-actions">
