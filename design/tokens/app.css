@@ -80,6 +80,15 @@
   --lfa-prog-sure-bg: color-mix(in srgb, var(--lfa-bordo) 10%,  var(--lfa-surface));  --lfa-prog-sure-fg: var(--lfa-bordo);
   --lfa-prog-eudr-bg: color-mix(in srgb, var(--lfa-szary) 16%,  var(--lfa-surface));  --lfa-prog-eudr-fg: var(--lfa-atrament);
 
+  /* --- Mapa audytów (markery Leaflet na jasnych kaflach OSM — zawsze wersja jasna) --- */
+  --lfa-map-planned:     var(--lfa-primary);
+  --lfa-map-done:        color-mix(in srgb, var(--lfa-granat) 55%, var(--lfa-papier));
+  --lfa-map-rejected:    var(--lfa-accent);
+  --lfa-map-change:      var(--lfa-detail-strong);
+  --lfa-map-invoice:     var(--lfa-st-invoice-fg);
+  --lfa-map-other:       var(--lfa-text-muted);
+  --lfa-map-ring:        var(--lfa-surface);
+
   /* --- Kalendarz --- */
   --lfa-cal-free-bg:     color-mix(in srgb, var(--lfa-granat) 6%,  var(--lfa-surface)); --lfa-cal-free-fg:  var(--lfa-granat);   /* wolny: jasny granat + etykieta */
   --lfa-cal-off-bg:      color-mix(in srgb, var(--lfa-szary) 12%,  var(--lfa-surface)); --lfa-cal-off-fg:   var(--lfa-szary);    /* weekend / święto */

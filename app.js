@@ -2710,11 +2710,11 @@ const MapModule = (function () {
   const GEO_CACHE_KEY = "auditGeoCache_v1";
   // Kolory statusów z tokenów LF Assurance (wersja jasna — markery leżą na jasnych kaflach OSM)
   const STATUS_TOKENS = {
-    PLANNED:  "--lfa-st-planned-fg",
-    DONE:     "--lfa-st-done-fg",
-    REJECTED: "--lfa-st-rejected-fg",
-    CHANGE:   "--lfa-st-change-fg",
-    Invoice:  "--lfa-st-invoice-fg",
+    PLANNED:  "--lfa-map-planned",
+    DONE:     "--lfa-map-done",
+    REJECTED: "--lfa-map-rejected",
+    CHANGE:   "--lfa-map-change",
+    Invoice:  "--lfa-map-invoice",
   };
 
   let map = null;
@@ -2750,14 +2750,14 @@ const MapModule = (function () {
     markers = [];
   }
 
-  function statusColor(status) { return LfaTheme.cssColor(STATUS_TOKENS[status] || "--lfa-text-muted", "light"); } // kafle OSM są jasne
+  function statusColor(status) { return LfaTheme.cssColor(STATUS_TOKENS[status] || "--lfa-map-other", "light"); } // kafle OSM są jasne
 
   function circleMarker(latlng, color, count) {
     const size = Math.min(10 + count * 4, 32);
     return L.circleMarker(latlng, {
       radius: size,
       fillColor: color,
-      color: LfaTheme.cssColor("--lfa-surface", "light"),
+      color: LfaTheme.cssColor("--lfa-map-ring", "light"),
       weight: 2,
       opacity: 1,
       fillOpacity: 0.85,

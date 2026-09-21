@@ -1462,10 +1462,10 @@ tr.change-row-rzeznik:hover { background: var(--lfa-info-bg); }
 /* Legenda */
 .map-legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text2); }
 .map-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.map-dot.planned  { background: var(--lfa-primary); }
-.map-dot.done     { background: color-mix(in srgb, var(--lfa-granat) 55%, var(--lfa-papier)); }
-.map-dot.rejected { background: var(--lfa-accent); }
-.map-dot.other    { background: var(--lfa-text-muted); }
+.map-dot.planned  { background: var(--lfa-map-planned); }
+.map-dot.done     { background: var(--lfa-map-done); }
+.map-dot.rejected { background: var(--lfa-map-rejected); }
+.map-dot.other    { background: var(--lfa-map-other); }
 @media (max-width: 900px) { #map-container { grid-template-columns: 1fr; grid-template-rows: 60% 40%; } }
 
 /* ============================================================
