@@ -8,10 +8,10 @@
 /* --- Bazowe --- */
 .lfa-ui { font-family: var(--lfa-font-ui); color: var(--lfa-text); font-size: var(--lfa-text-md); line-height: var(--lfa-leading); }
 .lfa-data { font-family: var(--lfa-font-data); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
-.lfa-eyebrow { font-family: var(--lfa-font-data); font-size: var(--lfa-text-xs); letter-spacing: .18em; text-transform: uppercase; color: var(--lfa-detail-strong); font-weight: var(--lfa-w-medium); }
+.lfa-eyebrow { font-family: var(--lfa-font-data); font-size: var(--lfa-text-xs); letter-spacing: .18em; text-transform: uppercase; color: var(--lfa-eyebrow); font-weight: var(--lfa-w-medium); }
 .lfa-h1 { font-family: var(--lfa-font-ui); font-weight: var(--lfa-w-semibold); font-size: var(--lfa-text-2xl); letter-spacing: var(--lfa-h1-tracking); text-transform: uppercase; color: var(--lfa-text); margin: 0; }
 .lfa-h2 { font-family: var(--lfa-font-ui); font-weight: var(--lfa-w-semibold); font-size: var(--lfa-text-xl); letter-spacing: var(--lfa-h2-tracking); color: var(--lfa-text); margin: 0; }
-.lfa-h3 { font-family: var(--lfa-font-ui); font-weight: var(--lfa-w-semibold); font-size: var(--lfa-text-xs); letter-spacing: .12em; text-transform: uppercase; color: var(--lfa-detail-strong); margin: 0 0 var(--lfa-space-2); padding-bottom: var(--lfa-space-1); border-bottom: 1px solid var(--lfa-border); }
+.lfa-h3 { font-family: var(--lfa-font-ui); font-weight: var(--lfa-w-semibold); font-size: var(--lfa-text-xs); letter-spacing: .12em; text-transform: uppercase; color: var(--lfa-eyebrow); margin: 0 0 var(--lfa-space-2); padding-bottom: var(--lfa-space-1); border-bottom: 1px solid var(--lfa-border); }
 .lfa-muted { color: var(--lfa-text-muted); }
 :where(.lfa-btn, .lfa-chip, .lfa-input, .lfa-select, .lfa-textarea, .nav-btn):focus-visible { outline: none; box-shadow: var(--lfa-focus-ring); }
 
@@ -91,7 +91,7 @@
 /* --- Table --- */
 .lfa-table-wrap { background: var(--lfa-surface); border: 1px solid var(--lfa-border); border-radius: var(--lfa-radius-lg); overflow: auto; }
 .lfa-table { width: 100%; border-collapse: collapse; font-family: var(--lfa-font-ui); font-size: var(--lfa-text-sm); }
-.lfa-table thead th { position: sticky; top: 0; background: var(--lfa-surface-3); color: var(--lfa-text-muted); font-size: var(--lfa-text-xs); font-weight: var(--lfa-w-semibold); letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: 10px 14px; border-bottom: 2px solid var(--lfa-accent); white-space: nowrap; }
+.lfa-table thead th { position: sticky; top: 0; background: var(--lfa-surface-3); color: var(--lfa-th); font-size: var(--lfa-text-xs); font-weight: var(--lfa-w-semibold); letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: 10px 14px; border-bottom: 2px solid var(--lfa-accent); white-space: nowrap; }
 .lfa-table thead th[data-sort] { cursor: pointer; }
 .lfa-table thead th[data-sort]:hover { color: var(--lfa-text); }
 .lfa-table tbody td { padding: 10px 14px; border-bottom: 1px solid var(--lfa-border); color: var(--lfa-text); vertical-align: middle; }
@@ -178,7 +178,7 @@
 .lfa-nav .lfa-nav-logo { display: flex; align-items: center; gap: 10px; }
 .lfa-nav .lfa-nav-logo img, .lfa-nav .lfa-nav-logo svg { height: 34px; width: auto; }
 .lfa-nav .lfa-wordmark { font-family: var(--lfa-font-ui); font-weight: var(--lfa-w-semibold); font-size: var(--lfa-text-lg); letter-spacing: var(--lfa-h1-tracking); text-transform: uppercase; color: var(--lfa-primary); }
-.lfa-nav .lfa-wordmark small { display: block; font-family: var(--lfa-font-data); font-size: 10px; letter-spacing: .22em; color: var(--lfa-detail-strong); font-weight: var(--lfa-w-medium); }
+.lfa-nav .lfa-wordmark small { display: block; font-family: var(--lfa-font-data); font-size: 10px; letter-spacing: .22em; color: var(--lfa-eyebrow); font-weight: var(--lfa-w-medium); }
 .lfa-nav .nav-btn { height: var(--lfa-control-h); padding: 0 var(--lfa-space-3); border-radius: var(--lfa-radius); border: 1px solid transparent; background: transparent; color: var(--lfa-text-muted); font-family: var(--lfa-font-ui); font-size: var(--lfa-text-sm); font-weight: var(--lfa-w-semibold); cursor: pointer; }
 .lfa-nav .nav-btn:hover { background: var(--lfa-surface-2); color: var(--lfa-text); }
 .lfa-nav .nav-btn.active { background: var(--lfa-primary); color: var(--lfa-on-primary); }

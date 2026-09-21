@@ -37,6 +37,8 @@
   --lfa-on-accent:       var(--lfa-papier);
   --lfa-detail:          var(--lfa-mosiadz);       /* cienkie linie, daty, sygnatury */
   --lfa-detail-strong:   var(--lfa-mosiadz-text);
+  --lfa-eyebrow:         var(--lfa-mosiadz-text);  /* nagłówki sekcji, eyebrow — w ciemnym: Papier */
+  --lfa-th:              var(--lfa-text-muted);    /* tekst nagłówków tabel */
 
   /* --- Obramowania, focus --- */
   --lfa-border:          rgba(22, 38, 63, 0.14);
@@ -132,6 +134,7 @@
     --lfa-primary:        var(--lfa-papier);      --lfa-primary-hover: color-mix(in srgb, var(--lfa-papier) 88%, var(--lfa-granat)); --lfa-on-primary: var(--lfa-granat);
     --lfa-accent:         color-mix(in srgb, var(--lfa-bordo) 60%, var(--lfa-papier)); --lfa-accent-hover: color-mix(in srgb, var(--lfa-bordo) 48%, var(--lfa-papier)); --lfa-on-accent: var(--lfa-granat-deep);
     --lfa-detail:         var(--lfa-mosiadz-jasny); --lfa-detail-strong: var(--lfa-mosiadz-jasny); --lfa-mosiadz-text: var(--lfa-mosiadz-jasny);
+    --lfa-eyebrow:        var(--lfa-papier); --lfa-th: var(--lfa-papier);
     --lfa-border:         rgba(245, 243, 238, 0.14);
     --lfa-border-strong:  rgba(245, 243, 238, 0.28);
     --lfa-focus:          var(--lfa-mosiadz-jasny);
@@ -179,6 +182,7 @@
   --lfa-primary: var(--lfa-papier); --lfa-primary-hover: color-mix(in srgb, var(--lfa-papier) 88%, var(--lfa-granat)); --lfa-on-primary: var(--lfa-granat);
   --lfa-accent: color-mix(in srgb, var(--lfa-bordo) 60%, var(--lfa-papier)); --lfa-accent-hover: color-mix(in srgb, var(--lfa-bordo) 48%, var(--lfa-papier)); --lfa-on-accent: var(--lfa-granat-deep);
   --lfa-detail: var(--lfa-mosiadz-jasny); --lfa-detail-strong: var(--lfa-mosiadz-jasny); --lfa-mosiadz-text: var(--lfa-mosiadz-jasny);
+  --lfa-eyebrow: var(--lfa-papier); --lfa-th: var(--lfa-papier);
   --lfa-border: rgba(245, 243, 238, 0.14); --lfa-border-strong: rgba(245, 243, 238, 0.28);
   --lfa-focus: var(--lfa-mosiadz-jasny); --lfa-focus-ring: 0 0 0 2px var(--lfa-granat), 0 0 0 4px var(--lfa-mosiadz-jasny);
   --lfa-shadow: 0 4px 20px rgba(0, 0, 0, 0.35); --lfa-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
