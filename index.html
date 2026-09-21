@@ -3,14 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Audit CRM — LogisticFit</title>
+  <title>AuditCRM — LF Assurance</title>
+  <meta name="color-scheme" content="light dark">
+  <script>try{var t=localStorage.getItem("lfa-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="icon" type="image/png" sizes="16x16" href="auditcrm-favicon-16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="auditcrm-favicon-32.png">
   <link rel="icon" type="image/png" sizes="64x64" href="auditcrm-favicon-64.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="auditcrm-icon-256.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <!-- LF Assurance design system: fonty → tokeny → komponenty → układ ekranów -->
+  <link rel="stylesheet" href="fonts/lfa/lfa-fonts.css">
+  <link rel="stylesheet" href="design/tokens/tokens.css">
+  <link rel="stylesheet" href="design/tokens/app.css">
+  <link rel="stylesheet" href="design/components.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="leaflet.css">
   <script src="leaflet.js"></script>
@@ -21,25 +27,15 @@
 </head>
 <body>
 
-<!-- SVG SYMBOLS — AuditCRM logo mark -->
+<!-- SVG SYMBOL — znak LF Assurance (design/assets/logo/01_znak.svg); kolory z tokenów --lfa-mark-* (style.css) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
-    <!-- Pełny kolor: granatowy kafel, biała karta, zielony check -->
-    <symbol id="acrm-full" viewBox="0 0 64 64">
-      <rect x="4" y="4" width="56" height="56" rx="15" fill="#3a4d98"/>
-      <rect x="13" y="13" width="38" height="38" rx="9" fill="#fff"/>
-      <path d="M22 32.5 L29 39.5 L43 24.5" fill="none" stroke="#239d46" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
-    </symbol>
-    <!-- Favicon / małe rozmiary: uproszczony — sam check, bez karty -->
-    <symbol id="acrm-fav" viewBox="0 0 64 64">
-      <rect x="2" y="2" width="60" height="60" rx="15" fill="#3a4d98"/>
-      <path d="M19 33 L28.5 42.5 L46 21.5" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-    </symbol>
-    <!-- Inwersja: białe tło, granatowa karta, jasnozielony check (na ciemnym tle) -->
-    <symbol id="acrm-inv" viewBox="0 0 64 64">
-      <rect x="4" y="4" width="56" height="56" rx="15" fill="#fff"/>
-      <rect x="13" y="13" width="38" height="38" rx="9" fill="#3a4d98"/>
-      <path d="M22 32.5 L29 39.5 L43 24.5" fill="none" stroke="#5fd089" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <symbol id="lfa-mark" viewBox="0 0 508.78 535.69">
+      <g transform="translate(6.00,6.00)"><line x1="314.02" y1="326.63" x2="443.30" y2="470.21" stroke="var(--lfa-mark-accent)" stroke-width="54.00" stroke-linecap="round"></line>
+<circle cx="443.30" cy="470.21" r="33.48" fill="var(--lfa-mark-accent)"></circle>
+<circle cx="200.0" cy="200.0" r="156.00" fill="var(--lfa-mark-globe)"></circle>
+<g fill="none" stroke="var(--lfa-mark-lines)" stroke-width="10"><circle cx="200" cy="200" r="130"></circle><line x1="70" y1="200" x2="330" y2="200"></line><line x1="85.7" y1="138" x2="314.3" y2="138"></line><line x1="85.7" y1="262" x2="314.3" y2="262"></line><line x1="200" y1="70" x2="200" y2="330"></line><ellipse cx="200" cy="200" rx="45" ry="130"></ellipse><ellipse cx="200" cy="200" rx="88" ry="130"></ellipse></g>
+<circle cx="200.0" cy="200.0" r="168.00" fill="none" stroke="var(--lfa-mark-accent)" stroke-width="24.00"></circle></g>
     </symbol>
   </defs>
 </svg>
@@ -48,10 +44,11 @@
 <div id="page-login" class="page">
   <div class="login-box">
     <div class="acrm-lockup acrm-stacked" style="margin-bottom:20px">
-      <svg width="64" height="64"><use href="#acrm-full"/></svg>
+      <svg class="lfa-mark" width="64" height="68" viewBox="0 0 508.78 535.69"><use href="#lfa-mark"/></svg>
       <span class="acrm-wm" style="font-size:32px"><span class="acrm-a">Audit</span><span class="acrm-c">CRM</span></span>
     </div>
-    <p>LogisticFit — system planowania audytów</p>
+    <p class="lfa-eyebrow">LF Assurance</p>
+    <p>System planowania i rozliczania audytów</p>
     <button id="btn-login" class="btn-primary">Zaloguj się przez Microsoft</button>
   </div>
 </div>
@@ -63,12 +60,12 @@
   <nav class="navbar">
     <div class="nav-left">
       <div class="acrm-lockup">
-        <svg width="32" height="32"><use href="#acrm-full"/></svg>
+        <svg class="lfa-mark" width="30" height="32" viewBox="0 0 508.78 535.69"><use href="#lfa-mark"/></svg>
         <span class="acrm-wm" style="font-size:22px"><span class="acrm-a">Audit</span><span class="acrm-c">CRM</span></span>
       </div>
     </div>
     <div class="nav-links">
-      <button class="nav-btn active" data-view="myaudits">📋 Audyty LogisticFit</button>
+      <button class="nav-btn active" data-view="myaudits">📋 Audyty</button>
       <button class="nav-btn" data-view="kalendarz">📅 Kalendarz</button>
       <button class="nav-btn" data-view="checkaudit">✅ Check Audyt</button>
       <button class="nav-btn" data-view="changes">🔄 Zmiany Audytora</button>
@@ -80,11 +77,12 @@
       <button id="btn-settle" class="btn-action" title="Rozliczenie audytów (CU / SGS) — eksport miesięczny i raporty">📊 Rozliczenie</button>
       <button id="btn-add-audit" class="btn-action btn-action-green" title="Dodaj nieplanowany audyt">＋ Dodaj audyt</button>
       <span id="nav-user"></span>
+      <button id="btn-theme" class="btn-ghost" title="Przełącz tryb jasny / ciemny" aria-label="Przełącz tryb jasny / ciemny">🌙</button>
       <button id="btn-logout" class="btn-ghost">Wyloguj</button>
     </div>
   </nav>
 
-  <!-- WIDOK: AUDYTY LOGISTICFIT -->
+  <!-- WIDOK: AUDYTY -->
   <div id="view-myaudits" class="view">
     <div class="filters-bar">
       <input id="search" type="text" placeholder="🔍 Szukaj firmy..." class="search-input">

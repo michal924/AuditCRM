@@ -24,7 +24,9 @@ report() { # $1 label, $2 regex, $3 files
 
 report "HEX poza tokenami"            '#[0-9a-fA-F]{3}([0-9a-fA-F]{3}([0-9a-fA-F]{2})?)?\b' "$FILES"
 report "rgb()/rgba()/hsl() poza tokenami" '\b(rgba?|hsla?)\(' "$FILES"
-report "font-family poza tokenami"    'font-family\s*:' "style.css index.html"
+# font-family tylko przez tokeny (var(...)) lub inherit — BSD grep bez lookahead, więc dwustopniowo
+ff=$(grep -nE 'font-family\s*:' style.css index.html 2>/dev/null | grep -vE 'font-family\s*:\s*(var\(|inherit)' | grep -vE "$ALLOW_RE" || true)
+if [ -n "$ff" ]; then n=$(printf "%s\n" "$ff" | wc -l | tr -d ' '); total=$((total+n)); fail=1; printf "\n\033[1mfont-family z nazwą poza tokenami\033[0m — %s wystąpień\n" "$n"; printf "%s\n" "$ff" | head -40; fi
 report "Marka LogisticFit w UI"        'LogisticFit|Bricolage|Work Sans|Geist|Poppins|#3a4d98|#239d46' "style.css index.html"
 
 if [ "$fail" -eq 0 ]; then

@@ -133,6 +133,7 @@ async function init() {
 
   document.getElementById("nav-user").textContent = account.name || account.username;
   document.getElementById("btn-logout").onclick = logout;
+  LfaTheme.init();
 
   show("page-app");
   hide("page-login");
@@ -1159,7 +1160,7 @@ async function createAuditCalendarEvents(audit) {
     `Termin: ${rangeLabel}${days > 1 ? ` (${days} dni)` : ""}`,
     `Adres: ${loc || "—"}`,
     ``,
-    `Zaplanowano przez Audit CRM — LogisticFit`,
+    `Zaplanowano przez AuditCRM — LF Assurance`,
   ].join("\n");
 
   const event = {
@@ -2010,9 +2011,53 @@ init();
 // ============================================================
 let auditHistory = {};      // { year: { "prj_program": { prj, title, program, auditor } } }
 let changesFilesByYear = {}; // { year: [{filename, count}] }
-let logoBase64 = null;
-let pdfFontRegular = null;  // base64 Poppins-Regular
-let pdfFontBold    = null;  // base64 Poppins-SemiBold
+// ============================================================
+// LF ASSURANCE — kolory wyłącznie z tokenów CSS (--lfa-*), motyw jasny/ciemny
+// ============================================================
+const LfaTheme = (function () {
+  const KEY = "lfa-theme";
+  const cache = new Map();
+  let probe = null;
+  function resolve(token) {
+    // Kolor rozwiązany przez przeglądarkę (var(), color-mix()) → zapis rgb lub color(srgb …)
+    if (!probe) { probe = document.createElement("span"); probe.style.cssText = "position:absolute;visibility:hidden;pointer-events:none"; document.body.appendChild(probe); }
+    probe.style.color = `var(${token})`;
+    return getComputedStyle(probe).color;
+  }
+  function triplet(token, mode) {
+    const k = (mode || current()) + token;
+    if (cache.has(k)) return cache.get(k);
+    const prev = document.documentElement.getAttribute("data-theme");
+    if (mode) document.documentElement.setAttribute("data-theme", mode);
+    const c = resolve(token);
+    if (mode) { if (prev) document.documentElement.setAttribute("data-theme", prev); else document.documentElement.removeAttribute("data-theme"); }
+    let out = [22, 38, 63];
+    let m = c.match(/rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)/);
+    if (m) out = [+m[1], +m[2], +m[3]].map(Math.round);
+    else if ((m = c.match(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/))) out = [m[1], m[2], m[3]].map(v => Math.round(+v * 255));
+    cache.set(k, out);
+    return out;
+  }
+  function cssColor(token, mode) { const [r, g, b] = triplet(token, mode); return `rgb(${r}, ${g}, ${b})`; } // lfa-allow (wartość z tokenu)
+  function current() { return document.documentElement.getAttribute("data-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); }
+  function apply(mode) {
+    if (mode) document.documentElement.setAttribute("data-theme", mode); else document.documentElement.removeAttribute("data-theme");
+    try { mode ? localStorage.setItem(KEY, mode) : localStorage.removeItem(KEY); } catch {}
+    cache.clear();
+    const b = document.getElementById("btn-theme");
+    if (b) b.textContent = current() === "dark" ? "☀️" : "🌙";
+  }
+  function init() {
+    let saved = null; try { saved = localStorage.getItem(KEY); } catch {}
+    apply(saved === "dark" || saved === "light" ? saved : null);
+    const b = document.getElementById("btn-theme");
+    if (b) b.onclick = () => apply(current() === "dark" ? "light" : "dark");
+  }
+  return { triplet, cssColor, current, apply, init };
+})();
+
+let pdfFontRegular = null;  // base64 Archivo-Regular (LF Assurance)
+let pdfFontBold    = null;  // base64 Archivo-SemiBold
 
 const LS_HISTORY_KEY = "auditHistory_v1";
 const LS_FILES_KEY   = "changesFilesByYear_v1";
@@ -2070,14 +2115,6 @@ function clearHistory() {
   showToast("Dane wyczyszczone", "success");
 }
 
-function initLogoBase64() {
-  fetch("logo.png").then(r => r.blob()).then(blob => {
-    const reader = new FileReader();
-    reader.onloadend = () => { logoBase64 = reader.result; };
-    reader.readAsDataURL(blob);
-  }).catch(() => {});
-}
-
 async function loadPdfFonts() {
   async function ttfToBase64(url) {
     const r = await fetch(url);
@@ -2088,24 +2125,23 @@ async function loadPdfFonts() {
     return btoa(bin);
   }
   try {
-    if (!pdfFontRegular) pdfFontRegular = await ttfToBase64("fonts/Poppins-Regular.ttf");
-    if (!pdfFontBold)    pdfFontBold    = await ttfToBase64("fonts/Poppins-SemiBold.ttf");
+    if (!pdfFontRegular) pdfFontRegular = await ttfToBase64("fonts/lfa/Archivo-Regular.ttf");
+    if (!pdfFontBold)    pdfFontBold    = await ttfToBase64("fonts/lfa/Archivo-SemiBold.ttf");
   } catch(e) { console.warn("Nie udało się załadować fontów PDF:", e); }
 }
 
 function registerPdfFonts(doc) {
   if (pdfFontRegular) {
-    doc.addFileToVFS("Poppins-Regular.ttf", pdfFontRegular);
-    doc.addFont("Poppins-Regular.ttf", "Poppins", "normal");
+    doc.addFileToVFS("Archivo-Regular.ttf", pdfFontRegular);
+    doc.addFont("Archivo-Regular.ttf", "Archivo", "normal");
   }
   if (pdfFontBold) {
-    doc.addFileToVFS("Poppins-SemiBold.ttf", pdfFontBold);
-    doc.addFont("Poppins-SemiBold.ttf", "Poppins", "bold");
+    doc.addFileToVFS("Archivo-SemiBold.ttf", pdfFontBold);
+    doc.addFont("Archivo-SemiBold.ttf", "Archivo", "bold");
   }
 }
 
 function setupChanges() {
-  initLogoBase64();
   loadPdfFonts();
   loadHistoryFromStorage();
   restoreChangesUI();
@@ -2423,24 +2459,25 @@ async function generatePdfRzeznik() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     registerPdfFonts(doc);
-    const F = pdfFontRegular ? "Poppins" : "helvetica";
+    const F = pdfFontRegular ? "Archivo" : "helvetica";
 
-    // ── LogisticFit Design System tokens ────────────────────────
-    const NAVY    = [58,  77, 152];   // --lf-navy   #3a4d98
-    const NAVY900 = [28,  38,  80];   // --lf-navy-900 #1c2650
-    const NAVY100 = [230, 233, 245];  // --lf-navy-100
-    const GREEN   = [35, 157,  70];   // --lf-green  #239d46
-    const GREEN100= [224, 243, 230];  // --lf-green-100
-    const DANGER  = [200,  54,  45];  // --lf-danger #c8362d
-    const DANGER_BG=[251, 229, 227];  // --lf-danger-bg
-    const INK     = [14,  20,  48];   // --lf-ink    #0e1430
-    const S700    = [58,  66,  99];   // --lf-slate-700
-    const S500    = [107,115, 146];   // --lf-slate-500
-    const S300    = [194,199, 214];   // --lf-slate-300
-    const S200    = [225,228, 238];   // --lf-slate-200
-    const S100    = [238,240, 246];   // --lf-slate-100
-    const S50     = [247,248, 251];   // --lf-slate-50
-    const WHITE   = [255, 255, 255];
+    // ── LF Assurance: kolory dokumentu z tokenów --lfa-* (dokument zawsze w wersji jasnej) ──
+    const T = (t) => LfaTheme.triplet(t, "light");
+    const NAVY    = T("--lfa-primary");
+    const NAVY900 = T("--lfa-granat-deep");
+    const NAVY100 = T("--lfa-info-bg");
+    const GREEN   = T("--lfa-success-fg");     // sukces = granat + ✓ (brak zieleni w palecie)
+    const GREEN100= T("--lfa-success-bg");
+    const DANGER  = T("--lfa-accent");         // bordo
+    const DANGER_BG=T("--lfa-danger-bg");
+    const INK     = T("--lfa-text");
+    const S700    = T("--lfa-text");
+    const S500    = T("--lfa-text-muted");
+    const S300    = T("--lfa-border-strong");
+    const S200    = T("--lfa-border");
+    const S100    = T("--lfa-surface-3");
+    const S50     = T("--lfa-surface-2");
+    const WHITE   = T("--lfa-surface");
 
     const now   = new Date();
     const dd    = String(now.getDate()).padStart(2,"0");
@@ -2480,7 +2517,7 @@ async function generatePdfRzeznik() {
       doc.line(14, 283, 196, 283);
       doc.setFontSize(6.5); doc.setFont(F, "normal");
       doc.setTextColor(...S500);
-      doc.text("LogisticFit  ·  Audit CRM  ·  Dokument poufny  ·  " + dateStr, 14, 288.5);
+      doc.text("LF Assurance  ·  AuditCRM  ·  Dokument poufny  ·  " + dateStr, 14, 288.5);
       doc.text(pageNum + " / " + totalPages, 196, 288.5, { align: "right" });
     }
 
@@ -2671,12 +2708,13 @@ async function generatePdfRzeznik() {
 // ============================================================
 const MapModule = (function () {
   const GEO_CACHE_KEY = "auditGeoCache_v1";
-  const STATUS_COLORS = {
-    PLANNED:  "#3a4d98",
-    DONE:     "#239d46",
-    REJECTED: "#dc3545",
-    CHANGE:   "#fd7e14",
-    Invoice:  "#6f42c1",
+  // Kolory statusów z tokenów LF Assurance (wersja jasna — markery leżą na jasnych kaflach OSM)
+  const STATUS_TOKENS = {
+    PLANNED:  "--lfa-st-planned-fg",
+    DONE:     "--lfa-st-done-fg",
+    REJECTED: "--lfa-st-rejected-fg",
+    CHANGE:   "--lfa-st-change-fg",
+    Invoice:  "--lfa-st-invoice-fg",
   };
 
   let map = null;
@@ -2712,14 +2750,14 @@ const MapModule = (function () {
     markers = [];
   }
 
-  function statusColor(status) { return STATUS_COLORS[status] || "#8a93ad"; }
+  function statusColor(status) { return LfaTheme.cssColor(STATUS_TOKENS[status] || "--lfa-text-muted", "light"); } // kafle OSM są jasne
 
   function circleMarker(latlng, color, count) {
     const size = Math.min(10 + count * 4, 32);
     return L.circleMarker(latlng, {
       radius: size,
       fillColor: color,
-      color: "#fff",
+      color: LfaTheme.cssColor("--lfa-surface", "light"),
       weight: 2,
       opacity: 1,
       fillOpacity: 0.85,
@@ -2730,10 +2768,10 @@ const MapModule = (function () {
     const lines = audits.slice(0, 20).map(a => {
       const date = a.AuditDateStart ? String(a.AuditDateStart).substring(0, 10) : "—";
       const color = statusColor(a.AuditStatus);
-      return `<li style="margin-bottom:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:5px;flex-shrink:0"></span><strong>${a.Title || "—"}</strong><br><span style="color:#666;font-size:11px">${a.Program || ""} · ${a.AuditStatus || ""} · ${date}</span></li>`;
+      return `<li style="margin-bottom:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:5px;flex-shrink:0"></span><strong>${a.Title || "—"}</strong><br><span class="lfa-map-muted" style="font-size:11px">${a.Program || ""} · ${a.AuditStatus || ""} · ${date}</span></li>`;
     }).join("");
-    const more = audits.length > 20 ? `<li style="color:#666;font-size:11px">…i ${audits.length - 20} więcej</li>` : "";
-    return `<div style="min-width:220px;max-width:300px"><strong style="font-size:14px">${city}</strong><br><span style="color:#666;font-size:12px">${audits.length} audyt${audits.length === 1 ? "" : audits.length < 5 ? "y" : "ów"}</span><ul style="margin:8px 0 0;padding-left:0;list-style:none;max-height:200px;overflow-y:auto">${lines}${more}</ul></div>`;
+    const more = audits.length > 20 ? `<li class="lfa-map-muted" style="font-size:11px">…i ${audits.length - 20} więcej</li>` : "";
+    return `<div style="min-width:220px;max-width:300px"><strong style="font-size:14px">${city}</strong><br><span class="lfa-map-muted" style="font-size:12px">${audits.length} audyt${audits.length === 1 ? "" : audits.length < 5 ? "y" : "ów"}</span><ul style="margin:8px 0 0;padding-left:0;list-style:none;max-height:200px;overflow-y:auto">${lines}${more}</ul></div>`;
   }
 
   function renderMarkers(audits) {
