@@ -1,0 +1,12 @@
+/* LF Assurance — fonty lokalne (bez zależności od Google Fonts, RODO-friendly)
+   Archivo (UI) 400/500/600/700 · IBM Plex Mono (dane) 400/500/600
+   Licencje: OFL — patrz fonts/lfa/OFL-*.txt */
+
+@font-face { font-family: "Archivo"; font-weight: 400; font-style: normal; font-display: swap; src: url("Archivo-Regular.ttf") format("truetype"); }
+@font-face { font-family: "Archivo"; font-weight: 500; font-style: normal; font-display: swap; src: url("Archivo-Medium.ttf") format("truetype"); }
+@font-face { font-family: "Archivo"; font-weight: 600; font-style: normal; font-display: swap; src: url("Archivo-SemiBold.ttf") format("truetype"); }
+@font-face { font-family: "Archivo"; font-weight: 700; font-style: normal; font-display: swap; src: url("Archivo-Bold.ttf") format("truetype"); }
+
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; font-style: normal; font-display: swap; src: url("IBMPlexMono-Regular.ttf") format("truetype"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 500; font-style: normal; font-display: swap; src: url("IBMPlexMono-Medium.ttf") format("truetype"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 600; font-style: normal; font-display: swap; src: url("IBMPlexMono-SemiBold.ttf") format("truetype"); }

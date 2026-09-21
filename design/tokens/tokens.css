@@ -1,0 +1,57 @@
+/* =====================================================================
+   LF Assurance — Design Tokens
+   Jedno źródło prawdy dla kolorów, typografii i odstępów.
+   Single source of truth for colors, typography and spacing.
+   Źródło / Source: Księga marki LF Assurance v2 (Lipiec 2026)
+   ===================================================================== */
+
+:root {
+  /* --- Kolory / Colors (6 ról / 6 roles) --- */
+  --lfa-granat:  #16263F; /* Granat Assurance · główny / primary  · rgb 22 38 63  */
+  --lfa-bordo:   #6E1F2C; /* Bordo Sygnet     · akcent / accent   · rgb 110 31 44 */
+  --lfa-mosiadz: #A6864E; /* Mosiądz          · detal / detail    · rgb 166 134 78 */
+  --lfa-papier:  #F5F3EE; /* Papier           · tło / background   · rgb 245 243 238 */
+  --lfa-szary:   #6C6A63; /* Szary Dokument   · pomocniczy / aux   · rgb 108 106 99 */
+  --lfa-atrament:#1E2024; /* Atrament         · tekst / text       · rgb 30 32 36  */
+
+  /* Warianty pomocnicze / helper variants */
+  --lfa-mosiadz-jasny: #C9A46A; /* jaśniejszy mosiądz / lighter brass */
+  --lfa-negatyw:       #F5F3EE; /* na ciemnym tle = Papier / on dark = Papier */
+
+  /* Role semantyczne / semantic roles */
+  --lfa-bg:        var(--lfa-papier);
+  --lfa-surface:   #FFFFFF;
+  --lfa-text:      var(--lfa-atrament);
+  --lfa-text-muted:var(--lfa-szary);
+  --lfa-primary:   var(--lfa-granat);
+  --lfa-accent:    var(--lfa-bordo);
+  --lfa-detail:    var(--lfa-mosiadz);
+  --lfa-border:    rgba(22,38,63,.14);
+  --lfa-hairline:  var(--lfa-mosiadz); /* cienkie linie / thin lines */
+
+  /* --- Typografia / Typography --- */
+  --lfa-font-sans: "Archivo", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --lfa-font-mono: "IBM Plex Mono", "SFMono-Regular", ui-monospace, "Courier New", monospace;
+
+  --lfa-w-regular: 400; /* @kind font */ /* tekst / body */
+  --lfa-w-medium:  500; /* @kind font */ /* wyróżnienia / emphasis */
+  --lfa-w-semibold:600; /* @kind font */ /* logo, nagłówki / logo, headings */
+  --lfa-w-bold:    700; /* @kind font */ /* akcent / accent */
+
+  --lfa-h1-tracking: .05em; /* +5% dla wersalików H1 / +5% for H1 caps */
+  --lfa-h2-tracking: .03em;
+
+  /* --- Odstępy i promienie / Spacing & radius --- */
+  --lfa-space-1: 4px;
+  --lfa-space-2: 8px;
+  --lfa-space-3: 16px;
+  --lfa-space-4: 24px;
+  --lfa-space-5: 40px;
+  --lfa-space-6: 64px;
+
+  --lfa-radius:   6px;
+  --lfa-radius-lg:12px;
+
+  /* --- Proporcje palety (użycie) / Palette proportions (usage) --- */
+  /* Papier 58% · Granat 28% · Bordo 9% · Mosiądz 5% */
+}

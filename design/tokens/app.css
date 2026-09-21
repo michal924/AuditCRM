@@ -1,0 +1,202 @@
+/* =====================================================================
+   AuditCRM · warstwa tokenów aplikacji nad pakietem LF Assurance
+   ---------------------------------------------------------------------
+   Zasada: KAŻDY odcień jest wyprowadzony z 6 kolorów palety
+   (design/tokens/tokens.css) przez color-mix / przezroczystość.
+   Zero nowych HEX. Ten plik ładować PO tokens.css.
+   Tryb ciemny: [data-theme="dark"] lub prefers-color-scheme: dark
+   (gdy brak data-theme="light").
+   ===================================================================== */
+
+:root {
+  /* --- Kolory pochodne palety (helpery, tylko tutaj) --- */
+  --lfa-granat-deep:  #0F1B2E; /* z księgi marki (paleta.html) */
+  --lfa-bordo-deep:   #571620; /* z księgi marki (paleta.html) */
+  --lfa-mosiadz-text: color-mix(in srgb, var(--lfa-mosiadz) 62%, var(--lfa-atrament)); /* mosiądz czytelny jako tekst */
+
+  /* --- Powierzchnie --- */
+  --lfa-bg:            var(--lfa-papier);
+  --lfa-surface:       #FFFFFF;                                              /* panel, karta, modal */
+  --lfa-surface-2:     color-mix(in srgb, var(--lfa-granat) 6%, var(--lfa-papier));   /* podniesione / hover */
+  --lfa-surface-3:     color-mix(in srgb, var(--lfa-granat) 10%, var(--lfa-papier));  /* nagłówki tabel, zebra */
+  --lfa-overlay:       rgba(22, 38, 63, 0.55);                              /* tło pod modalem (granat) */
+
+  /* --- Tekst --- */
+  --lfa-text:          var(--lfa-atrament);
+  --lfa-text-muted:    var(--lfa-szary);
+  --lfa-text-subtle:   color-mix(in srgb, var(--lfa-szary) 70%, var(--lfa-papier));
+  --lfa-text-inverse:  var(--lfa-papier);
+  --lfa-link:          var(--lfa-granat);
+
+  /* --- Akcje --- */
+  --lfa-primary:         var(--lfa-granat);        /* jeden primary na ekran */
+  --lfa-primary-hover:   var(--lfa-granat-deep);
+  --lfa-on-primary:      var(--lfa-papier);
+  --lfa-accent:          var(--lfa-bordo);         /* oficjalność, ostrzeżenie, akcja drugorzędna */
+  --lfa-accent-hover:    var(--lfa-bordo-deep);
+  --lfa-on-accent:       var(--lfa-papier);
+  --lfa-detail:          var(--lfa-mosiadz);       /* cienkie linie, daty, sygnatury */
+  --lfa-detail-strong:   var(--lfa-mosiadz-text);
+
+  /* --- Obramowania, focus --- */
+  --lfa-border:          rgba(22, 38, 63, 0.14);
+  --lfa-border-strong:   rgba(22, 38, 63, 0.28);
+  --lfa-focus:           var(--lfa-granat);
+  --lfa-focus-ring:      0 0 0 2px var(--lfa-papier), 0 0 0 4px var(--lfa-granat);
+  --lfa-shadow:          0 4px 20px rgba(22, 38, 63, 0.10);
+  --lfa-shadow-lg:       0 16px 48px rgba(22, 38, 63, 0.18);
+
+  /* --- Stany semantyczne (tekst statusu ZAWSZE obok koloru) --- */
+  --lfa-info-bg:     color-mix(in srgb, var(--lfa-granat) 12%, var(--lfa-surface)); --lfa-info-fg:    var(--lfa-granat);
+  --lfa-success-bg:  color-mix(in srgb, var(--lfa-granat) 9%,  var(--lfa-surface)); --lfa-success-fg: var(--lfa-granat);   /* sukces = granat + ✓ */
+  --lfa-warning-bg:  color-mix(in srgb, var(--lfa-mosiadz) 20%, var(--lfa-surface)); --lfa-warning-fg: var(--lfa-mosiadz-text);
+  --lfa-danger-bg:   color-mix(in srgb, var(--lfa-bordo) 12%,  var(--lfa-surface)); --lfa-danger-fg:  var(--lfa-bordo);
+  --lfa-neutral-bg:  color-mix(in srgb, var(--lfa-szary) 14%,  var(--lfa-surface)); --lfa-neutral-fg: var(--lfa-szary);
+
+  /* --- Status audytu (AuditStatus) --- */
+  --lfa-st-planned-bg:  var(--lfa-info-bg);     --lfa-st-planned-fg:  var(--lfa-granat);
+  --lfa-st-done-bg:     var(--lfa-success-bg);  --lfa-st-done-fg:     var(--lfa-granat);
+  --lfa-st-rejected-bg: var(--lfa-neutral-bg);  --lfa-st-rejected-fg: var(--lfa-szary);
+  --lfa-st-change-bg:   var(--lfa-danger-bg);   --lfa-st-change-fg:   var(--lfa-bordo);
+  --lfa-st-invoice-bg:  var(--lfa-warning-bg);  --lfa-st-invoice-fg:  var(--lfa-mosiadz-text);
+
+  /* --- Jednostka certyfikująca (CertBody): CU = granat, SGS = mosiądz --- */
+  --lfa-body-cu:      var(--lfa-granat);
+  --lfa-body-cu-bg:   color-mix(in srgb, var(--lfa-granat) 12%,  var(--lfa-surface));
+  --lfa-body-cu-fg:   var(--lfa-granat);
+  --lfa-body-sgs:     var(--lfa-mosiadz);
+  --lfa-body-sgs-bg:  color-mix(in srgb, var(--lfa-mosiadz) 22%, var(--lfa-surface));
+  --lfa-body-sgs-fg:  var(--lfa-mosiadz-text);
+
+  /* Wiersze tabeli: barwa = jednostka, jasność = status (od najmocniejszego) */
+  --lfa-row-a-planned: 16%; --lfa-row-a-change: 12%; --lfa-row-a-invoice: 9%; --lfa-row-a-done: 6%; --lfa-row-a-rejected: 3%;
+
+  /* --- Program (badge) — wszystkie z palety, różnicowane nasyceniem --- */
+  --lfa-prog-fsc-bg:  color-mix(in srgb, var(--lfa-granat) 14%, var(--lfa-surface));  --lfa-prog-fsc-fg:  var(--lfa-granat);
+  --lfa-prog-pefc-bg: color-mix(in srgb, var(--lfa-granat) 8%,  var(--lfa-surface));  --lfa-prog-pefc-fg: var(--lfa-granat);
+  --lfa-prog-kzr-bg:  color-mix(in srgb, var(--lfa-mosiadz) 22%, var(--lfa-surface)); --lfa-prog-kzr-fg:  var(--lfa-mosiadz-text);
+  --lfa-prog-sure-bg: color-mix(in srgb, var(--lfa-bordo) 10%,  var(--lfa-surface));  --lfa-prog-sure-fg: var(--lfa-bordo);
+  --lfa-prog-eudr-bg: color-mix(in srgb, var(--lfa-szary) 16%,  var(--lfa-surface));  --lfa-prog-eudr-fg: var(--lfa-atrament);
+
+  /* --- Kalendarz --- */
+  --lfa-cal-free-bg:     color-mix(in srgb, var(--lfa-granat) 6%,  var(--lfa-surface)); --lfa-cal-free-fg:  var(--lfa-granat);   /* wolny: jasny granat + etykieta */
+  --lfa-cal-off-bg:      color-mix(in srgb, var(--lfa-szary) 12%,  var(--lfa-surface)); --lfa-cal-off-fg:   var(--lfa-szary);    /* weekend / święto */
+  --lfa-cal-busy-bg:     color-mix(in srgb, var(--lfa-bordo) 14%,  var(--lfa-surface)); --lfa-cal-busy-fg:  var(--lfa-bordo);    /* zajęty (Outlook) */
+  --lfa-cal-custody:     var(--lfa-mosiadz);                                                                                    /* opieka: krawędź 3px */
+  --lfa-cal-conflict:    var(--lfa-bordo);                                                                                      /* audyt w dzień opieki: obrys */
+  --lfa-cal-today:       var(--lfa-granat);                                                                                     /* obrys dziś */
+  --lfa-cal-ext-bg:      var(--lfa-neutral-bg); --lfa-cal-ext-fg: var(--lfa-szary);                                             /* wydarzenie Outlook (chip) */
+
+  /* --- Rozliczenie (SettleStatus) i plan audytu --- */
+  --lfa-settle-open-bg:  var(--lfa-neutral-bg);  --lfa-settle-open-fg:  var(--lfa-szary);
+  --lfa-settle-sent-bg:  var(--lfa-warning-bg);  --lfa-settle-sent-fg:  var(--lfa-mosiadz-text);
+  --lfa-settle-done-bg:  var(--lfa-success-bg);  --lfa-settle-done-fg:  var(--lfa-granat);
+  --lfa-plan-sent-bg:    var(--lfa-success-bg);  --lfa-plan-sent-fg:    var(--lfa-granat);
+  --lfa-proforma-none-bg: var(--lfa-neutral-bg); --lfa-proforma-sent-bg: var(--lfa-warning-bg); --lfa-proforma-paid-bg: var(--lfa-success-bg);
+
+  /* --- Typografia aplikacji (mapowanie na tokeny pakietu) --- */
+  --lfa-font-ui:    var(--lfa-font-sans);   /* Archivo — całe UI */
+  --lfa-font-data:  var(--lfa-font-mono);   /* IBM Plex Mono — liczby, PRJ, daty, kwoty */
+  --lfa-text-xs: 11px; --lfa-text-sm: 12.5px; --lfa-text-md: 14px; --lfa-text-lg: 16px; --lfa-text-xl: 20px; --lfa-text-2xl: 26px;
+  --lfa-leading: 1.45;
+
+  /* --- Geometria UI --- */
+  --lfa-radius-sm: 4px;      /* chip, badge */
+  --lfa-control-h: 36px;     /* wysokość pól i przycisków md */
+  --lfa-control-h-sm: 30px;
+  --lfa-touch: 44px;         /* minimalny cel dotyku (mobile) */
+}
+
+/* =====================================================================
+   TRYB CIEMNY — te same tokeny, inne wartości. Tło = granat-deep,
+   powierzchnie = granat, tekst = Papier. Bordo/mosiądz rozjaśnione
+   mieszanką z Papierem, żeby trzymać kontrast AA.
+   ===================================================================== */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --lfa-scheme: dark; }
+}
+:root[data-theme="dark"] { --lfa-scheme: dark; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --lfa-bg:           var(--lfa-granat-deep);
+    --lfa-surface:      var(--lfa-granat);
+    --lfa-surface-2:    color-mix(in srgb, var(--lfa-papier) 7%,  var(--lfa-granat));
+    --lfa-surface-3:    color-mix(in srgb, var(--lfa-papier) 12%, var(--lfa-granat));
+    --lfa-overlay:      rgba(15, 27, 46, 0.72);
+    --lfa-text:         var(--lfa-papier);
+    --lfa-text-muted:   color-mix(in srgb, var(--lfa-papier) 66%, var(--lfa-granat));
+    --lfa-text-subtle:  color-mix(in srgb, var(--lfa-papier) 45%, var(--lfa-granat));
+    --lfa-text-inverse: var(--lfa-granat);
+    --lfa-link:         var(--lfa-mosiadz-jasny);
+    --lfa-primary:        var(--lfa-papier);      --lfa-primary-hover: color-mix(in srgb, var(--lfa-papier) 88%, var(--lfa-granat)); --lfa-on-primary: var(--lfa-granat);
+    --lfa-accent:         color-mix(in srgb, var(--lfa-bordo) 60%, var(--lfa-papier)); --lfa-accent-hover: color-mix(in srgb, var(--lfa-bordo) 48%, var(--lfa-papier)); --lfa-on-accent: var(--lfa-granat-deep);
+    --lfa-detail:         var(--lfa-mosiadz-jasny); --lfa-detail-strong: var(--lfa-mosiadz-jasny); --lfa-mosiadz-text: var(--lfa-mosiadz-jasny);
+    --lfa-border:         rgba(245, 243, 238, 0.14);
+    --lfa-border-strong:  rgba(245, 243, 238, 0.28);
+    --lfa-focus:          var(--lfa-mosiadz-jasny);
+    --lfa-focus-ring:     0 0 0 2px var(--lfa-granat), 0 0 0 4px var(--lfa-mosiadz-jasny);
+    --lfa-shadow:         0 4px 20px rgba(0, 0, 0, 0.35);
+    --lfa-shadow-lg:      0 16px 48px rgba(0, 0, 0, 0.5);
+
+    --lfa-info-bg:    color-mix(in srgb, var(--lfa-papier) 14%, var(--lfa-granat)); --lfa-info-fg:    var(--lfa-papier);
+    --lfa-success-bg: color-mix(in srgb, var(--lfa-papier) 10%, var(--lfa-granat)); --lfa-success-fg: var(--lfa-papier);
+    --lfa-warning-bg: color-mix(in srgb, var(--lfa-mosiadz) 30%, var(--lfa-granat)); --lfa-warning-fg: var(--lfa-mosiadz-jasny);
+    --lfa-danger-bg:  color-mix(in srgb, var(--lfa-bordo) 45%,  var(--lfa-granat)); --lfa-danger-fg:  color-mix(in srgb, var(--lfa-bordo) 35%, var(--lfa-papier));
+    --lfa-neutral-bg: color-mix(in srgb, var(--lfa-szary) 35%,  var(--lfa-granat)); --lfa-neutral-fg: color-mix(in srgb, var(--lfa-papier) 70%, var(--lfa-granat));
+
+    --lfa-st-planned-fg: var(--lfa-papier); --lfa-st-done-fg: var(--lfa-papier); --lfa-st-rejected-fg: var(--lfa-neutral-fg);
+    --lfa-st-change-fg:  var(--lfa-danger-fg); --lfa-st-invoice-fg: var(--lfa-mosiadz-jasny);
+
+    --lfa-body-cu:     var(--lfa-papier);
+    --lfa-body-cu-bg:  color-mix(in srgb, var(--lfa-papier) 14%, var(--lfa-granat));  --lfa-body-cu-fg:  var(--lfa-papier);
+    --lfa-body-sgs:    var(--lfa-mosiadz-jasny);
+    --lfa-body-sgs-bg: color-mix(in srgb, var(--lfa-mosiadz) 30%, var(--lfa-granat)); --lfa-body-sgs-fg: var(--lfa-mosiadz-jasny);
+
+    --lfa-prog-fsc-bg:  var(--lfa-info-bg);    --lfa-prog-fsc-fg:  var(--lfa-papier);
+    --lfa-prog-pefc-bg: var(--lfa-success-bg); --lfa-prog-pefc-fg: var(--lfa-papier);
+    --lfa-prog-kzr-bg:  var(--lfa-warning-bg); --lfa-prog-kzr-fg:  var(--lfa-mosiadz-jasny);
+    --lfa-prog-sure-bg: var(--lfa-danger-bg);  --lfa-prog-sure-fg: var(--lfa-danger-fg);
+    --lfa-prog-eudr-bg: var(--lfa-neutral-bg); --lfa-prog-eudr-fg: var(--lfa-papier);
+
+    --lfa-cal-free-bg: color-mix(in srgb, var(--lfa-papier) 9%, var(--lfa-granat));  --lfa-cal-free-fg: var(--lfa-papier);
+    --lfa-cal-off-bg:  color-mix(in srgb, var(--lfa-szary) 25%, var(--lfa-granat));  --lfa-cal-off-fg:  var(--lfa-neutral-fg);
+    --lfa-cal-busy-bg: var(--lfa-danger-bg);                                          --lfa-cal-busy-fg: var(--lfa-danger-fg);
+    --lfa-cal-custody: var(--lfa-mosiadz-jasny); --lfa-cal-conflict: var(--lfa-danger-fg); --lfa-cal-today: var(--lfa-papier);
+    --lfa-cal-ext-bg:  var(--lfa-neutral-bg); --lfa-cal-ext-fg: var(--lfa-neutral-fg);
+
+    --lfa-settle-open-fg: var(--lfa-neutral-fg); --lfa-settle-sent-fg: var(--lfa-mosiadz-jasny); --lfa-settle-done-fg: var(--lfa-papier);
+    --lfa-plan-sent-fg:   var(--lfa-papier);
+  }
+}
+/* Jawny wybór ciemnego — te same wartości co powyżej (utrzymywać w synchronizacji z blokiem @media) */
+:root[data-theme="dark"] {
+  --lfa-bg: var(--lfa-granat-deep); --lfa-surface: var(--lfa-granat);
+  --lfa-surface-2: color-mix(in srgb, var(--lfa-papier) 7%, var(--lfa-granat)); --lfa-surface-3: color-mix(in srgb, var(--lfa-papier) 12%, var(--lfa-granat));
+  --lfa-overlay: rgba(15, 27, 46, 0.72);
+  --lfa-text: var(--lfa-papier); --lfa-text-muted: color-mix(in srgb, var(--lfa-papier) 66%, var(--lfa-granat)); --lfa-text-subtle: color-mix(in srgb, var(--lfa-papier) 45%, var(--lfa-granat));
+  --lfa-text-inverse: var(--lfa-granat); --lfa-link: var(--lfa-mosiadz-jasny);
+  --lfa-primary: var(--lfa-papier); --lfa-primary-hover: color-mix(in srgb, var(--lfa-papier) 88%, var(--lfa-granat)); --lfa-on-primary: var(--lfa-granat);
+  --lfa-accent: color-mix(in srgb, var(--lfa-bordo) 60%, var(--lfa-papier)); --lfa-accent-hover: color-mix(in srgb, var(--lfa-bordo) 48%, var(--lfa-papier)); --lfa-on-accent: var(--lfa-granat-deep);
+  --lfa-detail: var(--lfa-mosiadz-jasny); --lfa-detail-strong: var(--lfa-mosiadz-jasny); --lfa-mosiadz-text: var(--lfa-mosiadz-jasny);
+  --lfa-border: rgba(245, 243, 238, 0.14); --lfa-border-strong: rgba(245, 243, 238, 0.28);
+  --lfa-focus: var(--lfa-mosiadz-jasny); --lfa-focus-ring: 0 0 0 2px var(--lfa-granat), 0 0 0 4px var(--lfa-mosiadz-jasny);
+  --lfa-shadow: 0 4px 20px rgba(0, 0, 0, 0.35); --lfa-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --lfa-info-bg: color-mix(in srgb, var(--lfa-papier) 14%, var(--lfa-granat)); --lfa-info-fg: var(--lfa-papier);
+  --lfa-success-bg: color-mix(in srgb, var(--lfa-papier) 10%, var(--lfa-granat)); --lfa-success-fg: var(--lfa-papier);
+  --lfa-warning-bg: color-mix(in srgb, var(--lfa-mosiadz) 30%, var(--lfa-granat)); --lfa-warning-fg: var(--lfa-mosiadz-jasny);
+  --lfa-danger-bg: color-mix(in srgb, var(--lfa-bordo) 45%, var(--lfa-granat)); --lfa-danger-fg: color-mix(in srgb, var(--lfa-bordo) 35%, var(--lfa-papier));
+  --lfa-neutral-bg: color-mix(in srgb, var(--lfa-szary) 35%, var(--lfa-granat)); --lfa-neutral-fg: color-mix(in srgb, var(--lfa-papier) 70%, var(--lfa-granat));
+  --lfa-st-planned-fg: var(--lfa-papier); --lfa-st-done-fg: var(--lfa-papier); --lfa-st-rejected-fg: var(--lfa-neutral-fg); --lfa-st-change-fg: var(--lfa-danger-fg); --lfa-st-invoice-fg: var(--lfa-mosiadz-jasny);
+  --lfa-body-cu: var(--lfa-papier); --lfa-body-cu-bg: color-mix(in srgb, var(--lfa-papier) 14%, var(--lfa-granat)); --lfa-body-cu-fg: var(--lfa-papier);
+  --lfa-body-sgs: var(--lfa-mosiadz-jasny); --lfa-body-sgs-bg: color-mix(in srgb, var(--lfa-mosiadz) 30%, var(--lfa-granat)); --lfa-body-sgs-fg: var(--lfa-mosiadz-jasny);
+  --lfa-prog-fsc-bg: var(--lfa-info-bg); --lfa-prog-fsc-fg: var(--lfa-papier); --lfa-prog-pefc-bg: var(--lfa-success-bg); --lfa-prog-pefc-fg: var(--lfa-papier);
+  --lfa-prog-kzr-bg: var(--lfa-warning-bg); --lfa-prog-kzr-fg: var(--lfa-mosiadz-jasny); --lfa-prog-sure-bg: var(--lfa-danger-bg); --lfa-prog-sure-fg: var(--lfa-danger-fg);
+  --lfa-prog-eudr-bg: var(--lfa-neutral-bg); --lfa-prog-eudr-fg: var(--lfa-papier);
+  --lfa-cal-free-bg: color-mix(in srgb, var(--lfa-papier) 9%, var(--lfa-granat)); --lfa-cal-free-fg: var(--lfa-papier);
+  --lfa-cal-off-bg: color-mix(in srgb, var(--lfa-szary) 25%, var(--lfa-granat)); --lfa-cal-off-fg: var(--lfa-neutral-fg);
+  --lfa-cal-busy-bg: var(--lfa-danger-bg); --lfa-cal-busy-fg: var(--lfa-danger-fg);
+  --lfa-cal-custody: var(--lfa-mosiadz-jasny); --lfa-cal-conflict: var(--lfa-danger-fg); --lfa-cal-today: var(--lfa-papier);
+  --lfa-cal-ext-bg: var(--lfa-neutral-bg); --lfa-cal-ext-fg: var(--lfa-neutral-fg);
+  --lfa-settle-open-fg: var(--lfa-neutral-fg); --lfa-settle-sent-fg: var(--lfa-mosiadz-jasny); --lfa-settle-done-fg: var(--lfa-papier); --lfa-plan-sent-fg: var(--lfa-papier);
+}

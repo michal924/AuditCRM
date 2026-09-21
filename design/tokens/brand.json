@@ -1,0 +1,100 @@
+{
+  "brand": "LF Assurance",
+  "source": "Księga marki LF Assurance v2",
+  "palette": [
+    {
+      "name": "Granat Assurance",
+      "role": "primary",
+      "hex": "#16263F",
+      "rgb": [
+        22,
+        38,
+        63
+      ],
+      "usage": "28%"
+    },
+    {
+      "name": "Bordo Sygnet",
+      "role": "accent",
+      "hex": "#6E1F2C",
+      "rgb": [
+        110,
+        31,
+        44
+      ],
+      "usage": "9%"
+    },
+    {
+      "name": "Mosiądz",
+      "role": "detail",
+      "hex": "#A6864E",
+      "rgb": [
+        166,
+        134,
+        78
+      ],
+      "usage": "5%"
+    },
+    {
+      "name": "Papier",
+      "role": "background",
+      "hex": "#F5F3EE",
+      "rgb": [
+        245,
+        243,
+        238
+      ],
+      "usage": "58%"
+    },
+    {
+      "name": "Szary Dokument",
+      "role": "aux",
+      "hex": "#6C6A63",
+      "rgb": [
+        108,
+        106,
+        99
+      ]
+    },
+    {
+      "name": "Atrament",
+      "role": "text",
+      "hex": "#1E2024",
+      "rgb": [
+        30,
+        32,
+        36
+      ]
+    }
+  ],
+  "helpers": {
+    "Mosiądz jasny": "#C9A46A",
+    "Negatyw": "#F5F3EE"
+  },
+  "type": {
+    "sans": "Archivo — \"Archivo\", \"Segoe UI\", system-ui, -apple-system, sans-serif",
+    "mono": "IBM Plex Mono — \"IBM Plex Mono\", \"SFMono-Regular\", ui-monospace, \"Courier New\", monospace",
+    "weights": {
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
+    },
+    "tracking": {
+      "h1": "+5%",
+      "h2": "+3%"
+    }
+  },
+  "spacing": {
+    "1": "4px",
+    "2": "8px",
+    "3": "16px",
+    "4": "24px",
+    "5": "40px",
+    "6": "64px"
+  },
+  "radius": {
+    "base": "6px",
+    "lg": "12px"
+  }
+}
