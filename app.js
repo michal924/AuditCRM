@@ -217,10 +217,16 @@ function settleCalc(a) {
 function fmtPLN(n) {
   return (Math.round((n || 0) * 100) / 100).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " zł";
 }
+// Etykieta statusu zależna od jednostki: "Wysłany do CU" / "Wysłany do SGS" (wartość w SP jest jedna)
+function settleBodyName(a) { return certBodyOf(a) === "SGS" ? "SGS" : "CU"; }
+function settleStatusLabel(a) {
+  const s = settleStatusOf(a);
+  return s === "Wysłany do CU" ? "Wysłany do " + settleBodyName(a) : s;
+}
 function settleBadge(a) {
   const s = settleStatusOf(a);
   const cls = s === "Rozliczony" ? "done" : s === "Wysłany do CU" ? "sent" : "open";
-  return '<span class="settle-badge ' + cls + '">' + escHtml(s) + '</span>';
+  return '<span class="settle-badge ' + cls + '">' + escHtml(settleStatusLabel(a)) + '</span>';
 }
 function settleSetText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
 function renderSettleView(a) {
@@ -244,7 +250,7 @@ function renderSettleView(a) {
 function updateSettleHead(a) {
   const s = settleStatusOf(a), c = settleCalc(a);
   const st = document.getElementById("settle-head-status");
-  if (st) { st.textContent = s; st.className = "settle-badge " + (s === "Rozliczony" ? "done" : s === "Wysłany do CU" ? "sent" : "open"); }
+  if (st) { st.textContent = settleStatusLabel(a); st.className = "settle-badge " + (s === "Rozliczony" ? "done" : s === "Wysłany do CU" ? "sent" : "open"); }
   settleSetText("settle-head-total", (c.total || c.costs) ? fmtPLN(c.total) : "—");
 }
 // Przeliczenie na żywo w trybie edycji
@@ -268,7 +274,9 @@ function updateMultiBtn(key) {
   const btn = document.getElementById(`filter-${key}-btn`);
   if (!btn) return;
   const label = MULTI_LABELS[key];
-  btn.textContent = sel.length === 0 ? label : sel.length === 1 ? sel[0] : `${label} (${sel.length})`;
+  // Dla filtra rozliczenia wartość "Wysłany do CU" obejmuje też SGS → pokaż neutralnie
+  const show1 = (key === "settle" && sel[0] === "Wysłany do CU") ? "Wysłany do jednostki" : sel[0];
+  btn.textContent = sel.length === 0 ? label : sel.length === 1 ? show1 : `${label} (${sel.length})`;
   btn.classList.toggle("filter-multi-active", sel.length > 0);
 }
 
@@ -876,6 +884,9 @@ function openModal(id) {
   currentSettleStatus = settleStatusOf(a);
   currentSettleDate = a.SettleDate ? String(a.SettleDate).substring(0, 10) : null;
   document.querySelectorAll(".settle-btn").forEach(b => b.classList.toggle("active", b.dataset.val === currentSettleStatus));
+  // Przycisk "Wysłany do …" nazywa jednostkę tego audytu (CU lub SGS)
+  const sentBtn = document.querySelector('.settle-btn[data-val="Wysłany do CU"]');
+  if (sentBtn) sentBtn.textContent = "📤 Wysłany do " + settleBodyName(a);
   const settleDateEl = document.getElementById("settle-date");
   settleDateEl.value = currentSettleDate || "";
   settleDateEl.classList.toggle("hidden", currentSettleStatus !== "Rozliczony");
@@ -3941,7 +3952,7 @@ const SettleModule = (function () {
       aoa.push([d, a.Title || "", a.ProjectID || "", a.Program || "", a.AuditDays != null ? a.AuditDays : "",
         a.SettleFeeBasis || "", typ, a.SettleRoute || "", km, km != null ? c.kmCost : null, "",
         n(a.SettleHotel), n(a.SettleHighway), n(a.SettleOther), n(a.SettleTickets),
-        n(a.SettleFee), c.total, settleStatusOf(a)]);
+        n(a.SettleFee), c.total, settleStatusLabel(a)]);
       sums.I += km || 0; sums.J += km != null ? c.kmCost : 0; sums.L += settleNum(a.SettleHotel); sums.M += settleNum(a.SettleHighway);
       sums.N += settleNum(a.SettleOther); sums.O += settleNum(a.SettleTickets); sums.P += settleNum(a.SettleFee); sums.Q += c.total;
     });
@@ -3993,8 +4004,11 @@ const SettleModule = (function () {
       '<div class="settle-kpis">' +
         kpi("Audyty", rows.length) + kpi("Koszty", fmtPLN(costs)) + kpi("Wynagrodzenie", fmtPLN(fee)) + kpi("Razem", fmtPLN(total)) +
       '</div>' +
-      '<div class="settle-statusline">' + ["Nierozliczony", "Wysłany do CU", "Rozliczony"].map(s =>
-        '<span class="settle-badge ' + (s === "Rozliczony" ? "done" : s === "Wysłany do CU" ? "sent" : "open") + '">' + s + ': ' + (byStatus[s] || 0) + '</span>').join(" ") + '</div>';
+      '<div class="settle-statusline">' + ["Nierozliczony", "Wysłany do CU", "Rozliczony"].map(s => {
+        const b = bodyFilter();
+        const lbl = s === "Wysłany do CU" ? ("Wysłany do " + (b === "SGS" ? "SGS" : b === "CUC" ? "CU" : "jednostki")) : s;
+        return '<span class="settle-badge ' + (s === "Rozliczony" ? "done" : s === "Wysłany do CU" ? "sent" : "open") + '">' + lbl + ': ' + (byStatus[s] || 0) + '</span>';
+      }).join(" ") + '</div>';
   }
   function kpi(label, val) { return '<div class="settle-kpi"><span class="settle-kpi-val">' + val + '</span><span class="settle-kpi-label">' + label + '</span></div>'; }
 
@@ -4020,7 +4034,7 @@ const SettleModule = (function () {
     box.innerHTML =
       table("Wg klienta", agg(a => a.Title || "—"), "Klient", false) +
       table("Wg miesiąca", byMonth, "Miesiąc", true) +
-      table("Wg statusu rozliczenia", agg(a => settleStatusOf(a)), "Status", true);
+      table("Wg statusu rozliczenia", agg(a => settleStatusLabel(a)), "Status", true);
   }
 
   function fillYears() {

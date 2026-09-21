@@ -77,7 +77,7 @@
     </div>
     <div class="nav-right">
       <button id="btn-import" class="btn-action" title="Importuj kwartalny plan z CUC">⬆ Import CUC</button>
-      <button id="btn-settle" class="btn-action" title="Rozliczenie audytów CU — eksport miesięczny i raporty">📊 Rozliczenie CU</button>
+      <button id="btn-settle" class="btn-action" title="Rozliczenie audytów (CU / SGS) — eksport miesięczny i raporty">📊 Rozliczenie</button>
       <button id="btn-add-audit" class="btn-action btn-action-green" title="Dodaj nieplanowany audyt">＋ Dodaj audyt</button>
       <span id="nav-user"></span>
       <button id="btn-logout" class="btn-ghost">Wyloguj</button>
@@ -143,7 +143,7 @@
         <button class="filter-select filter-multi-btn" id="filter-settle-btn">Rozliczenie</button>
         <div class="filter-multi-panel hidden" id="filter-settle-panel">
           <label class="filter-multi-opt"><input type="checkbox" value="Nierozliczony"> Nierozliczony</label>
-          <label class="filter-multi-opt"><input type="checkbox" value="Wysłany do CU"> Wysłany do CU</label>
+          <label class="filter-multi-opt"><input type="checkbox" value="Wysłany do CU"> Wysłany do jednostki (CU / SGS)</label>
           <label class="filter-multi-opt"><input type="checkbox" value="Rozliczony"> Rozliczony</label>
         </div>
       </div>
@@ -906,7 +906,7 @@
 <div id="settle-overlay" class="modal-overlay hidden">
   <div class="modal settle-modal">
     <div class="modal-header">
-      <h2>📊 Rozliczenie audytów — CU</h2>
+      <h2>📊 Rozliczenie audytów — CU / SGS</h2>
       <button id="settle-close" class="btn-ghost">✕</button>
     </div>
     <div class="modal-body">
