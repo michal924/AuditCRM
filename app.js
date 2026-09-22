@@ -302,6 +302,10 @@ function updateMultiBtn(key) {
   const show1 = (key === "settle" && sel[0] === "Wysłany do CU") ? "Wysłany do jednostki" : sel[0];
   btn.textContent = sel.length === 0 ? label : sel.length === 1 ? show1 : `${label} (${sel.length})`;
   btn.classList.toggle("filter-multi-active", sel.length > 0);
+  // Filtr jednostki w kolorze jednostki (CU granat / SGS mosiądz), gdy wybrana dokładnie jedna
+  if (key === "certbody") { if (sel.length === 1) btn.dataset.body = sel[0]; else delete btn.dataset.body; }
+  const clr = document.getElementById("btn-clear-filters");
+  if (clr) clr.classList.toggle("has-filters", MULTI_KEYS.some(k => getSelectedMulti(k).length > 0) || !!(document.getElementById("search") || {}).value);
 }
 
 function saveFilters() {

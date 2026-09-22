@@ -210,7 +210,7 @@ td.date-col,
   transition: border 0.2s;
   font-family: var(--font-data);
 }
-.search-input:focus { border-color: var(--accent-light); }
+.search-input:focus { border-color: var(--lfa-primary); box-shadow: 0 0 0 3px var(--lfa-info-bg); }
 
 .filter-select {
   background: var(--bg2);
@@ -224,13 +224,18 @@ td.date-col,
   transition: border 0.2s;
   font-family: var(--font-data);
 }
-.filter-select:focus { border-color: var(--accent-light); }
+.filter-select:focus { border-color: var(--lfa-primary); box-shadow: 0 0 0 3px var(--lfa-info-bg); }
 
 /* Multi-select status dropdown */
 .filter-multi-wrap { position: relative; }
 .filter-multi-btn { text-align: left; min-width: 110px; appearance: none; }
 .filter-multi-btn::after { content: " ▾"; font-size: 11px; color: var(--text2); }
-.filter-multi-btn.filter-multi-active { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+/* Aktywny filtr = granat (marka); jednostka w kolorze jednostki: CU granat, SGS mosiądz */
+.filter-multi-btn.filter-multi-active { background: var(--lfa-primary); border-color: var(--lfa-primary); color: var(--lfa-on-primary); font-weight: 700; }
+.filter-multi-btn.filter-multi-active::after { color: inherit; opacity: .8; }
+.filter-multi-btn.filter-multi-active[data-body="CUC"] { background: var(--lfa-body-cu-bg); border-color: var(--lfa-body-cu); color: var(--lfa-body-cu-fg); }
+.filter-multi-btn.filter-multi-active[data-body="SGS"] { background: var(--lfa-body-sgs-bg); border-color: var(--lfa-body-sgs); color: var(--lfa-body-sgs-fg); }
+.filters-bar .btn-ghost.has-filters { color: var(--lfa-accent); border-color: var(--lfa-accent); font-weight: 700; }
 .filter-multi-panel { position: absolute; top: calc(100% + 4px); left: 0; z-index: 1200; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: var(--lfa-shadow-lg); min-width: 140px; display: flex; flex-direction: column; gap: 2px; }
 .filter-multi-panel.hidden { display: none; }
 .filter-multi-opt { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text); transition: background .1s; }
@@ -250,21 +255,23 @@ td.date-col,
 .stat-card {
   background: var(--bg2);
   border: 1px solid var(--border);
+  border-top: 3px solid var(--lfa-detail);          /* Łącznie: linia mosiądz (detal, suma) */
   border-radius: var(--radius);
   padding: 12px 20px;
   min-width: 120px;
   text-align: center;
 }
-.stat-card.planned { border-color: var(--accent-light); }
-.stat-card.done    { border-color: var(--green); }
-.stat-card.proforma{ border-color: var(--orange); }
-
-.stat-num   { display: block; font-size: 26px; font-weight: 800; }
+.stat-num   { display: block; font-size: 26px; font-weight: 800; color: var(--lfa-primary); font-variant-numeric: tabular-nums; }
 .stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
 
-.stat-card.planned .stat-num { color: var(--accent-light); }
-.stat-card.done    .stat-num { color: var(--green); }
-.stat-card.proforma .stat-num { color: var(--orange); }
+/* Zaplanowane: granat tint · Wykonane: granat pełny + ✓ · Do proformy: bordo (wymaga działania) */
+.stat-card.planned  { background: var(--lfa-info-bg); border-color: var(--lfa-primary); border-top-color: var(--lfa-primary); }
+.stat-card.done     { background: var(--lfa-primary); border-color: var(--lfa-primary); border-top-color: var(--lfa-primary); }
+.stat-card.done .stat-num, .stat-card.done .stat-label { color: var(--lfa-on-primary); }
+.stat-card.done .stat-label::before { content: "✓ "; }
+.stat-card.proforma { background: var(--lfa-danger-bg); border-color: var(--lfa-accent); border-top-color: var(--lfa-accent); }
+.stat-card.proforma .stat-num { color: var(--lfa-accent); }
+.stat-card.proforma .stat-label { color: var(--lfa-accent); }
 
 /* ============================================================
    TABLE
