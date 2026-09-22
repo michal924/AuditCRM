@@ -127,44 +127,60 @@ td.date-col,
 /* ============================================================
    NAVBAR
    ============================================================ */
+/* Układ aplikacji: treść po lewej, pasek zakładek po prawej (sticky, pełna wysokość) */
+#page-app { display: grid; grid-template-columns: minmax(0, 1fr) 236px; align-items: start; }
+.app-main { min-width: 0; order: 1; }
 .navbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  height: 58px;
+  order: 2;
+  display: flex; flex-direction: column; align-items: stretch; gap: 18px;
+  padding: 18px 14px 16px;
+  height: 100vh; overflow-y: auto;
   background: var(--bg2);
-  border-bottom: 2px solid var(--accent);
+  border-left: 1px solid var(--border);
   position: sticky; top: 0; z-index: 100;
 }
 
 .nav-left { display: flex; align-items: center; gap: 14px; }
 
-/* AuditCRM logo lockup */
+/* Lockup marki */
 .acrm-lockup { display: inline-flex; align-items: center; gap: 0.55em; text-decoration: none; flex-shrink: 0; }
 .acrm-lockup.acrm-stacked { flex-direction: column; gap: 0.35em; align-items: center; }
 .acrm-wm { font-family: var(--lfa-font-ui); font-weight: var(--lfa-w-semibold); letter-spacing: var(--lfa-h1-tracking); text-transform: uppercase; line-height: 1; white-space: nowrap; }
 .acrm-a { color: var(--lfa-primary); }
 .acrm-c { color: var(--lfa-accent); }
+.nav-wm { font-size: 14px; line-height: 1.2; white-space: normal; }
+.nav-wm .acrm-c { display: block; }
 
-.nav-links { display: flex; gap: 4px; }
+.nav-links { display: flex; flex-direction: column; gap: 4px; }
 .nav-btn {
   background: transparent;
-  border: none;
+  border: none; border-left: 3px solid transparent;
   color: var(--text2);
-  padding: 6px 14px;
+  padding: 10px 12px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
+  text-align: left;
+  font-size: 13.5px;
   font-weight: 600;
-  transition: all 0.2s;
+  transition: background 0.15s, color 0.15s;
   font-family: var(--font-data);
 }
 .nav-btn:hover { background: var(--bg3); color: var(--text); }
-.nav-btn.active { background: var(--accent); color: white; }
+.nav-btn.active { background: var(--accent); color: var(--lfa-on-primary); border-left-color: var(--lfa-accent); }
 
-.nav-right { display: flex; align-items: center; gap: 12px; }
-#nav-user { font-size: 13px; color: var(--text2); }
+.nav-right { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border); }
+.nav-right .btn-action, .nav-right .btn-ghost { width: 100%; text-align: center; }
+#nav-user { font-size: 12.5px; color: var(--text2); text-align: center; padding: 4px 0; }
+/* Wąskie okno: pasek wraca na górę (poziomo) */
+@media (max-width: 900px) {
+  #page-app { display: block; }
+  .navbar { height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 14px; border-left: 0; border-bottom: 2px solid var(--accent); }
+  .nav-wm .acrm-c { display: inline; }
+  .nav-links { flex-direction: row; flex-wrap: wrap; }
+  .nav-btn { padding: 6px 12px; border-left-width: 0; }
+  .nav-right { flex-direction: row; flex-wrap: wrap; align-items: center; margin-top: 0; padding-top: 0; border-top: 0; margin-left: auto; }
+  .nav-right .btn-action, .nav-right .btn-ghost { width: auto; }
+}
 
 /* ============================================================
    VIEWS
@@ -1600,3 +1616,6 @@ tr.change-row-rzeznik:hover { background: var(--lfa-info-bg); }
 .settle-import-meta { font-family: var(--lfa-font-data); font-size: 11px; color: var(--lfa-text-muted); margin-left: 4px; }
 tr.imp-missing td { color: var(--lfa-text-muted); }
 tr.imp-write td { background: var(--lfa-success-bg); }
+
+/* FAB zgłoszeń odsunięty od prawego paska zakładek */
+@media (min-width: 901px) { .dev-fab { right: 258px; } }
