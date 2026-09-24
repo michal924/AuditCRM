@@ -1241,14 +1241,14 @@ tr.change-row-rzeznik:hover { background: var(--lfa-info-bg); }
 .op-day.father { background: var(--lfa-warning-bg); color: var(--lfa-detail-strong); font-weight: 800; }
 .op-day.special { background: color-mix(in srgb, var(--lfa-mosiadz) 45%, var(--lfa-surface)); color: var(--lfa-text); }
 .op-day.handover { box-shadow: inset 0 0 0 2px var(--orange); }
-.op-day.is-today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.op-day.is-today { outline: 2px solid var(--lfa-cal-today); outline-offset: 1px; }
 
 .op-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 14px; font-size: 13px; color: var(--text2); font-weight: 700; }
 .op-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .op-sw { width: 16px; height: 16px; border-radius: 5px; display: inline-block; }
 .op-sw.father { background: var(--lfa-warning-bg); } .op-sw.special { background: color-mix(in srgb, var(--lfa-mosiadz) 45%, var(--lfa-surface)); }
 .op-sw.handover { background: var(--bg2); box-shadow: inset 0 0 0 2px var(--orange); }
-.op-sw.today { background: var(--bg2); outline: 2px solid var(--accent); outline-offset: -2px; }
+.op-sw.today { background: var(--bg2); outline: 2px solid var(--lfa-cal-today); outline-offset: -2px; }
 .op-sw.audit { background: var(--bg2); position: relative; }
 .op-sw.audit::after { content: ""; position: absolute; bottom: 2px; right: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .op-sw.conflict { background: var(--bg2); box-shadow: inset 0 0 0 2px var(--red); }
@@ -1279,11 +1279,11 @@ tr.change-row-rzeznik:hover { background: var(--lfa-info-bg); }
 .op-day-large.father { background: var(--lfa-warning-bg); border-color: var(--lfa-detail); }
 .op-day-large.special { background: color-mix(in srgb, var(--lfa-mosiadz) 45%, var(--lfa-surface)); border-color: var(--lfa-detail-strong); }
 .op-day-large.handover { box-shadow: inset 0 0 0 2px var(--orange); }
-.op-day-large.is-today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.op-day-large.is-today { outline: 2px solid var(--lfa-cal-today); outline-offset: 1px; }
 .op-day-large.conflict { box-shadow: inset 0 0 0 2px var(--red); }
 .op-day-large-num { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1; }
 .op-day-large.father .op-day-large-num { color: var(--green2); }
-.op-day-large.is-today .op-day-large-num { color: var(--accent); }
+.op-day-large.is-today .op-day-large-num { color: var(--lfa-cal-today); }
 .op-day-large-status { font-size: 11px; font-weight: 700; color: var(--green2); text-transform: uppercase; letter-spacing: .04em; }
 .op-day-large.special .op-day-large-status { color: var(--lfa-text); }
 .op-day-large-ho { font-size: 11px; color: var(--orange); font-weight: 700; }
@@ -1299,15 +1299,15 @@ tr.change-row-rzeznik:hover { background: var(--lfa-info-bg); }
 .op-week-col.father { background: var(--lfa-warning-bg); border-color: var(--lfa-detail); }
 .op-week-col.special { background: color-mix(in srgb, var(--lfa-mosiadz) 45%, var(--lfa-surface)); border-color: var(--lfa-detail-strong); }
 .op-week-col.handover { box-shadow: inset 0 0 0 2px var(--orange); }
-.op-week-col.is-today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.op-week-col.is-today { outline: 2px solid var(--lfa-cal-today); outline-offset: 1px; }
 .op-week-col.conflict { box-shadow: inset 0 0 0 2px var(--red); }
 .op-week-col-hdr { padding: 10px 12px 8px; border-bottom: 1px solid var(--border); background: var(--bg3); }
 .op-week-col.father .op-week-col-hdr { background: var(--lfa-warning-bg); border-bottom-color: var(--lfa-detail); }
-.op-week-col.is-today .op-week-col-hdr { background: var(--lfa-info-bg); }
+.op-week-col.is-today .op-week-col-hdr { background: var(--lfa-danger-bg); }
 .op-week-dow { display: block; font-size: 11px; font-weight: 800; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; }
 .op-week-date { display: block; font-size: 20px; font-weight: 800; color: var(--text); line-height: 1.1; margin-top: 2px; }
 .op-week-col.father .op-week-date { color: var(--green2); }
-.op-week-col.is-today .op-week-date { color: var(--accent); }
+.op-week-col.is-today .op-week-date { color: var(--lfa-cal-today); }
 .op-week-col-body { padding: 10px 12px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .op-week-custody { display: flex; flex-direction: column; gap: 2px; }
 .op-week-custody strong { font-size: 13px; font-weight: 800; color: var(--green2); }
@@ -1412,7 +1412,7 @@ tr.change-row-rzeznik:hover { background: var(--lfa-info-bg); }
 .scal-day.has-both { background: linear-gradient(135deg, var(--lfa-body-cu-bg) 0 50%, var(--lfa-body-sgs-bg) 50% 100%); color: var(--lfa-text); }
 .scal-day.busy-other { background: var(--lfa-cal-busy-bg); color: var(--lfa-cal-busy-fg); }   /* zajęty czymś innym niż audyt (opieka/Outlook) */
 .scal-day.conflict-edge { outline: 2px solid var(--red); outline-offset: -2px; } /* audyt w dzień opieki */
-.scal-day.today   { outline: 2px solid var(--accent); outline-offset: -2px; }
+.scal-day.today   { outline: 2px solid var(--lfa-cal-today); outline-offset: -2px; }
 .scal-day.sel     { outline: 2px solid var(--lfa-text); outline-offset: -2px; }
 .scal-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 10px 0; font-size: 11px; color: var(--text2); }
 .scal-legend span { display: inline-flex; align-items: center; gap: 4px; }
@@ -1734,7 +1734,7 @@ tr.imp-write td { background: var(--lfa-success-bg); }
   .ac-day-top { flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; }
   .op-day-large-num { font-size: 20px; text-align: center; line-height: 1; }
   .op-day-large-num::after { content: attr(data-dow); display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text2); margin-top: 3px; }
-  .op-day-large.is-today .op-day-large-num::after { color: var(--accent); }
+  .op-day-large.is-today .op-day-large-num::after { color: var(--lfa-cal-today); }
   .op-day-large.ac-off:not(.ac-custody):not(.is-today) { padding-top: 6px; padding-bottom: 6px; opacity: .8; }
   .op-day-large.ac-off:not(.ac-custody) .op-day-large-num { font-size: 15px; }
   .ac-chip, .op-day-large-audit { white-space: normal; }
