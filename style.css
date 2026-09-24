@@ -1710,3 +1710,46 @@ tr.imp-write td { background: var(--lfa-success-bg); }
   .modal-header { padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 12px; }
   .modal-body { padding: 14px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ============================================================
+   MOBILE — kalendarze (Kalendarz audytów, Opieka): miesiąc = lista dni, tydzień = kolumny pod sobą
+   ============================================================ */
+@media (max-width: 768px) {
+  .view-header { margin-bottom: 10px; gap: 8px; }
+  .view-header h2 { font-size: 15px; width: 100%; }
+  .header-filters { flex-wrap: wrap; gap: 8px; width: 100%; }
+  .header-filters .op-view-switcher { flex: 1 1 100%; display: flex; }
+  .header-filters .op-view-btn { flex: 1; padding: 8px 6px; font-size: 13px; }
+  .header-filters .btn-ghost, .header-filters .btn-action { padding: 8px 12px; font-size: 12.5px; }
+  .op-year-label { flex: 1; min-width: 0; font-size: 15px; }
+  .header-filters .btn-action { flex: 1 1 40%; }
+  #ac-outlook-toggle { flex: 0 0 auto; }
+  /* Miesiąc → lista dni: numer + dzień tygodnia po lewej, treść po prawej; puste komórki znikają */
+  .op-calendar-month .op-month-large-header { display: none; }
+  .op-calendar-month .op-month-large-grid { display: flex; flex-direction: column; gap: 6px; }
+  .op-day-large.op-day-empty { display: none; }
+  .op-day-large { min-height: 0; display: grid; grid-template-columns: 52px minmax(0, 1fr); grid-auto-rows: min-content; column-gap: 10px; row-gap: 4px; padding: 8px 10px 8px 8px; align-items: start; }
+  .op-day-large > * { grid-column: 2; min-width: 0; }
+  .op-day-large > .ac-day-top, .op-day-large > .op-day-large-num { grid-column: 1; grid-row: 1; }
+  .ac-day-top { flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; }
+  .op-day-large-num { font-size: 20px; text-align: center; line-height: 1; }
+  .op-day-large-num::after { content: attr(data-dow); display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text2); margin-top: 3px; }
+  .op-day-large.is-today .op-day-large-num::after { color: var(--accent); }
+  .op-day-large.ac-off:not(.ac-custody):not(.is-today) { padding-top: 6px; padding-bottom: 6px; opacity: .8; }
+  .op-day-large.ac-off:not(.ac-custody) .op-day-large-num { font-size: 15px; }
+  .ac-chip, .op-day-large-audit { white-space: normal; }
+  .ac-free-tag, .ac-off-tag { align-self: center; }
+  /* Tydzień → dni jedna pod drugą */
+  .op-week-grid { grid-template-columns: 1fr !important; gap: 8px; }
+  .op-week-col { min-height: 0; }
+  .op-week-col-hdr { display: flex; align-items: baseline; gap: 10px; padding: 8px 12px; }
+  .op-week-date { font-size: 16px; margin: 0; }
+  .op-week-col-body { padding: 8px 12px 10px; }
+  /* Rok: 2 miesiące w rzędzie */
+  .op-calendar:not(.op-calendar-month):not(.op-calendar-week) { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .op-month { padding: 8px; }
+  .op-legend { gap: 8px 14px; font-size: 12px; margin-bottom: 64px; }
+  .op-today { padding: 14px 16px; }
+  .op-today-who { font-size: 18px; }
+  .op-layout { grid-template-columns: 1fr; }
+}

@@ -3204,7 +3204,7 @@ const OpiekaModule = (function () {
       if (sameDay(dd, today)) cell.classList.add("is-today");
       if (iN.special && fN) cell.classList.add("special");
 
-      const num = document.createElement("div"); num.className = "op-day-large-num"; num.textContent = d; cell.appendChild(num);
+      const num = document.createElement("div"); num.className = "op-day-large-num"; num.textContent = d; num.dataset.dow = ["Pn","Wt","Śr","Cz","Pt","So","Nd"][(dd.getDay()+6)%7]; cell.appendChild(num);
       if (fN) {
         const st = document.createElement("div"); st.className = "op-day-large-status";
         st.textContent = iN.special ? "★ Specjalny" : "Ojciec"; cell.appendChild(st);
@@ -3587,7 +3587,7 @@ const AuditCalModule = (function () {
       if (sameDay(dd, today)) cell.classList.add("is-today");
 
       const top = document.createElement("div"); top.className = "ac-day-top";
-      const num = document.createElement("div"); num.className = "op-day-large-num"; num.textContent = d; top.appendChild(num);
+      const num = document.createElement("div"); num.className = "op-day-large-num"; num.textContent = d; num.dataset.dow = DOW[(dd.getDay()+6)%7]; top.appendChild(num);
       if (cl.custody) { const m = document.createElement("span"); m.className = "ac-custody-mark"; m.textContent = "👨‍👦"; top.appendChild(m); }
       cell.appendChild(top);
 
