@@ -95,7 +95,7 @@
   --lfa-cal-busy-bg:     color-mix(in srgb, var(--lfa-bordo) 14%,  var(--lfa-surface)); --lfa-cal-busy-fg:  var(--lfa-bordo);    /* zajęty (Outlook) */
   --lfa-cal-custody:     var(--lfa-mosiadz);                                                                                    /* opieka: krawędź 3px */
   --lfa-cal-conflict:    var(--lfa-bordo);                                                                                      /* audyt w dzień opieki: obrys */
-  --lfa-cal-today:       var(--lfa-bordo);                                                                                      /* obrys dziś — bordo (decyzja Michała 2026-09-24) */
+  --lfa-cal-today:       var(--lfa-bordo-deep);                                                                                 /* obrys dziś — ciemne bordo (Michał 2026-09-24) */
   --lfa-cal-ext-bg:      var(--lfa-neutral-bg); --lfa-cal-ext-fg: var(--lfa-szary);                                             /* wydarzenie Outlook (chip) */
 
   /* --- Rozliczenie (SettleStatus) i plan audytu --- */
@@ -174,7 +174,7 @@
     --lfa-cal-free-bg: color-mix(in srgb, var(--lfa-papier) 9%, var(--lfa-granat));  --lfa-cal-free-fg: var(--lfa-papier);
     --lfa-cal-off-bg:  color-mix(in srgb, var(--lfa-szary) 25%, var(--lfa-granat));  --lfa-cal-off-fg:  var(--lfa-neutral-fg);
     --lfa-cal-busy-bg: var(--lfa-danger-bg);                                          --lfa-cal-busy-fg: var(--lfa-danger-fg);
-    --lfa-cal-custody: var(--lfa-mosiadz-jasny); --lfa-cal-conflict: var(--lfa-danger-fg); --lfa-cal-today: color-mix(in srgb, var(--lfa-bordo) 55%, var(--lfa-papier));
+    --lfa-cal-custody: var(--lfa-mosiadz-jasny); --lfa-cal-conflict: var(--lfa-danger-fg); --lfa-cal-today: color-mix(in srgb, var(--lfa-bordo) 78%, var(--lfa-papier));
     --lfa-cal-ext-bg:  var(--lfa-neutral-bg); --lfa-cal-ext-fg: var(--lfa-neutral-fg);
 
     --lfa-settle-open-fg: var(--lfa-neutral-fg); --lfa-settle-sent-fg: var(--lfa-mosiadz-jasny); --lfa-settle-done-fg: var(--lfa-papier);
@@ -209,7 +209,7 @@
   --lfa-cal-free-bg: color-mix(in srgb, var(--lfa-papier) 9%, var(--lfa-granat)); --lfa-cal-free-fg: var(--lfa-papier);
   --lfa-cal-off-bg: color-mix(in srgb, var(--lfa-szary) 25%, var(--lfa-granat)); --lfa-cal-off-fg: var(--lfa-neutral-fg);
   --lfa-cal-busy-bg: var(--lfa-danger-bg); --lfa-cal-busy-fg: var(--lfa-danger-fg);
-  --lfa-cal-custody: var(--lfa-mosiadz-jasny); --lfa-cal-conflict: var(--lfa-danger-fg); --lfa-cal-today: color-mix(in srgb, var(--lfa-bordo) 55%, var(--lfa-papier));
+  --lfa-cal-custody: var(--lfa-mosiadz-jasny); --lfa-cal-conflict: var(--lfa-danger-fg); --lfa-cal-today: color-mix(in srgb, var(--lfa-bordo) 78%, var(--lfa-papier));
   --lfa-cal-ext-bg: var(--lfa-neutral-bg); --lfa-cal-ext-fg: var(--lfa-neutral-fg);
   --lfa-settle-open-fg: var(--lfa-neutral-fg); --lfa-settle-sent-fg: var(--lfa-mosiadz-jasny); --lfa-settle-done-fg: var(--lfa-papier); --lfa-plan-sent-fg: var(--lfa-papier);
 }
