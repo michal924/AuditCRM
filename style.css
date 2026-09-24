@@ -1626,3 +1626,77 @@ tr.imp-write td { background: var(--lfa-success-bg); }
 
 /* FAB zgłoszeń odsunięty od prawego paska zakładek */
 @media (min-width: 901px) { .dev-fab { right: 258px; } }
+
+/* ============================================================
+   MOBILE (≤ 768px) — PWA: górny pasek + dolne zakładki jak w iOS, tabela jako karty
+   ============================================================ */
+.nav-ico { display: inline; }
+.nav-lbl { display: inline; margin-left: 6px; }
+@media (max-width: 768px) {
+  #page-app { display: block; }
+  .navbar, .nav-right { display: contents; }
+  .nav-left { position: fixed; top: 0; left: 0; right: 0; height: calc(52px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 12px 0;
+    background: var(--bg2); border-bottom: 1px solid var(--border); z-index: 100; display: flex; align-items: center; gap: 10px; }
+  .nav-left .lfa-mark { width: 28px; height: 30px; }
+  .nav-wm { font-size: 12.5px; }
+  .nav-wm .acrm-c { display: block; }
+  #nav-user, #btn-import { display: none; }
+  #btn-theme  { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 9px); right: 90px; z-index: 101; padding: 5px 9px; }
+  #btn-logout { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 9px); right: 12px; z-index: 101; padding: 6px 10px; font-size: 12.5px; }
+  /* Dolny pasek: 6 zakładek + Rozliczenie */
+  .nav-links { position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; display: grid; grid-template-columns: repeat(7, 1fr);
+    padding: 4px 0 calc(4px + env(safe-area-inset-bottom, 0px)); background: var(--bg2); border-top: 1px solid var(--border); }
+  .nav-links::after { content: ""; }                          /* 7. slot zajmuje przycisk Rozliczenie (fixed) */
+  .nav-btn, #btn-settle { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 52px; padding: 4px 2px;
+    border: 0; border-radius: 8px; background: transparent; color: var(--text2); font-family: var(--font-data); font-weight: 600; box-shadow: none; text-align: center; min-width: 0; overflow: hidden; }
+  .nav-btn .nav-ico, #btn-settle .nav-ico { font-size: 19px; line-height: 1; }
+  .nav-btn .nav-lbl, #btn-settle .nav-lbl { display: block; width: 100%; margin: 0; font-size: 9.5px; line-height: 1.1; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-btn.active { background: var(--lfa-info-bg); color: var(--lfa-primary); border-left: 0; }
+  #btn-settle { position: fixed; bottom: calc(4px + env(safe-area-inset-bottom, 0px)); right: 0; width: calc(100% / 7); z-index: 101; color: var(--lfa-accent); }
+  #btn-add-audit { position: fixed; right: 14px; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); z-index: 99; border-radius: 999px; padding: 12px 18px; box-shadow: var(--lfa-shadow-lg); font-size: 14px; }
+  .dev-fab { right: 14px !important; bottom: calc(128px + env(safe-area-inset-bottom, 0px)); width: 44px; height: 44px; font-size: 20px; }
+  .app-main { padding-top: calc(52px + env(safe-area-inset-top, 0px)); padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .view { padding: 12px; }
+  /* Filtry: jeden przewijany wiersz; KPI 2×2 */
+  .filters-bar { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; gap: 8px; scrollbar-width: none; }
+  .filters-bar::-webkit-scrollbar { display: none; }
+  .filters-bar > * { flex-shrink: 0; }
+  .search-input { width: 170px; }
+  .stats-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { min-width: 0; padding: 10px 12px; }
+  .stat-num { font-size: 22px; }
+  .myaudits-layout { flex-direction: column; align-items: stretch; }
+  .myaudits-main { width: 100%; }
+  .myaudits-cal, .myaudits-cal.collapsed { width: 100%; position: static; }
+  /* Tabela audytów → karty */
+  #audits-table { min-width: 0; }
+  #audits-table thead { display: none; }
+  #audits-table, #audits-table tbody, #audits-table tr, #audits-table td { display: block; }
+  #audits-table tr.audit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; padding: 12px 14px 12px 12px; border-bottom: 1px solid var(--border); border-left: 4px solid var(--lfa-border); }
+  #audits-table tr.audit-row.row-body-cuc { border-left-color: var(--lfa-body-cu); }
+  #audits-table tr.audit-row.row-body-sgs { border-left-color: var(--lfa-body-sgs); }
+  #audits-table tr.audit-row td { padding: 0; border: 0; font-size: 12.5px; white-space: normal; min-width: 0; }
+  #audits-table td.firma-col { grid-column: 1 / -1; order: -3; font-weight: 700; font-size: 15px; line-height: 1.25; }
+  #audits-table td.prj-col { order: -2; grid-column: 1 / -1; font-family: var(--lfa-font-data); font-size: 11px; color: var(--text2); }
+  #audits-table td.prj-col::before { content: "PRJ "; }
+  #audits-table td.program-col { order: -1; grid-column: 1 / -1; }
+  #audits-table tr.audit-row td:nth-child(4), #audits-table tr.audit-row td:nth-child(8), #audits-table td.notes-col { display: none; }
+  #audits-table tr.audit-row td::before { display: block; font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text2); font-weight: 600; margin-bottom: 1px; }
+  #audits-table tr.audit-row td:nth-child(5)::before { content: "Data CU"; }
+  #audits-table tr.audit-row td:nth-child(6)::before { content: "Audyt LF"; }
+  #audits-table tr.audit-row td:nth-child(7)::before { content: "Miasto"; }
+  #audits-table tr.audit-row td:nth-child(9)::before { content: "Status"; }
+  #audits-table tr.audit-row td:nth-child(10)::before { content: "Proforma"; }
+  #audits-table tr.audit-row td:nth-child(11)::before { content: "Plan audytu"; }
+  #audits-table tr.audit-row td:nth-child(12)::before { content: "Rozliczenie"; }
+  #audits-table td.firma-col::before, #audits-table td.prj-col::before, #audits-table td.program-col::before { display: inline; font-size: inherit; letter-spacing: 0; text-transform: none; font-weight: inherit; color: inherit; margin: 0; }
+  #audits-table td.firma-col::before, #audits-table td.program-col::before { content: none; }
+  #audits-table td.date-col { font-family: var(--lfa-font-data); }
+  #audits-table td[colspan] { padding: 12px 14px; }
+  .row-preview-wrap td { padding: 0 !important; }
+  /* Modale na pełny ekran */
+  .modal-overlay { padding: 0; align-items: stretch; }
+  .modal { max-width: none; width: 100%; max-height: none; height: 100dvh; border-radius: 0; border: 0; }
+  .modal-header { padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 12px; }
+  .modal-body { padding: 14px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
+}

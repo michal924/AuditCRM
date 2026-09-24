@@ -2,7 +2,13 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#16263F"> <!-- lfa-allow: granat z palety, meta nie czyta CSS -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Audit System">
   <title>LF Assurance Audit System</title>
   <meta name="color-scheme" content="light dark">
   <script>try{var t=localStorage.getItem("lfa-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
@@ -64,16 +70,16 @@
       </div>
     </div>
     <div class="nav-links">
-      <button class="nav-btn active" data-view="myaudits">📋 Audyty</button>
-      <button class="nav-btn" data-view="kalendarz">📅 Kalendarz</button>
-      <button class="nav-btn" data-view="checkaudit">✅ Check Audyt</button>
-      <button class="nav-btn" data-view="changes">🔄 Zmiany Audytora</button>
-      <button class="nav-btn" data-view="opieka">👨‍👦 Opieka — Szymon</button>
-      <button class="nav-btn" data-view="mapa">🗺 Mapa audytów</button>
+      <button class="nav-btn active" data-view="myaudits"><span class="nav-ico">📋</span><span class="nav-lbl">Audyty</span></button>
+      <button class="nav-btn" data-view="kalendarz"><span class="nav-ico">📅</span><span class="nav-lbl">Kalendarz</span></button>
+      <button class="nav-btn" data-view="checkaudit"><span class="nav-ico">✅</span><span class="nav-lbl">Check Audyt</span></button>
+      <button class="nav-btn" data-view="changes"><span class="nav-ico">🔄</span><span class="nav-lbl">Zmiany Audytora</span></button>
+      <button class="nav-btn" data-view="opieka"><span class="nav-ico">👨‍👦</span><span class="nav-lbl">Opieka — Szymon</span></button>
+      <button class="nav-btn" data-view="mapa"><span class="nav-ico">🗺</span><span class="nav-lbl">Mapa audytów</span></button>
     </div>
     <div class="nav-right">
       <button id="btn-import" class="btn-action" title="Importuj kwartalny plan z CUC">⬆ Import CUC</button>
-      <button id="btn-settle" class="btn-action" title="Rozliczenie audytów (CU / SGS) — eksport miesięczny i raporty">📊 Rozliczenie</button>
+      <button id="btn-settle" class="btn-action" title="Rozliczenie audytów (CU / SGS) — eksport miesięczny i raporty"><span class="nav-ico">📊</span><span class="nav-lbl">Rozliczenie</span></button>
       <button id="btn-add-audit" class="btn-action btn-action-green" title="Dodaj nieplanowany audyt">＋ Dodaj audyt</button>
       <span id="nav-user"></span>
       <button id="btn-theme" class="btn-ghost" title="Przełącz tryb jasny / ciemny" aria-label="Przełącz tryb jasny / ciemny">🌙</button>
@@ -972,5 +978,6 @@
 <script src="auth.js"></script>
 <script src="api.js"></script>
 <script src="app.js"></script>
+<script>if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {})); }</script>
 </body>
 </html>
