@@ -1753,3 +1753,6 @@ tr.imp-write td { background: var(--lfa-success-bg); }
   .op-today-who { font-size: 18px; }
   .op-layout { grid-template-columns: 1fr; }
 }
+
+/* Rozliczenie: wiersz raportu PDF */
+.settle-pdf-row { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--lfa-border); }

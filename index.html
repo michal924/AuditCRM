@@ -941,6 +941,18 @@
           <button id="settle-export-open-btn" class="btn-action" title="Wszystkie audyty wybranej jednostki ze statusem innym niż Rozliczony">⬇ Eksport nierozliczonych</button>
         </div>
       </div>
+      <div class="settle-toolbar settle-pdf-row">
+        <div class="form-row">
+          <label for="settle-pdf-layout">Raport PDF do faktury — układ</label>
+          <select id="settle-pdf-layout" class="form-input">
+            <option value="C" selected>Załącznik do faktury (wynagrodzenie + koszty, podpisy)</option>
+            <option value="A">Zestawienie tabelaryczne (jak Excel, poziomo)</option>
+          </select>
+        </div>
+        <div class="settle-toolbar-actions">
+          <button id="settle-pdf-btn" class="btn-primary" style="width:auto">⬇ Raport PDF do faktury</button>
+        </div>
+      </div>
 
       <div id="settle-month-summary" class="settle-summary"></div>
 
