@@ -822,6 +822,7 @@ function setupModal() {
     setTimeout(() => { const f = document.getElementById("e-s-route"); if (f) f.focus(); }, 250);
   });
   document.getElementById("btn-save").onclick = saveChanges;
+  document.getElementById("btn-delete-audit").onclick = deleteCurrentAudit;
 
   // Zmiana daty w trybie edycji → aktualizuj kwartał i rok
   document.getElementById("e-date").addEventListener("change", e => {
@@ -993,6 +994,21 @@ function cancelEditMode() {
   renderDayBusy("e-daybusy", "");
   const sb = document.getElementById("settle-body"); if (sb) sb.classList.add("hidden");
   if (currentAudit) updateSettleHead(currentAudit);
+}
+
+// Usunięcie wpisu (np. duplikat po imporcie). Potwierdzenie z nazwą i datą — bez cofania.
+async function deleteCurrentAudit() {
+  const a = currentAudit; if (!a) return;
+  const label = (a.Title || "—") + (a.ProjectID ? " · PRJ " + a.ProjectID : "") + " · " + (formatDate(a.AuditDateStart) || "bez daty");
+  if (!confirm("Usunąć wpis?\n\n" + label + "\n\nTej operacji nie da się cofnąć.")) return;
+  const btn = document.getElementById("btn-delete-audit"); btn.disabled = true;
+  try {
+    await deleteAudit(a.Id);
+    allAudits = allAudits.filter(x => x.Id !== a.Id);
+    closeModal(); renderTable();
+    showToast("🗑 Usunięto: " + (a.Title || ""), "success");
+  } catch (e) { showToast("Nie udało się usunąć: " + (e.message || e), "error"); }
+  finally { btn.disabled = false; }
 }
 
 function closeModal() {

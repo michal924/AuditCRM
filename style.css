@@ -1758,3 +1758,7 @@ tr.imp-write td { background: var(--lfa-success-bg); }
 .settle-pdf-row { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--lfa-border); }
 
 .settle-rate { width: 120px; font-family: var(--lfa-font-data); }
+
+/* Usuń wpis — akcja niszcząca: bordo, po lewej stronie od Zapisz */
+.btn-delete-audit { color: var(--lfa-accent); border-color: var(--lfa-accent); margin-right: auto; }
+.btn-delete-audit:hover { background: var(--lfa-accent); color: var(--lfa-on-accent); }
