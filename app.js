@@ -4006,7 +4006,7 @@ const SettleModule = (function () {
   function myRows() {
     return (Array.isArray(allAudits) ? allAudits : []).filter(a => a.AuditorName === MY_AUDITOR);
   }
-  function bodyFilter() { return $("settle-body") ? $("settle-body").value : "CUC"; }
+  function bodyFilter() { const el = $("settle-body-select"); return el ? el.value : "all"; }   // UWAGA: #settle-body to sekcja w oknie audytu
   function rowsByBody() {
     const b = bodyFilter();
     return myRows().filter(a => b === "all" || certBodyOf(a) === b);
@@ -4446,7 +4446,7 @@ const SettleModule = (function () {
     const eo = $("settle-export-open-btn"); if (eo) eo.onclick = exportOpen;
     const pb = $("settle-pdf-btn"); if (pb) pb.onclick = exportPdf;
     const mo = $("settle-month"); if (mo) mo.onchange = renderMonthSummary;
-    const bd = $("settle-body"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
+    const bd = $("settle-body-select"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
     const yr = $("settle-year"); if (yr) yr.onchange = renderReports;
     const imf = $("settle-import-file"); if (imf) imf.onchange = onImportFile;
     const ims = $("settle-import-save"); if (ims) ims.onclick = saveImport;
