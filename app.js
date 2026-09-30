@@ -1961,8 +1961,9 @@ function syncKindType(kindId, typeRowId) {
 // Stawka dzienna wg umowy z jednostką (CU: 1500 zł). Wartość NIE trafia do raportów, tylko iloczyn dni × stawka.
 const DAY_RATES_KEY = "lfa-day-rates";
 function getDayRates() {
-  const def = { CUC: 1500, SGS: null };
-  try { return Object.assign(def, JSON.parse(localStorage.getItem(DAY_RATES_KEY) || "{}")); } catch { return def; }
+  const def = { CUC: 1500, SGS: 800 };   // wg umów (Michał 2026-09-30); nadpisanie w panelu Rozliczenie zapisuje się lokalnie
+  try { const saved = JSON.parse(localStorage.getItem(DAY_RATES_KEY) || "{}"); Object.keys(saved).forEach(k => { if (saved[k] != null && !isNaN(+saved[k])) def[k] = +saved[k]; }); } catch {}
+  return def;
 }
 function setDayRate(body, value) {
   const r = getDayRates(); r[body] = (value === "" || value == null || isNaN(+value)) ? null : +value;
