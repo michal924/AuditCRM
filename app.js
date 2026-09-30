@@ -4287,8 +4287,8 @@ const SettleModule = (function () {
     let ny = y + 4; noteTxt.forEach(t => { const ls = doc.splitTextToSize(t, bx - MX - 10); doc.text(ls, MX, ny); ny += ls.length * 3.4 + 1.5; });
     if (layout !== "A") {
       const sy = room(Math.max(y + 3 * rh + 2, ny) + 22, 12);
-      doc.setDrawColor(...INK); doc.setLineWidth(0.2); doc.line(MX, sy, MX + 78, sy); doc.line(W - MX - 78, sy, W - MX, sy);
-      doc.setFontSize(6.5); doc.setTextColor(...MUTED); doc.text("SPORZĄDZIŁ · " + auditor.toUpperCase() + ", LF ASSURANCE", MX, sy + 3.6); doc.text("ZATWIERDZIŁ · " + bd.full.toUpperCase(), W - MX - 78, sy + 3.6);
+      doc.setDrawColor(...INK); doc.setLineWidth(0.2); doc.line(MX, sy, MX + 78, sy);
+      doc.setFontSize(6.5); doc.setTextColor(...MUTED); doc.text("SPORZĄDZIŁ · " + auditor.toUpperCase() + ", LF ASSURANCE", MX, sy + 3.6);
     }
     // Stopka na każdej stronie
     const pages = doc.internal.getNumberOfPages();
