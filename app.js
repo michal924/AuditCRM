@@ -191,8 +191,8 @@ async function loadAudits() {
 // FILTRY — z persystencją w localStorage
 // ============================================================
 const FILTERS_KEY = "auditFilters_v3";
-const MULTI_KEYS  = ["quarter", "year", "program", "status", "certbody", "plan", "settle"];
-const MULTI_LABELS = { quarter: "Kwartał", year: "Rok", program: "Program", status: "Status", certbody: "Jednostka", plan: "Plan audytu", settle: "Rozliczenie" };
+const MULTI_KEYS  = ["quarter", "month", "year", "program", "status", "certbody", "plan", "settle"];
+const MULTI_LABELS = { quarter: "Kwartał", month: "Miesiąc", year: "Rok", program: "Program", status: "Status", certbody: "Jednostka", plan: "Plan audytu", settle: "Rozliczenie" };
 
 // Jednostka certyfikująca. Puste/stare rekordy = CUC (domyślnie), bez potrzeby backfillu.
 function certBodyOf(a) { return (a && a.CertBody) ? a.CertBody : "CUC"; }
@@ -374,10 +374,14 @@ function setupFilters() {
   document.getElementById("auditors-year").addEventListener("change", renderAuditorsTable);
 }
 
+// Miesiąc audytu do filtra: data audytu LF, a gdy jej brak — planowana data CU ("01".."12")
+function auditMonthKey(a) { const d = a.AuditDateStart || a.PlannedCUDate; return d ? String(d).substring(5, 7) : ""; }
+
 function getFilters() {
   return {
     search:   document.getElementById("search").value.toLowerCase(),
     quarters: getSelectedMulti("quarter"),
+    months:   getSelectedMulti("month"),
     years:    getSelectedMulti("year"),
     programs: getSelectedMulti("program"),
     statuses: getSelectedMulti("status"),
@@ -398,6 +402,7 @@ function applyFilters(audits) {
   return audits.filter(a => {
     if (f.search       && !((a.Title || "").toLowerCase().includes(f.search))) return false;
     if (f.quarters.length > 0 && !f.quarters.includes(a.Quarter)) return false;
+    if (f.months.length > 0 && !f.months.includes(auditMonthKey(a))) return false;
     if (f.years.length > 0    && !f.years.includes(String(a.Year))) return false;
     if (f.programs.length > 0 && !f.programs.some(p => normProgramKey(p) === normProgramKey(a.Program))) return false;
     if (f.statuses.length > 0 && !f.statuses.includes(a.AuditStatus)) return false;
