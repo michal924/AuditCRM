@@ -519,7 +519,19 @@
               <option value="SGS">SGS</option>
             </select>
           </div>
-          <div class="field-row"><label>Typ audytu</label><span id="m-type">—</span></div>
+          <div class="field-row"><label>Typ audytu</label><span id="m-type" class="view-val">—</span>
+            <select id="e-type" class="edit-val field-input">
+              <option value="">—</option>
+              <option>Surveillance announced</option>
+              <option>Re-assessment</option>
+              <option>Re-Certification Audit</option>
+              <option>Certification Audit</option>
+              <option>Extension Audit</option>
+              <option>Main Audit</option>
+              <option>Other</option>
+              <option value="Spotkanie">Spotkanie (tylko koszty)</option>
+              <option value="Szkolenie">Szkolenie (tylko koszty)</option>
+            </select></div>
           <div class="field-row"><label>Standard</label><span id="m-standard">—</span></div>
           <div class="field-row">
             <label>Adres</label>
@@ -798,7 +810,11 @@
               <option>Re-Certification Audit</option>
               <option>Certification Audit</option>
               <option>Extension Audit</option>
+              <option>Main Audit</option>
               <option>Other</option>
+              <option disabled>──────────</option>
+              <option value="Spotkanie">Spotkanie (tylko koszty, bez dnia audytowego)</option>
+              <option value="Szkolenie">Szkolenie (tylko koszty, bez dnia audytowego)</option>
             </select>
           </div>
           <div class="form-row">
@@ -935,6 +951,14 @@
             <option value="CUC">CUC (Control Union)</option>
             <option value="SGS">SGS</option>
           </select>
+        </div>
+        <div class="form-row">
+          <label for="settle-rate-CUC">Stawka dzienna CU</label>
+          <input type="number" id="settle-rate-CUC" class="form-input settle-rate" min="0" step="50" placeholder="np. 1500">
+        </div>
+        <div class="form-row">
+          <label for="settle-rate-SGS">Stawka dzienna SGS</label>
+          <input type="number" id="settle-rate-SGS" class="form-input settle-rate" min="0" step="50" placeholder="brak">
         </div>
         <div class="settle-toolbar-actions">
           <button id="settle-export-btn" class="btn-primary" style="width:auto">⬇ Eksport .xlsx (miesiąc)</button>
