@@ -4143,7 +4143,7 @@ const SettleModule = (function () {
 
   // ── Raport PDF do faktury (jedna jednostka, jeden miesiąc) ──
   // Zasady (Michał 2026-09-21): bez stawki dziennej przy audytach; wynagrodzenie jedną kwotą w podsumowaniu; koszty w pełnym rozbiciu.
-  const PDF_BODIES = { CUC: { short: "CU", full: "Control Union" }, SGS: { short: "SGS", full: "SGS" } };
+  const PDF_BODIES = { CUC: { short: "CU", full: "Control Union" }, SGS: { short: "SGS", full: "SGS" }, all: { short: "CU-SGS", full: "Control Union + SGS" } };
   const MIES_FULL = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
   const LF_COMPANY = "LF Assurance · Gocławska 9B/7, 03-810 Warszawa · NIP 9182077986 · REGON 527791960";
   const num2 = n => { const [i, d] = (Math.round((n || 0) * 100) / 100).toFixed(2).split("."); return i.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + "," + d; };   // 6 000,00 (zwykła spacja — font PDF)
@@ -4160,6 +4160,9 @@ const SettleModule = (function () {
       PAPIER = T("--lfa-papier"), LINE = T("--lfa-border"), TINT = T("--lfa-info-bg"), DISK = T("--lfa-surface-2"), WHITE = T("--lfa-surface");
     const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), MX = 14;
     const [yy, mm] = month.split("-"); const bd = PDF_BODIES[body] || { short: body, full: body };
+    const multi = body === "all";                                     // raport wspólny: kolumna Jednostka + podsumowanie per jednostka
+    const bodyShort = a => (PDF_BODIES[certBodyOf(a)] || { short: certBodyOf(a) }).short;
+    if (multi) rows = rows.slice().sort((x, y) => certBodyOf(x).localeCompare(certBodyOf(y)) || String(x.AuditDateStart).localeCompare(String(y.AuditDateStart)));
     const now = new Date(); const issued = pad(now.getDate()) + "." + pad(now.getMonth() + 1) + "." + now.getFullYear();
     const nr = "R/" + yy + "/" + mm + "/" + bd.short + "-001";
     const auditor = String(MY_AUDITOR || "").split(" ").reverse().join(" ");
@@ -4234,39 +4237,41 @@ const SettleModule = (function () {
         doc.setFont(F, "bold"); doc.setFontSize(8.5); doc.setTextColor(...INK); doc.text(mt[1], x, 57.2); });
       doc.autoTable({
         startY: 64, margin: { left: MX, right: MX, bottom: 20 }, theme: "plain", styles: tStyles, headStyles: tHead, footStyles: tFoot, showFoot: "lastPage", didDrawCell: bordoUnderHead,
-        head: [["Data", "Klient", "PRJ", "Program", "Dni", "Trasa", "Km", "Km zł", "Hotel", "Autostr.", "Inne", "Bilety", "Koszty"]],
-        body: items.map(i => { const r = costRow(i); return [r[0], i.a.Title || "—", i.a.ProjectID || "—", isMeeting(i.a) ? i.a.AuditType : (i.a.Program || "—"), (!isMeeting(i.a) && i.days) ? String(i.days) : "—", r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]]; }),
-        foot: [[{ content: "Razem koszty", colSpan: 4 }, String(days), "", costFoot[3], costFoot[4], costFoot[5], costFoot[6], costFoot[7], costFoot[8], costFoot[9]]],
-        columnStyles: { 0: { cellWidth: 19 }, 1: { cellWidth: 52, fontStyle: "bold", textColor: GRANAT }, 2: { cellWidth: 17 }, 3: { cellWidth: 22 }, 4: { cellWidth: 11, ...R }, 5: { cellWidth: "auto", textColor: MUTED },
-          6: { cellWidth: 13, ...R }, 7: { cellWidth: 18, ...R }, 8: { cellWidth: 17, ...R }, 9: { cellWidth: 17, ...R }, 10: { cellWidth: 15, ...R }, 11: { cellWidth: 15, ...R }, 12: { cellWidth: 20, ...R, fontStyle: "bold" } },
+        head: [["Data", "Klient", "PRJ", "Program", "Dni", "Trasa", "Km", "Km zł", "Hotel", "Autostr.", "Inne", "Bilety", "Koszty"].concat(multi ? ["Jedn."] : [])],
+        body: items.map(i => { const r = costRow(i); return [r[0], i.a.Title || "—", i.a.ProjectID || "—", isMeeting(i.a) ? i.a.AuditType : (i.a.Program || "—"), (!isMeeting(i.a) && i.days) ? String(i.days) : "—", r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]].concat(multi ? [bodyShort(i.a)] : []); }),
+        foot: [[{ content: "Razem koszty", colSpan: 4 }, String(days), "", costFoot[3], costFoot[4], costFoot[5], costFoot[6], costFoot[7], costFoot[8], costFoot[9]].concat(multi ? [""] : [])],
+        columnStyles: { 0: { cellWidth: 19 }, 1: { cellWidth: multi ? 44 : 52, fontStyle: "bold", textColor: GRANAT }, 2: { cellWidth: 17 }, 3: { cellWidth: 22 }, 4: { cellWidth: 11, ...R }, 5: { cellWidth: "auto", textColor: MUTED },
+          6: { cellWidth: 13, ...R }, 7: { cellWidth: 18, ...R }, 8: { cellWidth: 17, ...R }, 9: { cellWidth: 17, ...R }, 10: { cellWidth: 15, ...R }, 11: { cellWidth: 15, ...R }, 12: { cellWidth: 20, ...R, fontStyle: "bold" }, 13: { cellWidth: 12, fontStyle: "bold", textColor: MOS } },
         didParseCell: d => { if (d.section !== "body" && [4, 6, 7, 8, 9, 10, 11, 12].includes(d.column.index) && !(d.cell.colSpan > 1)) d.cell.styles.halign = "right"; },
       });
       y = room(doc.lastAutoTable.finalY + 8, 30);
     } else {
       // ── C · Załącznik do faktury (pozycja 1: wynagrodzenie, pozycja 2: koszty) ──
-      header("SPECYFIKACJA DO FAKTURY");
-      title("Rozliczenie usług audytowych — " + MIES_FULL[parseInt(mm) - 1] + " " + yy, "Zleceniodawca: " + bd.full + " · Wykonawca: LF Assurance, " + auditor);
+      header(multi ? "RAPORT ROZLICZENIA — WSZYSTKIE JEDNOSTKI" : "SPECYFIKACJA DO FAKTURY");
+      title("Rozliczenie usług audytowych — " + MIES_FULL[parseInt(mm) - 1] + " " + yy, (multi ? "Jednostki: " : "Zleceniodawca: ") + bd.full + " · Wykonawca: LF Assurance, " + auditor);
       const secTitle = (n, t, yy2) => { doc.setFont(F, "bold"); doc.setFontSize(8); doc.setTextColor(...GRANAT); doc.text(n + "   " + t.toUpperCase(), MX, yy2, { charSpace: 0.35 });
         doc.setDrawColor(...MOS); doc.setLineWidth(0.25); doc.line(MX + doc.getTextWidth(n + "   " + t.toUpperCase()) + t.length * 0.35 + 6, yy2 - 1, W - MX, yy2 - 1); };
       secTitle("1", "Wynagrodzenie za dni audytowe", 52);
       doc.autoTable({
         startY: 55, margin: { left: MX, right: MX, bottom: 20 }, theme: "plain", styles: tStyles, headStyles: tHead, footStyles: tFoot, showFoot: "lastPage", didDrawCell: bordoUnderHead,
-        head: [["Data", "Klient", "PRJ", "Program", "Rodzaj", "Dni"]],
-        body: audits.map(i => [i.date, i.a.Title || "—", i.a.ProjectID || "—", i.a.Program || "—", i.a.AuditType ? shortType(i.a.AuditType) : "—", i.days ? String(i.days) : "—"]),
-        foot: [[{ content: "Wynagrodzenie wg umowy · " + daysTxt, colSpan: 5 }, { content: num2(fee) + " zł", styles: { halign: "right" } }]],
-        columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: "auto", fontStyle: "bold", textColor: GRANAT }, 2: { cellWidth: 20 }, 3: { cellWidth: 26 }, 4: { cellWidth: 34 }, 5: { cellWidth: 26, ...R } },
-        didParseCell: d => { if (d.section === "head" && d.column.index === 5) d.cell.styles.halign = "right"; },
+        head: [["Data", "Klient"].concat(multi ? ["Jedn."] : []).concat(["PRJ", "Program", "Rodzaj", "Dni"])],
+        body: audits.map(i => [i.date, i.a.Title || "—"].concat(multi ? [bodyShort(i.a)] : []).concat([i.a.ProjectID || "—", i.a.Program || "—", i.a.AuditType ? shortType(i.a.AuditType) : "—", i.days ? String(i.days) : "—"])),
+        foot: [[{ content: "Wynagrodzenie wg umowy · " + daysTxt, colSpan: multi ? 6 : 5 }, { content: num2(fee) + " zł", styles: { halign: "right" } }]],
+        columnStyles: multi
+          ? { 0: { cellWidth: 20 }, 1: { cellWidth: "auto", fontStyle: "bold", textColor: GRANAT }, 2: { cellWidth: 14, fontStyle: "bold", textColor: MOS }, 3: { cellWidth: 18 }, 4: { cellWidth: 24 }, 5: { cellWidth: 30 }, 6: { cellWidth: 24, ...R } }
+          : { 0: { cellWidth: 22 }, 1: { cellWidth: "auto", fontStyle: "bold", textColor: GRANAT }, 2: { cellWidth: 20 }, 3: { cellWidth: 26 }, 4: { cellWidth: 34 }, 5: { cellWidth: 26, ...R } },
+        didParseCell: d => { if (d.section === "head" && d.column.index === (multi ? 6 : 5)) d.cell.styles.halign = "right"; },
       });
       y = room(doc.lastAutoTable.finalY + 10, 30);
       secTitle("2", "Koszty audytów", y);
       doc.autoTable({
         startY: y + 3, margin: { left: MX, right: MX, bottom: 20 }, theme: "plain", styles: { ...tStyles, fontSize: 7.2 }, headStyles: tHead, footStyles: tFoot, showFoot: "lastPage", didDrawCell: bordoUnderHead,
-        head: [costHead], body: items.map(costRow), foot: [[{ content: "Razem koszty", colSpan: 3 }, costFoot[3], costFoot[4], costFoot[5], costFoot[6], costFoot[7], costFoot[8], costFoot[9]]],
-        columnStyles: { 0: { cellWidth: 19 }, 1: { cellWidth: 34, fontStyle: "bold", textColor: GRANAT }, 2: { cellWidth: "auto", textColor: MUTED }, 3: { cellWidth: 11, ...R }, 4: { cellWidth: 16, ...R }, 5: { cellWidth: 15, ...R },
-          6: { cellWidth: 15, ...R }, 7: { cellWidth: 13, ...R }, 8: { cellWidth: 14, ...R }, 9: { cellWidth: 22, ...R, fontStyle: "bold" } },
+        head: [costHead.concat(multi ? ["Jedn."] : [])], body: items.map(i => costRow(i).concat(multi ? [bodyShort(i.a)] : [])), foot: [[{ content: "Razem koszty", colSpan: 3 }, costFoot[3], costFoot[4], costFoot[5], costFoot[6], costFoot[7], costFoot[8], costFoot[9]].concat(multi ? [""] : [])],
+        columnStyles: { 0: { cellWidth: 19 }, 1: { cellWidth: multi ? 30 : 34, fontStyle: "bold", textColor: GRANAT }, 2: { cellWidth: "auto", textColor: MUTED }, 3: { cellWidth: 11, ...R }, 4: { cellWidth: 16, ...R }, 5: { cellWidth: 15, ...R },
+          6: { cellWidth: 15, ...R }, 7: { cellWidth: 13, ...R }, 8: { cellWidth: 14, ...R }, 9: { cellWidth: multi ? 19 : 22, ...R, fontStyle: "bold" }, 10: { cellWidth: 11, fontStyle: "bold", textColor: MOS } },
         didParseCell: d => { if (d.section !== "body" && d.column.index >= 3 && !(d.cell.colSpan > 1)) d.cell.styles.halign = "right"; },
       });
-      y = room(doc.lastAutoTable.finalY + 8, 46);
+      y = room(doc.lastAutoTable.finalY + 8, multi ? 60 : 46);
     }
 
     // Podsumowanie: koszty + wynagrodzenie (jedna kwota) = razem do faktury
@@ -4275,10 +4280,18 @@ const SettleModule = (function () {
       if (strong) { doc.setFillColor(...GRANAT); doc.rect(bx, yy3, bw, rh + 2, "F"); doc.setTextColor(...PAPIER); doc.setFont(F, "bold"); doc.setFontSize(9.5); doc.text(label, bx + 4, yy3 + 5.9); doc.text(val, bx + bw - 4, yy3 + 5.9, { align: "right" }); }
       else { doc.setTextColor(...INK); doc.setFont(F, "normal"); doc.setFontSize(8.2); doc.text(label, bx + 4, yy3 + 4.8); doc.text(val, bx + bw - 4, yy3 + 4.8, { align: "right" }); doc.setDrawColor(...LINE); doc.setLineWidth(0.15); doc.line(bx, yy3 + rh, bx + bw, yy3 + rh); }
     };
-    line("Koszty audytów", num2(costs) + " zł", y, false);
-    line("Wynagrodzenie wg umowy (" + daysTxt + ")", num2(fee) + " zł", y + rh, false);
-    line("Razem do faktury (netto)", num2(r2(costs + fee)) + " zł", y + 2 * rh, true);
-    doc.setDrawColor(...LINE); doc.setLineWidth(0.2); doc.rect(bx, y, bw, 3 * rh + 2, "S");
+    let yl = y;
+    if (multi) {
+      ["CUC", "SGS"].forEach(bk => { const its = items.filter(i => certBodyOf(i.a) === bk); if (!its.length) return;
+        const bc = r2(its.reduce((s2, i) => s2 + i.c.costs, 0)), bf = r2(its.filter(i => !isMeeting(i.a)).reduce((s2, i) => s2 + i.c.fee, 0));
+        line(PDF_BODIES[bk].short + " · koszty", num2(bc) + " zł", yl, false); yl += rh;
+        line(PDF_BODIES[bk].short + " · wynagrodzenie wg umowy", num2(bf) + " zł", yl, false); yl += rh; });
+    } else {
+      line("Koszty audytów", num2(costs) + " zł", yl, false); yl += rh;
+      line("Wynagrodzenie wg umowy (" + daysTxt + ")", num2(fee) + " zł", yl, false); yl += rh;
+    }
+    line(multi ? "Razem (netto)" : "Razem do faktury (netto)", num2(r2(costs + fee)) + " zł", yl, true);
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.2); doc.rect(bx, y, bw, (yl - y) + rh + 2, "S");
     // Uwagi po lewej
     doc.setFont(F, "normal"); doc.setFontSize(7.2); doc.setTextColor(...MUTED);
     const noteTxt = ["Wynagrodzenie za dni audytowe zgodnie z umową o współpracy. Stawka dzienna nie jest wykazywana w raporcie."]
@@ -4286,7 +4299,7 @@ const SettleModule = (function () {
       .concat(notes.length ? ["Uwagi: " + notes.join("; ")] : []);
     let ny = y + 4; noteTxt.forEach(t => { const ls = doc.splitTextToSize(t, bx - MX - 10); doc.text(ls, MX, ny); ny += ls.length * 3.4 + 1.5; });
     if (layout !== "A") {
-      const sy = room(Math.max(y + 3 * rh + 2, ny) + 22, 12);
+      const sy = room(Math.max(yl + rh + 2, ny) + 22, 12);
       doc.setDrawColor(...INK); doc.setLineWidth(0.2); doc.line(MX, sy, MX + 78, sy);
       doc.setFontSize(6.5); doc.setTextColor(...MUTED); doc.text("SPORZĄDZIŁ · " + auditor.toUpperCase() + ", LF ASSURANCE", MX, sy + 3.6);
     }
@@ -4297,13 +4310,12 @@ const SettleModule = (function () {
       doc.setFont(F, "normal"); doc.setFontSize(6.3); doc.setTextColor(...MUTED);
       doc.text(LF_COMPANY, MX, H - 9);
       doc.text("Wygenerowano z LF Assurance Audit System · " + issued + " · strona " + p + " / " + pages, W - MX, H - 9, { align: "right" }); }
-    return { doc, fee, costs, filename: "Raport_rozliczenia_" + bd.short + "_" + month + (layout === "A" ? "_zestawienie" : "_do_faktury") + ".pdf" };
+    return { doc, fee, costs, filename: "Raport_rozliczenia_" + (multi ? "CU-SGS" : bd.short) + "_" + month + (layout === "A" ? "_zestawienie" : "_do_faktury") + ".pdf" };
   }
 
   async function exportPdf() {
     const m = $("settle-month").value, b = bodyFilter();
     if (!m) { showToast("Wybierz miesiąc", "warn"); return; }
-    if (b === "all") { showToast("Wybierz jednostkę (CUC lub SGS) — raport do faktury jest dla jednej jednostki", "warn"); return; }
     const rows = monthRows();
     if (!rows.length) { showToast("Brak audytów w tym miesiącu dla wybranej jednostki", "warn"); return; }
     const btn = $("settle-pdf-btn"); btn.disabled = true; const old = btn.textContent; btn.textContent = "Generuję PDF…";
