@@ -874,7 +874,8 @@ function openModal(id) {
   document.getElementById("m-prj").textContent       = a.ProjectID || "—";
   document.getElementById("m-program").textContent   = a.Program || "—";
   document.getElementById("m-certbody").textContent   = certBodyOf(a);
-  document.getElementById("m-type").textContent      = a.AuditType || "—";
+  document.getElementById("m-type").textContent      = isMeeting(a) ? "—" : (a.AuditType || "—");
+  { const mk = document.getElementById("m-kind"); if (mk) mk.textContent = kindOf(a); }
   document.getElementById("m-standard").textContent  = (a.Standard || "—").replace(/\n/g, " | ");
   document.getElementById("m-address").textContent   = a.Address || "—";
   const cityFull = `${a.City || ""} ${a.PostalCode || ""}`.trim();
@@ -947,7 +948,10 @@ function enterEditMode() {
   document.getElementById("e-mobile").value  = a.Mobile || "";
   document.getElementById("e-date").value    = originalAuditDate;
   document.getElementById("e-days").value    = a.AuditDays != null ? a.AuditDays : "";
-  { const et = document.getElementById("e-type"); if (et) { if (a.AuditType && ![...et.options].some(o => o.value === a.AuditType)) et.add(new Option(a.AuditType, a.AuditType)); et.value = a.AuditType || ""; } }
+  { const ek = document.getElementById("e-kind"), et = document.getElementById("e-type");
+    if (ek) ek.value = kindOf(a);
+    if (et) { const t = isMeeting(a) ? "" : (a.AuditType || ""); if (t && ![...et.options].some(o => o.value === t)) et.add(new Option(t, t)); et.value = t; }
+    syncKindType("e-kind", "e-type-row"); }
   document.getElementById("e-mode").value    = a.AuditMode || "On-site";
   document.getElementById("e-certbody").value = certBodyOf(a);
   document.getElementById("e-cu").value      = a.PlannedCUDate ? a.PlannedCUDate.substring(0, 10) : "";
@@ -1029,7 +1033,8 @@ async function saveChanges() {
       fields.AuditDateStart = dateVal ? safeDate(dateVal) : null;
       const daysVal = document.getElementById("e-days").value;
       fields.AuditDays     = daysVal !== "" ? parseFloat(daysVal) : null;
-      { const et = document.getElementById("e-type"); if (et) fields.AuditType = et.value || null; }
+      { const ek = document.getElementById("e-kind"), et = document.getElementById("e-type");
+        if (ek && et) fields.AuditType = ek.value === "Audyt" ? (et.value || null) : ek.value; }
       fields.AuditMode     = document.getElementById("e-mode").value || null;
       fields.CertBody      = document.getElementById("e-certbody").value || "CUC";
       fields.PlannedCUDate = cuVal ? safeDate(cuVal) : null;
@@ -1843,6 +1848,8 @@ function openAddAuditModal() {
   document.getElementById("new-certbody").value = "CUC";
   updateProjectIdLabel();
   document.getElementById("new-type").value     = "";
+  document.getElementById("new-kind").value     = "Audyt";
+  syncKindType("new-kind", "new-type-row");
   document.getElementById("new-date").value     = "";
   document.getElementById("new-days").value     = "1";
   document.getElementById("new-mode").value     = "On-site";
@@ -1863,7 +1870,8 @@ function closeAddAudit() {
 async function saveNewAudit() {
   const title   = document.getElementById("new-title").value.trim();
   const program = document.getElementById("new-program").value;
-  const type    = document.getElementById("new-type").value;
+  const kind    = document.getElementById("new-kind").value;
+  const type    = kind === "Audyt" ? document.getElementById("new-type").value : kind;
   const date    = document.getElementById("new-date").value;
 
   if (!title)   { showToast("Podaj nazwę firmy", "error"); return; }
@@ -1941,6 +1949,14 @@ function shortType(t) {
 // Spotkanie / szkolenie u jednostki: NIE jest dniem audytowym — rozliczamy tylko koszty dojazdu i hotelu (Michał, nagranie 2026-09-30)
 const MEETING_TYPES = ["Spotkanie", "Szkolenie"];
 function isMeeting(a) { return MEETING_TYPES.includes(String((a && a.AuditType) || "").trim()); }
+function kindOf(a) { return isMeeting(a) ? a.AuditType.trim() : "Audyt"; }
+// Pole „Typ audytu” aktywne tylko dla rodzaju Audyt (spotkanie/szkolenie nie ma typu)
+function syncKindType(kindId, typeRowId) {
+  const k = document.getElementById(kindId), row = document.getElementById(typeRowId);
+  if (!k || !row) return;
+  const apply = () => { const isAudit = k.value === "Audyt"; row.classList.toggle("hidden", !isAudit); const t = row.querySelector("select"); if (t) t.disabled = !isAudit; };
+  k.onchange = apply; apply();
+}
 
 // Stawka dzienna wg umowy z jednostką (CU: 1500 zł). Wartość NIE trafia do raportów, tylko iloczyn dni × stawka.
 const DAY_RATES_KEY = "lfa-day-rates";

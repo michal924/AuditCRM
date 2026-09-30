@@ -519,7 +519,13 @@
               <option value="SGS">SGS</option>
             </select>
           </div>
-          <div class="field-row"><label>Typ audytu</label><span id="m-type" class="view-val">—</span>
+          <div class="field-row"><label>Rodzaj wpisu</label><span id="m-kind" class="view-val">—</span>
+            <select id="e-kind" class="edit-val field-input">
+              <option value="Audyt">Audyt</option>
+              <option value="Spotkanie">Spotkanie (tylko koszty)</option>
+              <option value="Szkolenie">Szkolenie (tylko koszty)</option>
+            </select></div>
+          <div class="field-row" id="e-type-row"><label>Typ audytu</label><span id="m-type" class="view-val">—</span>
             <select id="e-type" class="edit-val field-input">
               <option value="">—</option>
               <option>Surveillance announced</option>
@@ -527,10 +533,8 @@
               <option>Re-Certification Audit</option>
               <option>Certification Audit</option>
               <option>Extension Audit</option>
-              <option>Main Audit</option>
+              <option value="Main Audit">Main</option>
               <option>Other</option>
-              <option value="Spotkanie">Spotkanie (tylko koszty)</option>
-              <option value="Szkolenie">Szkolenie (tylko koszty)</option>
             </select></div>
           <div class="field-row"><label>Standard</label><span id="m-standard">—</span></div>
           <div class="field-row">
@@ -802,6 +806,14 @@
             </select>
           </div>
           <div class="form-row">
+            <label>Rodzaj wpisu *</label>
+            <select id="new-kind" class="form-input">
+              <option value="Audyt" selected>Audyt</option>
+              <option value="Spotkanie">Spotkanie (tylko koszty, bez dnia audytowego)</option>
+              <option value="Szkolenie">Szkolenie (tylko koszty, bez dnia audytowego)</option>
+            </select>
+          </div>
+          <div class="form-row" id="new-type-row">
             <label>Typ audytu *</label>
             <select id="new-type" class="form-input">
               <option value="">— wybierz —</option>
@@ -810,11 +822,8 @@
               <option>Re-Certification Audit</option>
               <option>Certification Audit</option>
               <option>Extension Audit</option>
-              <option>Main Audit</option>
+              <option value="Main Audit">Main</option>
               <option>Other</option>
-              <option disabled>──────────</option>
-              <option value="Spotkanie">Spotkanie (tylko koszty, bez dnia audytowego)</option>
-              <option value="Szkolenie">Szkolenie (tylko koszty, bez dnia audytowego)</option>
             </select>
           </div>
           <div class="form-row">
