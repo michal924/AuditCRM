@@ -739,6 +739,22 @@
           <input type="file" id="import-file" accept=".xlsx,.xls" style="display:none">
           <button class="btn-primary" style="width:auto;margin-top:12px" onclick="document.getElementById('import-file').click()">Wybierz plik .xlsx</button>
         </div>
+
+        <!-- Wsad CSV: dowolny podmiot (SGS, CU, zlecenia od spółki) -->
+        <div class="wsad-box">
+          <h3 class="settle-h">Wsad CSV (SGS i inni zleceniodawcy)</h3>
+          <p class="settle-import-hint">Plik CSV ze średnikami i nagłówkiem: FIRMA; JEDNOSTKA CERTYFIKUJĄCA; NR PRJ; PROGRAM; RODZAJ WPISU; TYP AUDYTU; STANDARD; ADRES; MIASTO; KOD; EMAIL KLIENTA; TELEFON; KOMÓRKA; NOTATKI; DATA AUDYTU; LICZBA DNI; TRYB; KWARTAŁ; ROK; STATUS. Najpierw podgląd: nowe wpisy dodaję, w istniejących uzupełniam tylko puste pola.</p>
+          <div class="settle-toolbar">
+            <div class="form-row">
+              <label for="wsad-file">Plik .csv</label>
+              <input type="file" id="wsad-file" accept=".csv,text/csv" class="form-input">
+            </div>
+            <div class="settle-toolbar-actions">
+              <button id="wsad-save" class="btn-primary hidden" style="width:auto">💾 Zapisz</button>
+            </div>
+          </div>
+          <div id="wsad-result"></div>
+        </div>
       </div>
 
       <!-- Stage 2: podgląd -->

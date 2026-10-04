@@ -1778,3 +1778,6 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .scal-day.has-lf { background: var(--lfa-body-lf-bg); color: var(--lfa-body-lf-fg); }
 .op-day.ac-has-lf { background: var(--lfa-body-lf-bg); color: var(--lfa-body-lf-fg); font-weight: 800; }
 @media (max-width: 768px) { #audits-table tr.audit-row.row-body-lf { border-left-color: var(--lfa-body-lf); } }
+
+/* Wsad CSV w oknie importu */
+.wsad-box { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--lfa-border); text-align: left; }

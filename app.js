@@ -146,6 +146,7 @@ async function init() {
   setupChanges();
   DevModule.setup();
   SettleModule.setup();
+  WsadModule.setup();
 
   await loadAudits();
 }
@@ -4545,3 +4546,127 @@ const SettleModule = (function () {
   return { setup, open, buildPdf };
 })();
 window.SettleModule = SettleModule;
+
+// ============================================================
+// MODUŁ: WSAD CSV — hurtowe dodawanie wpisów (SGS, CU, zlecenia od spółki)
+// Nagłówki jak w pliku „Wsad_Audit_CRM_*.csv"; nowe wpisy → dodaj, istniejące → uzupełnij tylko puste pola.
+// ============================================================
+const WsadModule = (function () {
+  const $ = id => document.getElementById(id);
+  let plan = null;
+
+  // CSV ze średnikiem, cudzysłowy "..." z podwojonym "" w środku, pola wieloliniowe
+  function parseCsv(text) {
+    text = text.replace(/^﻿/, "");
+    const first = text.split(/\r?\n/)[0] || "";
+    const sep = (first.split(";").length >= first.split(",").length) ? ";" : ",";
+    const rows = []; let row = [], cur = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true;
+      else if (c === sep) { row.push(cur); cur = ""; }
+      else if (c === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+      else if (c !== "\r") cur += c;
+    }
+    if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+    return rows.filter(r => r.some(v => String(v).trim() !== ""));
+  }
+  const norm = s => String(s || "").trim().toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/Ł/g, "L");
+  const COLS = { "FIRMA": "title", "JEDNOSTKA CERTYFIKUJACA": "body", "JEDNOSTKA": "body", "NR PRJ": "prj", "PROGRAM": "program", "RODZAJ WPISU": "kind", "TYP AUDYTU": "type",
+    "STANDARD": "standard", "ADRES": "address", "MIASTO": "city", "KOD": "postal", "EMAIL KLIENTA": "email", "TELEFON": "phone", "KOMORKA": "mobile", "NOTATKI": "notes",
+    "DATA AUDYTU": "date", "LICZBA DNI": "days", "TRYB": "mode", "KWARTAL": "quarter", "ROK": "year", "STATUS": "status" };
+  const TYPE_MAP = [[/^RE-?CERT|^RECERT/, "Re-Certification Audit"], [/^CERT/, "Certification Audit"], [/^NADZ|^SURV/, "Surveillance announced"], [/^RE-?ASS|^PONOWN/, "Re-assessment"],
+    [/^ROZSZ|^EXT/, "Extension Audit"], [/^MAIN|^GLOWN/, "Main Audit"], [/^OTHER|^INN/, "Other"]];
+  function mapType(kind, type) {
+    const k = norm(kind); if (k.startsWith("SPOTK")) return "Spotkanie"; if (k.startsWith("SZKOL")) return "Szkolenie";
+    const t = norm(type); for (const [re, v] of TYPE_MAP) if (re.test(t)) return v; return String(type || "").trim() || "Other";
+  }
+  function mapBody(v) { const b = norm(v); return b.startsWith("SGS") ? "SGS" : (b.startsWith("LOGISTIC") || b === "LF") ? "LF" : "CUC"; }
+  function mapDate(v) {
+    const t = String(v || "").trim(); let m = t.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
+    if (m) return m[3] + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0");
+    m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[0] : "";
+  }
+  function toRecords(rows) {
+    const hdr = rows[0].map(h => COLS[norm(h)] || null);
+    if (!hdr.includes("title") || !hdr.includes("date")) throw new Error("Brak kolumn FIRMA / DATA AUDYTU w nagłówku");
+    return rows.slice(1).map((r, i) => {
+      const o = {}; hdr.forEach((k, j) => { if (k) o[k] = String(r[j] == null ? "" : r[j]).trim(); });
+      const date = mapDate(o.date), status = norm(o.status);
+      const rec = {
+        Title: o.title, CertBody: mapBody(o.body), Program: o.program || null, AuditType: mapType(o.kind, o.type), Standard: o.standard || null,
+        AuditDateStart: date ? safeDate(date) : null, AuditDays: parseFloat(String(o.days || "").replace(",", ".")) || 1,
+        AuditMode: /online|zdal/i.test(o.mode || "") ? "Online" : "On-site",
+        AuditStatus: ["PLANNED", "DONE", "REJECTED", "CHANGE"].includes(status) ? status : status === "INVOICE" ? "Invoice" : "PLANNED",
+        Proforma: "Brak", Address: o.address || null, City: o.city || null, PostalCode: o.postal || null, ClientEmail: o.email || null, Phone: o.phone || null, Mobile: o.mobile || null,
+        Quarter: /^Q[1-4]$/i.test(o.quarter || "") ? o.quarter.toUpperCase() : (date ? detectQuarter(date) : null),
+        Year: parseInt(o.year) || (date ? parseInt(date.substring(0, 4)) : new Date().getFullYear()),
+        AuditorName: MY_AUDITOR, Notes: o.notes || null,
+      };
+      return { line: i + 2, rec, prj: o.prj || "", date };
+    }).filter(x => x.rec.Title);
+  }
+  const nameKey = s => String(s || "").toLowerCase().replace(/sp\.? ?z ?o\.? ?o\.?|s\.a\./g, "").replace(/[^a-z0-9ąćęłńóśźż]/g, "");
+  function findExisting(x) {
+    const d = x.date ? new Date(x.date + "T12:00:00") : null;
+    return (allAudits || []).find(a => bodyKey(a) === x.rec.CertBody
+      && ((x.prj && String(a.ProjectID || "").trim() === x.prj) || nameKey(a.Title) === nameKey(x.rec.Title))
+      && (!d || !a.AuditDateStart || Math.abs(new Date(String(a.AuditDateStart).substring(0, 10) + "T12:00:00") - d) / 86400000 <= 45));
+  }
+  const FILL = ["Program", "AuditType", "Standard", "Address", "City", "PostalCode", "ClientEmail", "Phone", "Mobile", "Notes", "AuditDays", "AuditDateStart", "Quarter", "Year"];
+  function buildPlan(items) {
+    return items.map(x => {
+      const ex = findExisting(x);
+      if (!ex) return { x, kind: "add" };
+      const fields = {}; FILL.forEach(k => { if ((ex[k] == null || ex[k] === "") && x.rec[k] != null && x.rec[k] !== "") fields[k] = x.rec[k]; });
+      if ((ex.ProjectID == null || ex.ProjectID === "") && x.prj) fields.ProjectID = x.prj;
+      return Object.keys(fields).length ? { x, kind: "fill", ex, fields } : { x, kind: "same", ex };
+    });
+  }
+  function render() {
+    const cnt = k => plan.filter(p => p.kind === k).length;
+    const badge = p => p.kind === "add" ? '<span class="settle-badge done">nowy wpis</span>' : p.kind === "fill" ? '<span class="settle-badge sent">uzupełnię: ' + Object.keys(p.fields).length + ' pól</span>' : '<span class="settle-badge open">już jest, bez zmian</span>';
+    $("wsad-result").innerHTML = '<div class="settle-statusline"><span class="settle-badge done">nowe: ' + cnt("add") + '</span> <span class="settle-badge sent">do uzupełnienia: ' + cnt("fill") + '</span> <span class="settle-badge open">bez zmian: ' + cnt("same") + '</span></div>' +
+      '<div class="table-wrapper settle-table-wrap settle-import-wrap"><table class="settle-table"><thead><tr><th>Wiersz</th><th>Data</th><th>Firma</th><th>Jedn.</th><th>Nr PRJ</th><th>Program</th><th>Typ</th><th class="num">Dni</th><th>Wynik</th></tr></thead><tbody>' +
+      plan.map(p => '<tr class="imp-' + (p.kind === "same" ? "missing" : "write") + '"><td class="num">' + p.x.line + '</td><td>' + (p.x.date ? formatDate(p.x.date) : "?") + '</td><td>' + escHtml(p.x.rec.Title) + '</td><td>' + escHtml(BODY_INFO[p.x.rec.CertBody].label) +
+        '</td><td>' + escHtml(p.x.prj) + '</td><td>' + escHtml(p.x.rec.Program || "") + '</td><td>' + escHtml(shortType(p.x.rec.AuditType)) + '</td><td class="num">' + p.x.rec.AuditDays + '</td><td>' + badge(p) + '</td></tr>').join("") + '</tbody></table></div>';
+    const n = cnt("add") + cnt("fill"); const b = $("wsad-save"); b.classList.toggle("hidden", !n); b.disabled = false; b.textContent = "💾 Zapisz " + n + " wpisów";
+  }
+  function onFile(e) {
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => { try { plan = buildPlan(toRecords(parseCsv(String(ev.target.result)))); if (!plan.length) { showToast("Plik nie zawiera wierszy z danymi", "warn"); return; } render(); }
+      catch (err) { showToast("Nie udało się odczytać CSV: " + (err.message || err), "error"); } };
+    reader.readAsText(file, "utf-8");
+  }
+  // Nr PRJ bywa tekstowy (np. PL/KZR/BIO-704). Jeśli kolumna ProjectID w SharePoint jest liczbowa i odrzuci tekst, numer trafia na początek notatek.
+  async function writeWithPrj(prj, base, send) {
+    if (!prj) return send(base);
+    const asNum = /^\d+$/.test(prj) ? parseInt(prj, 10) : prj;
+    try { return await send(Object.assign({}, base, { ProjectID: asNum })); }
+    catch (e) { const f = Object.assign({}, base); delete f.ProjectID; f.Notes = "Nr PRJ: " + prj + (base.Notes ? "\n" + base.Notes : ""); return send(f); }
+  }
+  async function save() {
+    const todo = (plan || []).filter(p => p.kind !== "same"); if (!todo.length) return;
+    const btn = $("wsad-save"); btn.disabled = true; let ok = 0; const fail = [];
+    for (let i = 0; i < todo.length; i++) {
+      const p = todo[i]; btn.textContent = "Zapisuję " + (i + 1) + "/" + todo.length + "…";
+      try {
+        if (p.kind === "add") await writeWithPrj(p.x.prj, p.x.rec, f => addAudit(f));
+        else { const f = Object.assign({}, p.fields); const prj = f.ProjectID; delete f.ProjectID; if (!f.Notes && prj) f.Notes = p.ex.Notes || null;
+          await writeWithPrj(prj, f, ff => updateAudit(p.ex.Id, ff)); }
+        ok++;
+      } catch (err) { fail.push(p.x.rec.Title + ": " + String(err.message || err).substring(0, 90)); }
+    }
+    btn.classList.add("hidden");
+    showToast("✅ Zapisano " + ok + " wpisów" + (fail.length ? ", błędy: " + fail.length : ""), fail.length ? "warn" : "success");
+    $("wsad-result").innerHTML = fail.length ? '<div class="settle-setup">Błędy zapisu:<br>' + fail.map(escHtml).join("<br>") + '</div>' : '<div class="settle-empty">Zapisano. Wpisy są już w tabeli audytów.</div>';
+    plan = null; $("wsad-file").value = "";
+    allAudits = await fetchAllAudits(); renderTable();
+  }
+  function setup() { const f = $("wsad-file"); if (f) f.onchange = onFile; const b = $("wsad-save"); if (b) b.onclick = save; }
+  return { setup, parseCsv, toRecords, buildPlan };
+})();
+window.WsadModule = WsadModule;
+
