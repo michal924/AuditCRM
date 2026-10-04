@@ -69,6 +69,10 @@
   --lfa-body-sgs:     var(--lfa-mosiadz);
   --lfa-body-sgs-bg:  color-mix(in srgb, var(--lfa-mosiadz) 22%, var(--lfa-surface));
   --lfa-body-sgs-fg:  var(--lfa-mosiadz-text);
+  /* LogisticFit (zlecenia od spółki) — neutralny Szary Dokument, żeby nie mylić z jednostkami certyfikującymi */
+  --lfa-body-lf:      var(--lfa-szary);
+  --lfa-body-lf-bg:   color-mix(in srgb, var(--lfa-szary) 20%, var(--lfa-surface));
+  --lfa-body-lf-fg:   var(--lfa-atrament);
 
   /* Wiersze tabeli: barwa = jednostka, jasność = status (od najmocniejszego) */
   --lfa-row-a-planned: 16%; --lfa-row-a-change: 12%; --lfa-row-a-invoice: 9%; --lfa-row-a-done: 6%; --lfa-row-a-rejected: 3%;
@@ -164,6 +168,7 @@
     --lfa-body-cu-bg:  color-mix(in srgb, var(--lfa-papier) 14%, var(--lfa-granat));  --lfa-body-cu-fg:  var(--lfa-papier);
     --lfa-body-sgs:    var(--lfa-mosiadz-jasny);
     --lfa-body-sgs-bg: color-mix(in srgb, var(--lfa-mosiadz) 30%, var(--lfa-granat)); --lfa-body-sgs-fg: var(--lfa-mosiadz-jasny);
+    --lfa-body-lf: color-mix(in srgb, var(--lfa-papier) 60%, var(--lfa-szary)); --lfa-body-lf-bg: color-mix(in srgb, var(--lfa-papier) 16%, var(--lfa-granat)); --lfa-body-lf-fg: var(--lfa-papier);
 
     --lfa-prog-fsc-bg:  var(--lfa-info-bg);    --lfa-prog-fsc-fg:  var(--lfa-papier);
     --lfa-prog-pefc-bg: var(--lfa-success-bg); --lfa-prog-pefc-fg: var(--lfa-papier);
@@ -203,6 +208,7 @@
   --lfa-st-planned-fg: var(--lfa-papier); --lfa-st-done-fg: var(--lfa-papier); --lfa-st-rejected-fg: var(--lfa-neutral-fg); --lfa-st-change-fg: var(--lfa-danger-fg); --lfa-st-invoice-fg: var(--lfa-mosiadz-jasny);
   --lfa-body-cu: var(--lfa-papier); --lfa-body-cu-bg: color-mix(in srgb, var(--lfa-papier) 14%, var(--lfa-granat)); --lfa-body-cu-fg: var(--lfa-papier);
   --lfa-body-sgs: var(--lfa-mosiadz-jasny); --lfa-body-sgs-bg: color-mix(in srgb, var(--lfa-mosiadz) 30%, var(--lfa-granat)); --lfa-body-sgs-fg: var(--lfa-mosiadz-jasny);
+  --lfa-body-lf: color-mix(in srgb, var(--lfa-papier) 60%, var(--lfa-szary)); --lfa-body-lf-bg: color-mix(in srgb, var(--lfa-papier) 16%, var(--lfa-granat)); --lfa-body-lf-fg: var(--lfa-papier);
   --lfa-prog-fsc-bg: var(--lfa-info-bg); --lfa-prog-fsc-fg: var(--lfa-papier); --lfa-prog-pefc-bg: var(--lfa-success-bg); --lfa-prog-pefc-fg: var(--lfa-papier);
   --lfa-prog-kzr-bg: var(--lfa-warning-bg); --lfa-prog-kzr-fg: var(--lfa-mosiadz-jasny); --lfa-prog-sure-bg: var(--lfa-danger-bg); --lfa-prog-sure-fg: var(--lfa-danger-fg);
   --lfa-prog-eudr-bg: var(--lfa-neutral-bg); --lfa-prog-eudr-fg: var(--lfa-papier);

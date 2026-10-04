@@ -141,6 +141,7 @@
         <div class="filter-multi-panel hidden" id="filter-certbody-panel">
           <label class="filter-multi-opt"><input type="checkbox" value="CUC"> CUC</label>
           <label class="filter-multi-opt"><input type="checkbox" value="SGS"> SGS</label>
+          <label class="filter-multi-opt"><input type="checkbox" value="LF"> LogisticFit</label>
         </div>
       </div>
       <div class="filter-multi-wrap" id="filter-status-wrap">
@@ -234,6 +235,7 @@
           <button id="scal-body-all" class="op-view-btn active">Wsz.</button>
           <button id="scal-body-cuc" class="op-view-btn">CUC</button>
           <button id="scal-body-sgs" class="op-view-btn">SGS</button>
+          <button id="scal-body-lf" class="op-view-btn">LF</button>
         </div>
         <div id="scal-activeday" class="scal-activeday hidden"></div>
         <div id="scal-daydetail" class="scal-daydetail hidden"></div>
@@ -483,6 +485,7 @@
           <button id="ac-body-all" class="op-view-btn active">Wszystkie</button>
           <button id="ac-body-cuc" class="op-view-btn">CUC</button>
           <button id="ac-body-sgs" class="op-view-btn">SGS</button>
+          <button id="ac-body-lf" class="op-view-btn">LogisticFit</button>
         </div>
         <button id="ac-prev" class="btn-ghost">‹</button>
         <span id="ac-label" class="op-year-label">—</span>
@@ -534,6 +537,7 @@
             <select id="e-certbody" class="edit-val field-input field-input-sm">
               <option value="CUC">CUC</option>
               <option value="SGS">SGS</option>
+              <option value="LF">LogisticFit (zlecenie od spółki)</option>
             </select>
           </div>
           <div class="field-row"><label>Rodzaj wpisu</label><span id="m-kind" class="view-val">—</span>
@@ -808,6 +812,7 @@
             <select id="new-certbody" class="form-input">
               <option value="CUC">CUC</option>
               <option value="SGS">SGS</option>
+              <option value="LF">LogisticFit (zlecenie od spółki)</option>
             </select>
           </div>
           <div class="form-row">
@@ -974,9 +979,10 @@
         <div class="form-row">
           <label>Jednostka</label>
           <select id="settle-body-select" class="form-input">
-            <option value="all" selected>Wszystkie (CU + SGS)</option>
+            <option value="all" selected>Wszyscy (CU + SGS + LogisticFit)</option>
             <option value="CUC">CUC (Control Union)</option>
             <option value="SGS">SGS</option>
+            <option value="LF">LogisticFit</option>
           </select>
         </div>
         <div class="form-row">
@@ -986,6 +992,10 @@
         <div class="form-row">
           <label for="settle-rate-SGS">Stawka dzienna SGS</label>
           <input type="number" id="settle-rate-SGS" class="form-input settle-rate" min="0" step="50" placeholder="np. 800">
+        </div>
+        <div class="form-row">
+          <label for="settle-rate-LF">Stawka dzienna LogisticFit</label>
+          <input type="number" id="settle-rate-LF" class="form-input settle-rate" min="0" step="50" placeholder="brak">
         </div>
         <div class="settle-toolbar-actions">
           <button id="settle-export-btn" class="btn-primary" style="width:auto">⬇ Eksport .xlsx (miesiąc)</button>

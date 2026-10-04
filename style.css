@@ -1762,3 +1762,19 @@ tr.imp-write td { background: var(--lfa-success-bg); }
 /* Usuń wpis — akcja niszcząca: bordo, po lewej stronie od Zapisz */
 .btn-delete-audit { color: var(--lfa-accent); border-color: var(--lfa-accent); margin-right: auto; }
 .btn-delete-audit:hover { background: var(--lfa-accent); color: var(--lfa-on-accent); }
+
+/* ============================================================
+   Podmiot LF = spółka-zleceniodawca (zlecenia dla LF Assurance) — trzeci „kolor” obok CU i SGS
+   ============================================================ */
+.filter-multi-btn.filter-multi-active[data-body="LF"] { background: var(--lfa-body-lf-bg); border-color: var(--lfa-body-lf); color: var(--lfa-body-lf-fg); }
+tbody tr.audit-row.row-body-lf.row-st-planned  { background: color-mix(in srgb, var(--lfa-body-lf) var(--lfa-row-a-planned), var(--lfa-surface)); }
+tbody tr.audit-row.row-body-lf.row-st-change   { background: color-mix(in srgb, var(--lfa-body-lf) var(--lfa-row-a-change), var(--lfa-surface)); }
+tbody tr.audit-row.row-body-lf.row-st-invoice  { background: color-mix(in srgb, var(--lfa-body-lf) var(--lfa-row-a-invoice), var(--lfa-surface)); }
+tbody tr.audit-row.row-body-lf.row-st-done     { background: color-mix(in srgb, var(--lfa-body-lf) var(--lfa-row-a-done), var(--lfa-surface)); }
+tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, var(--lfa-body-lf) var(--lfa-row-a-rejected), var(--lfa-surface)); }
+.badge-body-lf { background: var(--lfa-body-lf-bg); color: var(--lfa-body-lf-fg); border: 1px solid var(--lfa-body-lf); }
+.ac-chip.lf { background: var(--lfa-body-lf-bg); color: var(--lfa-body-lf-fg); border-left-color: var(--lfa-body-lf); }
+.db-audit.lf { background: var(--lfa-body-lf-bg); color: var(--lfa-body-lf-fg); }
+.scal-day.has-lf { background: var(--lfa-body-lf-bg); color: var(--lfa-body-lf-fg); }
+.op-day.ac-has-lf { background: var(--lfa-body-lf-bg); color: var(--lfa-body-lf-fg); font-weight: 800; }
+@media (max-width: 768px) { #audits-table tr.audit-row.row-body-lf { border-left-color: var(--lfa-body-lf); } }

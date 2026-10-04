@@ -196,6 +196,12 @@ const MULTI_LABELS = { quarter: "Kwartał", month: "Miesiąc", year: "Rok", prog
 
 // Jednostka certyfikująca. Puste/stare rekordy = CUC (domyślnie), bez potrzeby backfillu.
 function certBodyOf(a) { return (a && a.CertBody) ? a.CertBody : "CUC"; }
+// Podmioty zlecające: jednostki certyfikujące + LogisticFit (zlecenia od spółki dla LF Assurance, Michał 2026-10-04)
+const BODY_KEYS = ["CUC", "SGS", "LF"];
+const BODY_INFO = { CUC: { cls: "cuc", short: "CU", label: "CUC", full: "Control Union" }, SGS: { cls: "sgs", short: "SGS", label: "SGS", full: "SGS" }, LF: { cls: "lf", short: "LF", label: "LogisticFit", full: "LogisticFit Sp. z o.o." } };
+function bodyKey(a) { const b = certBodyOf(a); return BODY_INFO[b] ? b : "CUC"; }
+function bodyCls(a) { return BODY_INFO[bodyKey(a)].cls; }
+function bodyLabel(a) { return BODY_INFO[bodyKey(a)].label; }
 
 // Status → token CSS (gradacja jasności wiersza). Puste = planned (najmocniejszy).
 function statusKey(s) {
@@ -219,7 +225,7 @@ function fmtPLN(n) {
   return (Math.round((n || 0) * 100) / 100).toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " zł";
 }
 // Etykieta statusu zależna od jednostki: "Wysłany do CU" / "Wysłany do SGS" (wartość w SP jest jedna)
-function settleBodyName(a) { return certBodyOf(a) === "SGS" ? "SGS" : "CU"; }
+function settleBodyName(a) { const k = bodyKey(a); return k === "LF" ? "LogisticFit" : BODY_INFO[k].short; }
 function settleStatusLabel(a) {
   const s = settleStatusOf(a);
   return s === "Wysłany do CU" ? "Wysłany do " + settleBodyName(a) : s;
@@ -241,7 +247,7 @@ function renderSettleView(a) {
   settleSetText("m-s-highway", has(a.SettleHighway) ? fmtPLN(a.SettleHighway) : "—");
   settleSetText("m-s-other",   has(a.SettleOther)   ? fmtPLN(a.SettleOther)   : "—");
   settleSetText("m-s-tickets", has(a.SettleTickets) ? fmtPLN(a.SettleTickets) : "—");
-  settleSetText("m-s-fee",     has(a.SettleFee) ? fmtPLN(a.SettleFee) : isMeeting(a) ? "— (spotkanie: tylko koszty)" : c.fee ? fmtPLN(c.fee) + " (" + settleNum(a.AuditDays) + " dni × stawka " + certBodyOf(a) + ")" : "— (brak stawki dziennej)");
+  settleSetText("m-s-fee",     has(a.SettleFee) ? fmtPLN(a.SettleFee) : isMeeting(a) ? "— (spotkanie: tylko koszty)" : c.fee ? fmtPLN(c.fee) + " (" + settleNum(a.AuditDays) + " dni × stawka " + bodyLabel(a) + ")" : "— (brak stawki dziennej)");
   settleSetText("m-s-basis",   a.SettleFeeBasis || "—");
   settleSetText("m-s-note",    a.SettleNote || "—");
   settleSetText("m-s-costs",   fmtPLN(c.costs));
@@ -490,7 +496,7 @@ function renderTable() {
   const NCOLS = 13; // liczba kolumn tabeli
   tbody.innerHTML = filtered.map(a => {
     // Barwa wiersza = jednostka (CUC niebieski / SGS pomarańcz), jasność = status
-    const bodyCls = certBodyOf(a) === "SGS" ? "row-body-sgs" : "row-body-cuc";
+    const bodyCls = "row-body-" + window.bodyCls(a);
     const stCls   = "row-st-" + statusKey(a.AuditStatus);
     const rowClass = bodyCls + " " + stCls;
     const notesSnippet = a.Notes
@@ -656,8 +662,7 @@ async function renderDayBusy(boxId, dateStr) {
   try { if (window.OpiekaModule && OpiekaModule.dayInfo) { const i = OpiekaModule.dayInfo(d); if (i.father) custody = i.reason; } } catch {}
   if (custody) rows.push(`<div class="db-row db-custody">👨‍👦 Opieka nad Szymonem <span class="db-sub">${escHtml(custody)}</span></div>`);
   sameDayAudits(dateStr).forEach(a => {
-    const b = (a.CertBody === "SGS") ? "SGS" : "CUC";
-    rows.push(`<div class="db-row db-audit ${b === "SGS" ? "sgs" : "cuc"}">📋 ${escHtml(a.Title || "Audyt")} <span class="db-sub">${b} · ${escHtml(a.Program || "?")}</span></div>`);
+    rows.push(`<div class="db-row db-audit ${bodyCls(a)}">📋 ${escHtml(a.Title || "Audyt")} <span class="db-sub">${bodyLabel(a)} · ${escHtml(a.Program || "?")}</span></div>`);
   });
   const staticHtml = rows.join("");
   box.classList.remove("hidden");
@@ -1722,6 +1727,7 @@ function updateProjectIdLabel() {
   if (!lbl) return;
   const body = document.getElementById("new-certbody")?.value || "CUC";
   if (body === "SGS") { lbl.textContent = "Nr klienta (SGS)"; if (inp) inp.placeholder = "nr klienta SGS"; }
+  else if (body === "LF") { lbl.textContent = "Nr zlecenia (LogisticFit)"; if (inp) inp.placeholder = "opcjonalnie"; }
   else { lbl.textContent = "Nr PRJ (CUC)"; if (inp) inp.placeholder = "np. 884179"; }
 }
 
@@ -1982,7 +1988,7 @@ function syncKindType(kindId, typeRowId) {
 // Stawka dzienna wg umowy z jednostką (CU: 1500 zł). Wartość NIE trafia do raportów, tylko iloczyn dni × stawka.
 const DAY_RATES_KEY = "lfa-day-rates";
 function getDayRates() {
-  const def = { CUC: 1500, SGS: 800 };   // wg umów (Michał 2026-09-30); nadpisanie w panelu Rozliczenie zapisuje się lokalnie
+  const def = { CUC: 1500, SGS: 800, LF: null };   // wg umów (Michał 2026-09-30); nadpisanie w panelu Rozliczenie zapisuje się lokalnie
   try { const saved = JSON.parse(localStorage.getItem(DAY_RATES_KEY) || "{}"); Object.keys(saved).forEach(k => { if (saved[k] != null && !isNaN(+saved[k])) def[k] = +saved[k]; }); } catch {}
   return def;
 }
@@ -2042,9 +2048,7 @@ function programBadge(p) {
 }
 
 function certBodyBadge(a) {
-  const b = certBodyOf(a);
-  const cls = b === "SGS" ? "sgs" : "cuc";
-  return `<span class="badge badge-body-${cls}">${b}</span>`;
+  return `<span class="badge badge-body-${bodyCls(a)}">${bodyLabel(a)}</span>`;
 }
 
 function statusBadge(s) {
@@ -3537,7 +3541,7 @@ const AuditCalModule = (function () {
     return set;
   }
 
-  const bodyOf = a => (a.CertBody === "SGS") ? "SGS" : "CUC";
+  const bodyOf = a => bodyKey(a);
   const ceilDays = a => Math.max(1, Math.ceil(parseFloat(a.AuditDays) || 1));
 
   // Mapa: klucz dnia → [{a, cont}]; audyt rozciągnięty na AuditDays dni (mój audytor)
@@ -3576,7 +3580,7 @@ const AuditCalModule = (function () {
   function chipEl(item, small) {
     const a = item.a, b = bodyOf(a);
     const el = document.createElement("div");
-    el.className = "ac-chip " + (b === "SGS" ? "sgs" : "cuc") + (item.cont ? " cont" : "");
+    el.className = "ac-chip " + bodyCls(a) + (item.cont ? " cont" : "");
     el.textContent = (item.cont ? "↳ " : "") + (a.Title || "Audyt") + (small ? "" : ` · ${a.Program || "?"}`);
     el.title = `${a.Title || "—"} (${b} · ${a.Program || "?"})\nStatus: ${a.AuditStatus || "—"}${a.City ? "\n" + a.City : ""}`;
     el.onclick = (ev) => { ev.stopPropagation(); try { openModal(a.Id); } catch {} };
@@ -3742,9 +3746,9 @@ const AuditCalModule = (function () {
         cell.textContent = d;
         const chips = filtered(all);
         if (chips.length) {
-          const hasC = chips.some(it => bodyOf(it.a) === "CUC"), hasS = chips.some(it => bodyOf(it.a) === "SGS");
-          // Cała komórka podświetlona kolorem jednostki — dużo lepiej widoczne niż kropka
-          cell.classList.add(hasC && hasS ? "ac-has-both" : hasS ? "ac-has-sgs" : "ac-has-cuc");
+          const kinds = [...new Set(chips.map(it => bodyOf(it.a)))];
+          // Cała komórka podświetlona kolorem podmiotu — dużo lepiej widoczne niż kropka
+          cell.classList.add(kinds.length > 1 ? "ac-has-both" : "ac-has-" + BODY_INFO[kinds[0]].cls);
           if (cl.custody) cell.classList.add("ac-conflict");
           cell.title = `${fmtDate(dd)}\n` + chips.map(it => `• ${it.a.Title || "—"} (${bodyOf(it.a)})`).join("\n");
         } else {
@@ -3781,8 +3785,8 @@ const AuditCalModule = (function () {
     renderCal();
   }
   function setBody(b) {
-    bodyFilter = (b === "all") ? "all" : b.toUpperCase(); // "CUC" / "SGS"
-    ["all","cuc","sgs"].forEach(x => $(`ac-body-${x}`).classList.toggle("active", x === b));
+    bodyFilter = (b === "all") ? "all" : b.toUpperCase(); // "CUC" / "SGS" / "LF"
+    ["all","cuc","sgs","lf"].forEach(x => { const el = $(`ac-body-${x}`); if (el) el.classList.toggle("active", x === b); });
     renderCal();
   }
   function step(dir) {
@@ -3799,6 +3803,7 @@ const AuditCalModule = (function () {
     $("ac-body-all").onclick = () => setBody("all");
     $("ac-body-cuc").onclick = () => setBody("cuc");
     $("ac-body-sgs").onclick = () => setBody("sgs");
+    { const lfb = $("ac-body-lf"); if (lfb) lfb.onclick = () => setBody("lf"); }
     $("ac-prev").onclick = () => step(-1);
     $("ac-next").onclick = () => step(1);
     const ot = $("ac-outlook-toggle");
@@ -3839,7 +3844,7 @@ const SideCalModule = (function () {
   function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da);}
   const _hc = {};
   function holidays(y){ if(_hc[y]) return _hc[y]; const s=new Set(); ["01-01","01-06","05-01","05-03","08-15","11-01","11-11","12-25","12-26"].forEach(md=>s.add(`${y}-${md}`)); const e=easter(y); s.add(keyOf(e)); s.add(keyOf(addDays(e,1))); s.add(keyOf(addDays(e,49))); s.add(keyOf(addDays(e,60))); _hc[y]=s; return s; }
-  const bodyOf = a => (a.CertBody === "SGS") ? "SGS" : "CUC";
+  const bodyOf = a => bodyKey(a);
   const ceilDays = a => Math.max(1, Math.ceil(parseFloat(a.AuditDays) || 1));
   const custodyAt = d => { try { return !!(window.OpiekaModule && OpiekaModule.dayInfo && OpiekaModule.dayInfo(d).father); } catch { return false; } };
 
@@ -3918,7 +3923,7 @@ const SideCalModule = (function () {
     let custody = null;
     try { if (window.OpiekaModule && OpiekaModule.dayInfo){ const i = OpiekaModule.dayInfo(d); if (i.father) custody = i.reason; } } catch {}
     if (custody) rows.push(`<div class="db-row db-custody">👨‍👦 Opieka <span class="db-sub">${escHtml(custody)}</span></div>`);
-    audits.forEach(a => { const b = (a.CertBody==="SGS")?"SGS":"CUC"; rows.push(`<div class="db-row db-audit ${b==="SGS"?"sgs":"cuc"}">📋 ${escHtml(a.Title||"Audyt")} <span class="db-sub">${b}</span></div>`); });
+    audits.forEach(a => { rows.push(`<div class="db-row db-audit ${bodyCls(a)}">📋 ${escHtml(a.Title||"Audyt")} <span class="db-sub">${bodyLabel(a)}</span></div>`); });
     ext.forEach(e => { let t=""; if (!e.isAllDay && e.start && e.start.dateTime){ const x=new Date(e.start.dateTime); if(!isNaN(x)) t=pad(x.getHours())+":"+pad(x.getMinutes())+" "; } rows.push(`<div class="db-row db-ext">📆 ${t}${escHtml(e.subject||"(bez tytułu)")}</div>`); });
     if (!rows.length){ const dow = d.getDay(); rows.push(`<div class="db-row db-free">${(dow===0||dow===6)?"Weekend":"✓ Wolny dzień"}</div>`); }
     box.className = "scal-daydetail"; box.innerHTML = rows.join("");
@@ -3935,8 +3940,8 @@ const SideCalModule = (function () {
       const audits = (map[k]||[]).filter(a => sbody==="all" || bodyOf(a)===sbody);
       const cl = classify(dd, map[k]);
       const cell = document.createElement("div"); cell.className = "scal-day";
-      if (audits.length){ const hasC=audits.some(a=>bodyOf(a)==="CUC"), hasS=audits.some(a=>bodyOf(a)==="SGS");
-        cell.classList.add(hasC&&hasS?"has-both":hasS?"has-sgs":"has-cuc");
+      if (audits.length){ const kinds=[...new Set(audits.map(bodyOf))];
+        cell.classList.add(kinds.length>1?"has-both":"has-"+BODY_INFO[kinds[0]].cls);
         if (cl.custody) cell.classList.add("conflict-edge"); } // audyt w dzień opieki
       else if (cl.extBusy) cell.classList.add("busy-other"); // realnie zajęty (spotkanie/szkolenie Outlook) → czerwony
       else if (cl.free) cell.classList.add("free");
@@ -3967,11 +3972,11 @@ const SideCalModule = (function () {
 
   function updateLabel(){ const l=$("scal-label"); if (l) l.textContent = `${MIES_NOM[sm]} ${sy}`; }
   function step(dir){ sm+=dir; if(sm<0){sm=11;sy--;} else if(sm>11){sm=0;sy++;} updateLabel(); ensureOutlook(); renderGrid(); }
-  function setBody(b){ sbody=(b==="all")?"all":b.toUpperCase(); ["all","cuc","sgs"].forEach(x=>{const el=$(`scal-body-${x}`); if(el) el.classList.toggle("active", x===b);}); renderGrid(); }
+  function setBody(b){ sbody=(b==="all")?"all":b.toUpperCase(); ["all","cuc","sgs","lf"].forEach(x=>{const el=$(`scal-body-${x}`); if(el) el.classList.toggle("active", x===b);}); renderGrid(); }
 
   function setup(){
     const p=$("scal-prev"), n=$("scal-next"); if(p) p.onclick=()=>step(-1); if(n) n.onclick=()=>step(1);
-    ["all","cuc","sgs"].forEach(x=>{ const el=$(`scal-body-${x}`); if(el) el.onclick=()=>setBody(x); });
+    ["all","cuc","sgs","lf"].forEach(x=>{ const el=$(`scal-body-${x}`); if(el) el.onclick=()=>setBody(x); });
     const t=$("scal-toggle"); if(t) t.onclick=()=>{ collapsed=!collapsed; const box=$("myaudits-cal"); if(box) box.classList.toggle("collapsed", collapsed); };
   }
   function render(){ if(!inited){ setup(); inited=true; } updateLabel(); ensureOutlook(); renderGrid(); renderFree(); updateActiveDay(); renderDayDetail(); }
@@ -4143,7 +4148,7 @@ const SettleModule = (function () {
 
   // ── Raport PDF do faktury (jedna jednostka, jeden miesiąc) ──
   // Zasady (Michał 2026-09-21): bez stawki dziennej przy audytach; wynagrodzenie jedną kwotą w podsumowaniu; koszty w pełnym rozbiciu.
-  const PDF_BODIES = { CUC: { short: "CU", full: "Control Union" }, SGS: { short: "SGS", full: "SGS" }, all: { short: "CU-SGS", full: "Control Union + SGS" } };
+  const PDF_BODIES = { CUC: { short: "CU", full: "Control Union" }, SGS: { short: "SGS", full: "SGS" }, LF: { short: "LF", full: "LogisticFit Sp. z o.o." }, all: { short: "WSZYSCY", full: "wszyscy zleceniodawcy" } };
   const MIES_FULL = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
   const LF_COMPANY = "LF Assurance · Gocławska 9B/7, 03-810 Warszawa · NIP 9182077986 · REGON 527791960";
   const num2 = n => { const [i, d] = (Math.round((n || 0) * 100) / 100).toFixed(2).split("."); return i.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + "," + d; };   // 6 000,00 (zwykła spacja — font PDF)
@@ -4159,10 +4164,11 @@ const SettleModule = (function () {
     const GRANAT = T("--lfa-granat"), BORDO = T("--lfa-bordo"), MOS = T("--lfa-mosiadz-text"), INK = T("--lfa-atrament"), MUTED = T("--lfa-szary"),
       PAPIER = T("--lfa-papier"), LINE = T("--lfa-border"), TINT = T("--lfa-info-bg"), DISK = T("--lfa-surface-2"), WHITE = T("--lfa-surface");
     const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), MX = 14;
-    const [yy, mm] = month.split("-"); const bd = PDF_BODIES[body] || { short: body, full: body };
+    const [yy, mm] = month.split("-"); const bd = Object.assign({}, PDF_BODIES[body] || { short: body, full: body });
     const multi = body === "all";                                     // raport wspólny: kolumna Jednostka + podsumowanie per jednostka
-    const bodyShort = a => (PDF_BODIES[certBodyOf(a)] || { short: certBodyOf(a) }).short;
-    if (multi) rows = rows.slice().sort((x, y) => certBodyOf(x).localeCompare(certBodyOf(y)) || String(x.AuditDateStart).localeCompare(String(y.AuditDateStart)));
+    const bodyShort = a => PDF_BODIES[bodyKey(a)].short;
+    if (multi) { const present = BODY_KEYS.filter(k => rows.some(a => bodyKey(a) === k)); bd.short = present.map(k => PDF_BODIES[k].short).join("-"); bd.full = present.map(k => PDF_BODIES[k].full).join(" + "); }
+    if (multi) rows = rows.slice().sort((x, y) => (BODY_KEYS.indexOf(bodyKey(x)) - BODY_KEYS.indexOf(bodyKey(y))) || String(x.AuditDateStart).localeCompare(String(y.AuditDateStart)));
     const now = new Date(); const issued = pad(now.getDate()) + "." + pad(now.getMonth() + 1) + "." + now.getFullYear();
     const nr = "R/" + yy + "/" + mm + "/" + bd.short + "-001";
     const auditor = String(MY_AUDITOR || "").split(" ").reverse().join(" ");
@@ -4247,7 +4253,7 @@ const SettleModule = (function () {
       y = room(doc.lastAutoTable.finalY + 8, 30);
     } else {
       // ── C · Załącznik do faktury (pozycja 1: wynagrodzenie, pozycja 2: koszty) ──
-      header(multi ? "RAPORT ROZLICZENIA — WSZYSTKIE JEDNOSTKI" : "SPECYFIKACJA DO FAKTURY");
+      header(multi ? "RAPORT ROZLICZENIA — WSZYSCY ZLECENIODAWCY" : "SPECYFIKACJA DO FAKTURY");
       title("Rozliczenie usług audytowych — " + MIES_FULL[parseInt(mm) - 1] + " " + yy, (multi ? "Jednostki: " : "Zleceniodawca: ") + bd.full + " · Wykonawca: LF Assurance, " + auditor);
       const secTitle = (n, t, yy2) => { doc.setFont(F, "bold"); doc.setFontSize(8); doc.setTextColor(...GRANAT); doc.text(n + "   " + t.toUpperCase(), MX, yy2, { charSpace: 0.35 });
         doc.setDrawColor(...MOS); doc.setLineWidth(0.25); doc.line(MX + doc.getTextWidth(n + "   " + t.toUpperCase()) + t.length * 0.35 + 6, yy2 - 1, W - MX, yy2 - 1); };
@@ -4282,7 +4288,7 @@ const SettleModule = (function () {
     };
     let yl = y;
     if (multi) {
-      ["CUC", "SGS"].forEach(bk => { const its = items.filter(i => certBodyOf(i.a) === bk); if (!its.length) return;
+      BODY_KEYS.forEach(bk => { const its = items.filter(i => bodyKey(i.a) === bk); if (!its.length) return;
         const bc = r2(its.reduce((s2, i) => s2 + i.c.costs, 0)), bf = r2(its.filter(i => !isMeeting(i.a)).reduce((s2, i) => s2 + i.c.fee, 0));
         line(PDF_BODIES[bk].short + " · koszty", num2(bc) + " zł", yl, false); yl += rh;
         line(PDF_BODIES[bk].short + " · wynagrodzenie wg umowy", num2(bf) + " zł", yl, false); yl += rh; });
@@ -4310,7 +4316,7 @@ const SettleModule = (function () {
       doc.setFont(F, "normal"); doc.setFontSize(6.3); doc.setTextColor(...MUTED);
       doc.text(LF_COMPANY, MX, H - 9);
       doc.text("Wygenerowano z LF Assurance Audit System · " + issued + " · strona " + p + " / " + pages, W - MX, H - 9, { align: "right" }); }
-    return { doc, fee, costs, filename: "Raport_rozliczenia_" + (multi ? "CU-SGS" : bd.short) + "_" + month + (layout === "A" ? "_zestawienie" : "_do_faktury") + ".pdf" };
+    return { doc, fee, costs, filename: "Raport_rozliczenia_" + bd.short + "_" + month + (layout === "A" ? "_zestawienie" : "_do_faktury") + ".pdf" };
   }
 
   async function exportPdf() {
@@ -4340,7 +4346,7 @@ const SettleModule = (function () {
       '</div>' +
       '<div class="settle-statusline">' + ["Nierozliczony", "Wysłany do CU", "Rozliczony"].map(s => {
         const b = bodyFilter();
-        const lbl = s === "Wysłany do CU" ? ("Wysłany do " + (b === "SGS" ? "SGS" : b === "CUC" ? "CU" : "jednostki")) : s;
+        const lbl = s === "Wysłany do CU" ? ("Wysłany do " + (b === "SGS" ? "SGS" : b === "CUC" ? "CU" : b === "LF" ? "LogisticFit" : "zleceniodawcy")) : s;
         return '<span class="settle-badge ' + (s === "Rozliczony" ? "done" : s === "Wysłany do CU" ? "sent" : "open") + '">' + lbl + ': ' + (byStatus[s] || 0) + '</span>';
       }).join(" ") + '</div>';
   }
@@ -4525,8 +4531,8 @@ const SettleModule = (function () {
     const ex = $("settle-export-btn"); if (ex) ex.onclick = exportMonth;
     const eo = $("settle-export-open-btn"); if (eo) eo.onclick = exportOpen;
     const pb = $("settle-pdf-btn"); if (pb) pb.onclick = exportPdf;
-    ["CUC", "SGS"].forEach(bk => { const inp = $("settle-rate-" + bk); if (!inp) return; const r = getDayRates()[bk]; inp.value = r == null ? "" : r;
-      inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + (bk === "CUC" ? "CU" : bk) + " zapisana (na tym urządzeniu)", "success"); }; });
+    BODY_KEYS.forEach(bk => { const inp = $("settle-rate-" + bk); if (!inp) return; const r = getDayRates()[bk]; inp.value = r == null ? "" : r;
+      inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + BODY_INFO[bk].label + " zapisana (na tym urządzeniu)", "success"); }; });
     const mo = $("settle-month"); if (mo) mo.onchange = renderMonthSummary;
     const bd = $("settle-body-select"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
     const yr = $("settle-year"); if (yr) yr.onchange = renderReports;

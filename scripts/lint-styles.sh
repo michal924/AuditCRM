@@ -27,6 +27,8 @@ report "rgb()/rgba()/hsl() poza tokenami" '\b(rgba?|hsla?)\(' "$FILES"
 # font-family tylko przez tokeny (var(...)) lub inherit — BSD grep bez lookahead, więc dwustopniowo
 ff=$(grep -nE 'font-family\s*:' style.css index.html 2>/dev/null | grep -vE 'font-family\s*:\s*(var\(|inherit)' | grep -vE "$ALLOW_RE" || true)
 if [ -n "$ff" ]; then n=$(printf "%s\n" "$ff" | wc -l | tr -d ' '); total=$((total+n)); fail=1; printf "\n\033[1mfont-family z nazwą poza tokenami\033[0m — %s wystąpień\n" "$n"; printf "%s\n" "$ff" | head -40; fi
+# Marka LogisticFit w UI — wyjątek: LogisticFit jako PODMIOT-zleceniodawca (wartość "LF" w formularzach/filtrach)
+ALLOW_RE='lfa-allow|value="LF"|-lf"|rate-LF|\+ LogisticFit\)'
 report "Marka LogisticFit w UI"        'LogisticFit|Bricolage|Work Sans|Geist|Poppins|#3a4d98|#239d46' "style.css index.html"
 
 if [ "$fail" -eq 0 ]; then
