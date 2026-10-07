@@ -175,6 +175,16 @@ function setupNav() {
 // ============================================================
 // ŁADOWANIE DANYCH
 // ============================================================
+// Status „Invoice” wycofany (Michał 2026-10-07): istniejące wpisy przestawiane na SCHEDULED przy pierwszym załadowaniu
+async function migrateInvoiceStatus() {
+  const todo = (allAudits || []).filter(a => a.AuditStatus === "Invoice");
+  if (!todo.length) return;
+  let ok = 0;
+  for (const a of todo) { try { await updateAudit(a.Id, { AuditStatus: "SCHEDULED" }); a.AuditStatus = "SCHEDULED"; ok++; } catch (e) { console.warn("Invoice→SCHEDULED", a.Id, e.message); } }
+  renderTable();
+  showToast(`Status Invoice wycofany: ${ok}/${todo.length} audytów przestawiono na SCHEDULED`, ok === todo.length ? "success" : "warn");
+}
+
 async function loadAudits() {
   document.getElementById("audits-tbody").innerHTML =
     '<tr><td colspan="13" class="loading">Ładowanie danych...</td></tr>';
@@ -182,6 +192,7 @@ async function loadAudits() {
     allAudits = await fetchAllAudits();
     renderTable();
     try { SideCalModule.render(); } catch {}
+    migrateInvoiceStatus();
   } catch (e) {
     document.getElementById("audits-tbody").innerHTML =
       `<tr><td colspan="13" class="loading">Błąd: ${e.message}</td></tr>`;
@@ -206,7 +217,7 @@ function bodyLabel(a) { return BODY_INFO[bodyKey(a)].label; }
 
 // Status → token CSS (gradacja jasności wiersza). Puste = planned (najmocniejszy).
 function statusKey(s) {
-  const map = { PLANNED: "planned", SCHEDULED: "planned", CHANGE: "change", Invoice: "invoice", DONE: "done", REJECTED: "rejected" };
+  const map = { PLANNED: "planned", SCHEDULED: "planned", CHANGE: "change", DONE: "done", REJECTED: "rejected" };
   return map[s] || "planned";
 }
 
@@ -2054,10 +2065,10 @@ function certBodyBadge(a) {
 }
 
 // Statusy: PLANNED = „Do planowania” (termin CU, bez daty LF), SCHEDULED = „Zaplanowany” (termin uzgodniony) — rozdzielone na prośbę Michała 2026-10-07
-const STATUS_LABELS = { PLANNED: "PLANNED", SCHEDULED: "SCHEDULED", DONE: "DONE", REJECTED: "REJECTED", CHANGE: "CHANGE", Invoice: "Invoice" };   // etykiety angielskie (Michał 2026-10-07)
+const STATUS_LABELS = { PLANNED: "PLANNED", SCHEDULED: "SCHEDULED", DONE: "DONE", REJECTED: "REJECTED", CHANGE: "CHANGE" };   // Invoice usunięty 2026-10-07 → SCHEDULED   // etykiety angielskie (Michał 2026-10-07)
 function statusLabel(s) { return STATUS_LABELS[s] || s || "—"; }
 function statusBadge(s) {
-  const cls = { PLANNED:"planned", SCHEDULED:"scheduled", DONE:"done", REJECTED:"rejected", CHANGE:"change", Invoice:"invoice" };
+  const cls = { PLANNED:"planned", SCHEDULED:"scheduled", DONE:"done", REJECTED:"rejected", CHANGE:"change" };
   return `<span class="badge badge-${cls[s] || 'planned'}">${statusLabel(s)}</span>`;
 }
 
@@ -2811,7 +2822,6 @@ const MapModule = (function () {
     DONE:     "--lfa-map-done",
     REJECTED: "--lfa-map-rejected",
     CHANGE:   "--lfa-map-change",
-    Invoice:  "--lfa-map-invoice",
   };
 
   let map = null;
@@ -4607,7 +4617,7 @@ const WsadModule = (function () {
         Title: o.title, CertBody: mapBody(o.body), Program: o.program || null, AuditType: mapType(o.kind, o.type), Standard: o.standard || null,
         AuditDateStart: date ? safeDate(date) : null, AuditDays: parseFloat(String(o.days || "").replace(",", ".")) || 1,
         AuditMode: /online|zdal/i.test(o.mode || "") ? "Online" : "On-site",
-        AuditStatus: ["PLANNED", "SCHEDULED", "DONE", "REJECTED", "CHANGE"].includes(status) ? status : status === "INVOICE" ? "Invoice" : /^ZAPLAN/.test(status) ? "SCHEDULED" : "PLANNED",
+        AuditStatus: ["PLANNED", "SCHEDULED", "DONE", "REJECTED", "CHANGE"].includes(status) ? status : (status === "INVOICE" || /^ZAPLAN/.test(status)) ? "SCHEDULED" : "PLANNED",
         Proforma: "Brak", Address: o.address || null, City: o.city || null, PostalCode: o.postal || null, ClientEmail: o.email || null, Phone: o.phone || null, Mobile: o.mobile || null,
         Quarter: /^Q[1-4]$/i.test(o.quarter || "") ? o.quarter.toUpperCase() : (date ? detectQuarter(date) : null),
         Year: parseInt(o.year) || (date ? parseInt(date.substring(0, 4)) : new Date().getFullYear()),
