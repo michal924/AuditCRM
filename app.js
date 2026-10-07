@@ -2846,10 +2846,18 @@ const MapModule = (function () {
     L.Icon.Default.mergeOptions({ iconUrl: "marker-icon.png", iconRetinaUrl: "marker-icon-2x.png", shadowUrl: "marker-shadow.png" });
 
     map = L.map("audit-map", { zoomControl: true }).setView([52.0, 19.5], 6);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 18,
+    // Kafle: CARTO Positron (dane OSM) — serwery tile.openstreetmap.org zablokowały aplikację (403, polityka użycia kafli, 2026-10-07).
+    // Jasny, stonowany styl pasuje do palety LF Assurance; przy błędzie kafla próbujemy OSM bez poddomen {s}.
+    const carto = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: "abcd", maxZoom: 19, referrerPolicy: "strict-origin-when-cross-origin",
     }).addTo(map);
+    let fellBack = false;
+    carto.on("tileerror", () => {
+      if (fellBack) return; fellBack = true;
+      map.removeLayer(carto);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19, referrerPolicy: "strict-origin-when-cross-origin" }).addTo(map);
+    });
   }
 
   function clearMarkers() {
