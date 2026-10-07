@@ -94,6 +94,8 @@
   --lfa-map-ring:        var(--lfa-surface);
 
   /* --- Kalendarz --- */
+  /* Audyt CU w kalendarzach: wyraźniej niebieski niż „wolny” — mieszanie w OKLCH trzyma odcień granatu przy większej jasności (Michał 2026-10-07) */
+  --lfa-cal-cu-bg:       color-mix(in oklch, var(--lfa-granat) 42%, var(--lfa-surface)); --lfa-cal-cu-fg: var(--lfa-granat-deep);
   --lfa-cal-free-bg:     color-mix(in srgb, var(--lfa-granat) 6%,  var(--lfa-surface)); --lfa-cal-free-fg:  var(--lfa-granat);   /* wolny: jasny granat + etykieta */
   --lfa-cal-off-bg:      color-mix(in srgb, var(--lfa-szary) 12%,  var(--lfa-surface)); --lfa-cal-off-fg:   var(--lfa-szary);    /* weekend / święto */
   --lfa-cal-busy-bg:     color-mix(in srgb, var(--lfa-bordo) 14%,  var(--lfa-surface)); --lfa-cal-busy-fg:  var(--lfa-bordo);    /* zajęty (Outlook) */
@@ -177,6 +179,7 @@
     --lfa-prog-eudr-bg: var(--lfa-neutral-bg); --lfa-prog-eudr-fg: var(--lfa-papier);
 
     --lfa-cal-free-bg: color-mix(in srgb, var(--lfa-papier) 9%, var(--lfa-granat));  --lfa-cal-free-fg: var(--lfa-papier);
+    --lfa-cal-cu-bg: color-mix(in oklch, var(--lfa-papier) 34%, var(--lfa-granat)); --lfa-cal-cu-fg: var(--lfa-papier);
     --lfa-cal-off-bg:  color-mix(in srgb, var(--lfa-szary) 25%, var(--lfa-granat));  --lfa-cal-off-fg:  var(--lfa-neutral-fg);
     --lfa-cal-busy-bg: var(--lfa-danger-bg);                                          --lfa-cal-busy-fg: var(--lfa-danger-fg);
     --lfa-cal-custody: var(--lfa-mosiadz-jasny); --lfa-cal-conflict: var(--lfa-danger-fg); --lfa-cal-today: color-mix(in srgb, var(--lfa-bordo) 78%, var(--lfa-papier));
@@ -213,6 +216,7 @@
   --lfa-prog-kzr-bg: var(--lfa-warning-bg); --lfa-prog-kzr-fg: var(--lfa-mosiadz-jasny); --lfa-prog-sure-bg: var(--lfa-danger-bg); --lfa-prog-sure-fg: var(--lfa-danger-fg);
   --lfa-prog-eudr-bg: var(--lfa-neutral-bg); --lfa-prog-eudr-fg: var(--lfa-papier);
   --lfa-cal-free-bg: color-mix(in srgb, var(--lfa-papier) 9%, var(--lfa-granat)); --lfa-cal-free-fg: var(--lfa-papier);
+  --lfa-cal-cu-bg: color-mix(in oklch, var(--lfa-papier) 34%, var(--lfa-granat)); --lfa-cal-cu-fg: var(--lfa-papier);
   --lfa-cal-off-bg: color-mix(in srgb, var(--lfa-szary) 25%, var(--lfa-granat)); --lfa-cal-off-fg: var(--lfa-neutral-fg);
   --lfa-cal-busy-bg: var(--lfa-danger-bg); --lfa-cal-busy-fg: var(--lfa-danger-fg);
   --lfa-cal-custody: var(--lfa-mosiadz-jasny); --lfa-cal-conflict: var(--lfa-danger-fg); --lfa-cal-today: color-mix(in srgb, var(--lfa-bordo) 78%, var(--lfa-papier));
