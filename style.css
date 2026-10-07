@@ -173,7 +173,7 @@ td.date-col,
 /* ============================================================
    VIEWS
    ============================================================ */
-.view { padding: 20px 24px; }
+.view { padding: 18px 16px; }
 
 /* ============================================================
    FILTERS
@@ -273,7 +273,8 @@ td.date-col,
 
 table { width: 100%; border-collapse: collapse; }
 /* Tabela audytów: minimalna szerokość — zamiast ściskać kolumny, przewija się w poziomie */
-#audits-table { min-width: 1240px; }
+/* Tabela audytów: ma się mieścić bez przewijania poziomego (Michał 2026-10-07) — ciasne kolumny, zawijana nazwa firmy */
+#audits-table { min-width: 0; width: 100%; }
 
 thead th {
   background: var(--bg3);
@@ -281,8 +282,8 @@ thead th {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 10px 14px;
+  letter-spacing: 0.3px;
+  padding: 9px 8px;
   text-align: left;
   white-space: nowrap;
   border-bottom: 1px solid var(--border);
@@ -311,10 +312,10 @@ td.prj-col { color: var(--text2); font-size: 12px; white-space: nowrap; width: 6
 th[data-sort]:hover { background: var(--bg3); color: var(--accent); }
 
 tbody td {
-  padding: 10px 14px;
-  font-size: 13px;
+  padding: 8px 8px;
+  font-size: 12.5px;
   white-space: nowrap;
-  max-width: 220px;
+  max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -324,18 +325,18 @@ tbody td.firma-col {
   white-space: normal;
   word-break: normal;
   overflow-wrap: break-word;
-  min-width: 200px;
-  max-width: 280px;
+  min-width: 150px;
+  max-width: 230px;
   overflow: hidden;
   text-overflow: unset;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 /* Kolumna Program — badge'y w pionie, ale każdy w całości (bez łamania "KZR INiG") */
 tbody td.program-col {
   white-space: normal;
-  min-width: 96px;
-  max-width: 120px;
+  min-width: 80px;
+  max-width: 104px;
   overflow: hidden;
   line-height: 1.6;
   word-break: normal;
@@ -349,7 +350,8 @@ tbody td.program-col .badge {
 /* Kolumny dat — stały rozmiar, nie ucina */
 tbody td.date-col {
   white-space: nowrap;
-  min-width: 88px;
+  min-width: 74px;
+  font-size: 12px;
 }
 
 .loading { text-align: center; color: var(--text2); padding: 40px !important; }
@@ -595,7 +597,7 @@ tbody td.date-col {
 
 /* ── Kolumna Notatki w tabeli ── */
 .notes-col {
-  max-width: 220px;
+  max-width: 140px;
   white-space: nowrap;
   overflow: hidden;
 }
@@ -603,7 +605,7 @@ tbody td.date-col {
 .plan-sent { display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--lfa-plan-sent-fg); background: var(--lfa-plan-sent-bg); border: 1px solid var(--lfa-border-strong); border-radius: 20px; padding: 2px 9px; }
 .notes-preview {
   display: inline-block;
-  max-width: 210px;
+  max-width: 130px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1366,10 +1368,10 @@ tr.change-row-rzeznik:hover { background: var(--lfa-info-bg); }
 /* ============================================================
    BOCZNY KALENDARZYK w widoku Audyty (myaudits-cal)
    ============================================================ */
-.myaudits-layout { display: flex; gap: 16px; align-items: flex-start; }
+.myaudits-layout { display: flex; gap: 12px; align-items: flex-start; }
 .myaudits-main { flex: 1; min-width: 0; }              /* min-width:0 → tabela może się zwężać/scrollować */
 .myaudits-main .table-wrapper { overflow-x: auto; }
-.myaudits-cal { width: 300px; flex-shrink: 0; position: sticky; top: 12px; background: var(--bg2);
+.myaudits-cal { width: 272px; flex-shrink: 0; position: sticky; top: 12px; background: var(--bg2);
   border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px; }
 .myaudits-cal.collapsed { width: 46px; padding: 8px 6px; overflow: hidden; }
 .myaudits-cal.collapsed .scal-inner, .myaudits-cal.collapsed .scal-head { display: none; }
@@ -1770,3 +1772,13 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .badge-scheduled { background: var(--lfa-primary); color: var(--lfa-on-primary); }
 .stat-card.toplan { background: var(--lfa-surface); border-color: var(--lfa-primary); border-top-color: var(--lfa-primary); }
 .stat-card.toplan .stat-num { color: var(--lfa-primary); }
+
+/* Mac 769–1600 px: żeby tabela mieściła się bez przewijania, chowamy Tryb i Notatki (oba są w oknie audytu) i ciaśniej */
+@media (min-width: 769px) and (max-width: 1600px) {
+  #audits-table thead th:nth-child(8), #audits-table thead th:nth-child(13),
+  #audits-table tr.audit-row td:nth-child(8), #audits-table tr.audit-row td.notes-col { display: none; }
+  #audits-table thead th { padding: 8px 6px; font-size: 10px; }
+  #audits-table tbody td { padding: 7px 6px; font-size: 12px; }
+  tbody td.firma-col { min-width: 130px; max-width: 190px; }
+  .myaudits-cal { width: 248px; }
+}
