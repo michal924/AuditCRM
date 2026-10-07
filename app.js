@@ -2054,7 +2054,7 @@ function certBodyBadge(a) {
 }
 
 // Statusy: PLANNED = „Do planowania” (termin CU, bez daty LF), SCHEDULED = „Zaplanowany” (termin uzgodniony) — rozdzielone na prośbę Michała 2026-10-07
-const STATUS_LABELS = { PLANNED: "Do planowania", SCHEDULED: "Zaplanowany", DONE: "DONE", REJECTED: "REJECTED", CHANGE: "CHANGE", Invoice: "Invoice" };
+const STATUS_LABELS = { PLANNED: "PLANNED", SCHEDULED: "SCHEDULED", DONE: "DONE", REJECTED: "REJECTED", CHANGE: "CHANGE", Invoice: "Invoice" };   // etykiety angielskie (Michał 2026-10-07)
 function statusLabel(s) { return STATUS_LABELS[s] || s || "—"; }
 function statusBadge(s) {
   const cls = { PLANNED:"planned", SCHEDULED:"scheduled", DONE:"done", REJECTED:"rejected", CHANGE:"change", Invoice:"invoice" };
