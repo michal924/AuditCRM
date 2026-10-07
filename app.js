@@ -3983,7 +3983,11 @@ const SideCalModule = (function () {
   function setup(){
     const p=$("scal-prev"), n=$("scal-next"); if(p) p.onclick=()=>step(-1); if(n) n.onclick=()=>step(1);
     ["all","cuc","sgs","lf"].forEach(x=>{ const el=$(`scal-body-${x}`); if(el) el.onclick=()=>setBody(x); });
-    const t=$("scal-toggle"); if(t) t.onclick=()=>{ collapsed=!collapsed; const box=$("myaudits-cal"); if(box) box.classList.toggle("collapsed", collapsed); };
+    // Domyślnie zwinięty na węższych ekranach (≤1600 px), żeby tabela mieściła się bez przewijania; wybór użytkownika zapamiętany
+    { let saved=null; try{ saved=localStorage.getItem("scal-collapsed"); }catch{}
+      collapsed = saved!=null ? saved==="1" : (window.innerWidth>768 && window.innerWidth<=1600);
+      const box=$("myaudits-cal"); if(box) box.classList.toggle("collapsed", collapsed); }
+    const t=$("scal-toggle"); if(t) t.onclick=()=>{ collapsed=!collapsed; const box=$("myaudits-cal"); if(box) box.classList.toggle("collapsed", collapsed); try{ localStorage.setItem("scal-collapsed", collapsed?"1":"0"); }catch{} };
   }
   function render(){ if(!inited){ setup(); inited=true; } updateLabel(); ensureOutlook(); renderGrid(); renderFree(); updateActiveDay(); renderDayDetail(); }
   function refresh(){ if(!inited) return; renderGrid(); renderFree(); updateActiveDay(); renderDayDetail(); }

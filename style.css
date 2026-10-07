@@ -1773,12 +1773,11 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .stat-card.toplan { background: var(--lfa-surface); border-color: var(--lfa-primary); border-top-color: var(--lfa-primary); }
 .stat-card.toplan .stat-num { color: var(--lfa-primary); }
 
-/* Mac 769–1600 px: żeby tabela mieściła się bez przewijania, chowamy Tryb i Notatki (oba są w oknie audytu) i ciaśniej */
+/* Mac 769–1600 px: ciaśniejsze komórki; kalendarzyk domyślnie zwinięty (JS), kolumny Tryb i Notatki zostają */
 @media (min-width: 769px) and (max-width: 1600px) {
-  #audits-table thead th:nth-child(8), #audits-table thead th:nth-child(13),
-  #audits-table tr.audit-row td:nth-child(8), #audits-table tr.audit-row td.notes-col { display: none; }
   #audits-table thead th { padding: 8px 6px; font-size: 10px; }
   #audits-table tbody td { padding: 7px 6px; font-size: 12px; }
   tbody td.firma-col { min-width: 130px; max-width: 190px; }
-  .myaudits-cal { width: 248px; }
+  .notes-col, .notes-preview { max-width: 110px; }
+}
 }
