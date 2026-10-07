@@ -63,7 +63,10 @@ const SETTLE_FIELDS = [
   { name: "SettleStatus",   label: "Status rozliczenia",  type: "Choice",
     choices: ["Nierozliczony", "Wysłany do CU", "Rozliczony"], defaultValue: "Nierozliczony" },
   { name: "SettleDate",     label: "Data rozliczenia",    type: "DateTime" },
+  { name: "SettleDayRate",  label: "Stawka dzienna (audyt)", type: "Number" },   // nadpisanie stawki podmiotu (np. audyt łączony FSC+PEFC = 2100) — dodane 2026-10-07
 ];
+const SETTLE_NEWER_FIELDS = ["SettleDayRate"];   // pola dodane później: gdy ich brak, reszta rozliczeń nadal działa
+window.settleRateFieldMissing = false;
 const SETTLE_FIELD_NAMES = SETTLE_FIELDS.map(f => f.name);
 // true gdy lista nie ma jeszcze kolumn rozliczeń → UI pokaże przycisk konfiguracji, zapis pomija te pola
 window.settleFieldsMissing = false;
@@ -93,12 +96,20 @@ async function fetchAuditsWithSelect(selectArr) {
 async function fetchAllAudits() {
   try {
     const items = await fetchAuditsWithSelect(BASE_AUDIT_SELECT.concat(SETTLE_FIELD_NAMES));
-    window.settleFieldsMissing = false;
+    window.settleFieldsMissing = false; window.settleRateFieldMissing = false;
     return items;
-  } catch (e) {
-    console.warn("[Settle] Kolumny rozliczeń niedostępne — odczyt bazowy.", e.message);
-    window.settleFieldsMissing = true;
-    return fetchAuditsWithSelect(BASE_AUDIT_SELECT);
+  } catch (e0) {
+    try {
+      // Starsze kolumny rozliczeń są, brakuje tylko nowszych (np. SettleDayRate) → czytamy bez nich
+      const items = await fetchAuditsWithSelect(BASE_AUDIT_SELECT.concat(SETTLE_FIELD_NAMES.filter(n => !SETTLE_NEWER_FIELDS.includes(n))));
+      window.settleFieldsMissing = false; window.settleRateFieldMissing = true;
+      console.warn("[Settle] Brak nowszych kolumn rozliczeń:", SETTLE_NEWER_FIELDS.join(", "));
+      return items;
+    } catch (e) {
+      console.warn("[Settle] Kolumny rozliczeń niedostępne — odczyt bazowy.", e.message);
+      window.settleFieldsMissing = true; window.settleRateFieldMissing = true;
+      return fetchAuditsWithSelect(BASE_AUDIT_SELECT);
+    }
   }
 }
 

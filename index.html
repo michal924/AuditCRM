@@ -76,6 +76,7 @@
       <button class="nav-btn" data-view="changes"><span class="nav-ico">🔄</span><span class="nav-lbl">Zmiany Audytora</span></button>
       <button class="nav-btn" data-view="opieka"><span class="nav-ico">👨‍👦</span><span class="nav-lbl">Opieka — Szymon</span></button>
       <button class="nav-btn" data-view="mapa"><span class="nav-ico">🗺</span><span class="nav-lbl">Mapa audytów</span></button>
+      <button class="nav-btn" data-view="finanse"><span class="nav-ico">💰</span><span class="nav-lbl">Finanse</span></button>
     </div>
     <div class="nav-right">
       <button id="btn-import" class="btn-action" title="Importuj kwartalny plan z CUC">⬆ Import CUC</button>
@@ -513,6 +514,55 @@
     </div>
   </div>
 
+  <!-- WIDOK: FINANSE — plan finansowy i rozliczenia (prognoza vs wykonanie) -->
+  <div id="view-finanse" class="view hidden">
+    <div class="view-header">
+      <h2>Finanse — plan i rozliczenia</h2>
+      <div class="header-filters">
+        <div class="op-view-switcher" id="fin-body-switch">
+          <button class="op-view-btn active" data-body="all">Wszyscy</button>
+          <button class="op-view-btn" data-body="CUC">CU</button>
+          <button class="op-view-btn" data-body="SGS">SGS</button>
+          <button class="op-view-btn" data-body="LF">LogisticFit</button><!-- lfa-allow: podmiot -->
+        </div>
+        <button id="fin-prev" class="btn-ghost">‹</button>
+        <span id="fin-year" class="op-year-label">2026</span>
+        <button id="fin-next" class="btn-ghost">›</button>
+        <button id="fin-tools" class="btn-action" title="Eksport Excel, raport PDF, cennik, import historii">📊 Narzędzia rozliczeń</button>
+      </div>
+    </div>
+
+    <div class="fin-kpis" id="fin-kpis"></div>
+
+    <div class="fin-grid">
+      <div class="fin-card">
+        <div class="fin-card-head"><h3>Miesiąc po miesiącu</h3><span class="fin-hint" id="fin-chart-hint">wynagrodzenie netto · kliknij słupek, aby zobaczyć audyty</span></div>
+        <div id="fin-chart" class="fin-chart"></div>
+        <div class="fin-legend">
+          <span><i class="fin-sw done"></i> Rozliczone</span>
+          <span><i class="fin-sw sent"></i> Wysłane do zleceniodawcy</span>
+          <span><i class="fin-sw open"></i> Do rozliczenia (wykonane)</span>
+          <span><i class="fin-sw plan"></i> Prognoza (SCHEDULED)</span>
+          <span><i class="fin-sw tent"></i> Wstępnie (PLANNED)</span>
+        </div>
+      </div>
+      <div class="fin-card">
+        <div class="fin-card-head"><h3>Wg zleceniodawcy</h3></div>
+        <div id="fin-bodies"></div>
+      </div>
+    </div>
+
+    <div class="fin-card">
+      <div class="fin-card-head"><h3>Tabela miesięczna</h3><span class="fin-hint">dni audytowe · wynagrodzenie · koszty refakturowane</span></div>
+      <div class="table-wrapper settle-table-wrap"><table class="settle-table fin-table" id="fin-table"></table></div>
+    </div>
+
+    <div class="fin-card" id="fin-month-card">
+      <div class="fin-card-head"><h3 id="fin-month-title">Audyty w miesiącu</h3><span class="fin-hint">kliknij wiersz, aby otworzyć audyt</span></div>
+      <div id="fin-month-list" class="settle-empty">Wybierz miesiąc na wykresie lub w tabeli.</div>
+    </div>
+  </div>
+
   <!-- PŁYWAJĄCY PRZYCISK: zgłoszenie rozwoju -->
   <button id="btn-dev-request" class="dev-fab" title="Zgłoś rozwój aplikacji do dewelopera">💡</button>
 
@@ -668,7 +718,8 @@
           <div class="field-row"><label>Autostrada</label><span id="m-s-highway" class="view-val">—</span><input id="e-s-highway" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="0"></div>
           <div class="field-row"><label>Inne koszty</label><span id="m-s-other" class="view-val">—</span><input id="e-s-other" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="0"></div>
           <div class="field-row"><label>Bilety PKP/LOT</label><span id="m-s-tickets" class="view-val">—</span><input id="e-s-tickets" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="0"></div>
-          <div class="field-row"><label>Wynagrodzenie</label><span id="m-s-fee" class="view-val">—</span><input id="e-s-fee" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="0"></div>
+          <div class="field-row"><label>Stawka dzienna</label><span id="m-s-dayrate" class="view-val">—</span><input id="e-s-dayrate" type="number" step="50" min="0" class="edit-val field-input field-input-sm" placeholder="wg cennika" title="Puste = stawka podmiotu z cennika (CU 1500, CU łączony FSC+PEFC 2100, SGS 800). Wpisana ma pierwszeństwo."></div>
+          <div class="field-row"><label>Wynagrodzenie</label><span id="m-s-fee" class="view-val">—</span><input id="e-s-fee" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="dni × stawka" title="Puste = dni audytowe × stawka dzienna. Wpisana kwota ma pierwszeństwo."></div>
           <div class="field-row"><label>Obrót AAF / opłata</label><span id="m-s-basis" class="view-val">—</span><input id="e-s-basis" type="text" class="edit-val field-input" placeholder="np. AAF, 2168888.16"></div>
           <div class="field-row settle-wide"><label>Uwagi</label><span id="m-s-note" class="view-val">—</span><textarea id="e-s-note" class="edit-val field-textarea" rows="2" placeholder="np. 1/2 kosztów dojazdu, koszty odniesione do PRJ…"></textarea></div>
         </div>
@@ -720,6 +771,7 @@
           </div>
         </div>
         <button id="btn-delete-audit" class="btn-ghost btn-delete-audit" title="Usuń ten wpis z listy Audits (np. duplikat)">🗑 Usuń wpis</button>
+        <button id="btn-merge-audit" class="btn-ghost btn-merge-audit hidden" title="Scal z drugim wpisem tego samego dnia w audyt łączony">🔗 Scal w audyt łączony</button>
         <button id="btn-save" class="btn-primary">💾 Zapisz zmiany</button>
       </div>
     </div>
@@ -1009,6 +1061,10 @@
         <div class="form-row">
           <label for="settle-rate-CUC">Stawka dzienna CU</label>
           <input type="number" id="settle-rate-CUC" class="form-input settle-rate" min="0" step="50" placeholder="np. 1500">
+        </div>
+        <div class="form-row">
+          <label for="settle-rate-CUC_COMBO">CU łączony FSC+PEFC</label>
+          <input type="number" id="settle-rate-CUC_COMBO" class="form-input settle-rate" min="0" step="50" placeholder="np. 2100">
         </div>
         <div class="form-row">
           <label for="settle-rate-SGS">Stawka dzienna SGS</label>

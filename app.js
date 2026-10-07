@@ -147,6 +147,7 @@ async function init() {
   DevModule.setup();
   SettleModule.setup();
   WsadModule.setup();
+  FinanceModule.setup();
 
   await loadAudits();
 }
@@ -168,6 +169,7 @@ function setupNav() {
       if (view === "opieka")     OpiekaModule.render();
       if (view === "mapa")       MapModule.render();
       if (view === "kalendarz")  AuditCalModule.render();
+      if (view === "finanse")    FinanceModule.render();
     };
   });
 }
@@ -259,7 +261,8 @@ function renderSettleView(a) {
   settleSetText("m-s-highway", has(a.SettleHighway) ? fmtPLN(a.SettleHighway) : "—");
   settleSetText("m-s-other",   has(a.SettleOther)   ? fmtPLN(a.SettleOther)   : "—");
   settleSetText("m-s-tickets", has(a.SettleTickets) ? fmtPLN(a.SettleTickets) : "—");
-  settleSetText("m-s-fee",     has(a.SettleFee) ? fmtPLN(a.SettleFee) : isMeeting(a) ? "— (spotkanie: tylko koszty)" : c.fee ? fmtPLN(c.fee) + " (" + settleNum(a.AuditDays) + " dni × stawka " + bodyLabel(a) + ")" : "— (brak stawki dziennej)");
+  settleSetText("m-s-fee",     has(a.SettleFee) ? fmtPLN(a.SettleFee) : isMeeting(a) ? "— (spotkanie: tylko koszty)" : c.fee ? fmtPLN(c.fee) + " (" + settleNum(a.AuditDays) + " dni × " + dayRateSource(a) + ")" : "— (brak stawki dziennej)");
+  settleSetText("m-s-dayrate", has(a.SettleDayRate) ? fmtPLN(a.SettleDayRate) : (dayRateOf(a) != null ? fmtPLN(dayRateOf(a)) + " (" + dayRateSource(a) + ")" : "—"));
   settleSetText("m-s-basis",   a.SettleFeeBasis || "—");
   settleSetText("m-s-note",    a.SettleNote || "—");
   settleSetText("m-s-costs",   fmtPLN(c.costs));
@@ -296,7 +299,8 @@ function updateSettleHead(a) {
 function updateSettleCalcFromInputs() {
   const g = id => { const el = document.getElementById(id); return el ? el.value : ""; };
   const tmp = { SettleKm: g("e-s-km"), SettleKmRate: g("e-s-rate"), SettleHotel: g("e-s-hotel"),
-    SettleHighway: g("e-s-highway"), SettleOther: g("e-s-other"), SettleTickets: g("e-s-tickets"), SettleFee: g("e-s-fee") };
+    SettleHighway: g("e-s-highway"), SettleOther: g("e-s-other"), SettleTickets: g("e-s-tickets"), SettleFee: g("e-s-fee"),
+    SettleDayRate: g("e-s-dayrate"), AuditDays: g("e-days"), CertBody: g("e-certbody") || (currentAudit && currentAudit.CertBody), Program: currentAudit && currentAudit.Program, AuditType: g("e-type") || (currentAudit && currentAudit.AuditType) };
   const c = settleCalc(tmp);
   settleSetText("m-s-kmcost", c.km ? fmtPLN(c.kmCost) : "—");
   settleSetText("m-s-costs",  fmtPLN(c.costs));
@@ -414,6 +418,11 @@ function normProgramKey(p) {
   if (!p) return "";
   return p.replace(/\s*CoC$/i, "").trim().toUpperCase();
 }
+// Audyt łączony (np. FSC CoC + PEFC CoC w jednym dniu u CU): programy rozdzielone „+”
+function programsOf(a) { return String((a && a.Program) || "").split("+").map(x => x.trim()).filter(Boolean); }
+function hasProgram(a, key) { return programsOf(a).some(q => normProgramKey(q) === normProgramKey(key)); }
+function isCombinedAudit(a) { return hasProgram(a, "FSC") && hasProgram(a, "PEFC"); }
+const COMBINED_PROGRAM = "FSC CoC + PEFC CoC";
 
 function applyFilters(audits) {
   const f = getFilters();
@@ -422,7 +431,7 @@ function applyFilters(audits) {
     if (f.quarters.length > 0 && !f.quarters.includes(a.Quarter)) return false;
     if (f.months.length > 0 && !f.months.includes(auditMonthKey(a))) return false;
     if (f.years.length > 0    && !f.years.includes(String(a.Year))) return false;
-    if (f.programs.length > 0 && !f.programs.some(p => normProgramKey(p) === normProgramKey(a.Program))) return false;
+    if (f.programs.length > 0 && !f.programs.some(p => hasProgram(a, p))) return false;
     if (f.statuses.length > 0 && !f.statuses.includes(a.AuditStatus)) return false;
     if (f.certbodies.length > 0 && !f.certbodies.includes(certBodyOf(a))) return false;
     if (f.plans.length > 0) {
@@ -841,6 +850,7 @@ function setupModal() {
   });
   document.getElementById("btn-save").onclick = saveChanges;
   document.getElementById("btn-delete-audit").onclick = deleteCurrentAudit;
+  document.getElementById("btn-merge-audit").onclick = mergeCurrentAudit;
 
   // Zmiana daty w trybie edycji → aktualizuj kwartał i rok
   document.getElementById("e-date").addEventListener("change", e => {
@@ -890,6 +900,7 @@ function openModal(id) {
   const a = allAudits.find(x => x.Id === id);
   if (!a) return;
   currentAudit = a;
+  refreshMergeButton(a);
   currentStatus = a.AuditStatus;
   currentProforma = a.Proforma;
   currentPlanSent = !!a.PlanSentDate;
@@ -990,6 +1001,7 @@ function enterEditMode() {
   document.getElementById("e-s-other").value   = hv(a.SettleOther);
   document.getElementById("e-s-tickets").value = hv(a.SettleTickets);
   document.getElementById("e-s-fee").value     = hv(a.SettleFee);
+  { const el = document.getElementById("e-s-dayrate"); if (el) el.value = hv(a.SettleDayRate); }
   document.getElementById("e-s-basis").value   = a.SettleFeeBasis || "";
   document.getElementById("e-s-note").value    = a.SettleNote || "";
   updateSettleCalcFromInputs();
@@ -1012,6 +1024,39 @@ function cancelEditMode() {
   renderDayBusy("e-daybusy", "");
   const sb = document.getElementById("settle-body"); if (sb) sb.classList.add("hidden");
   if (currentAudit) updateSettleHead(currentAudit);
+}
+
+// Audyt łączony z dwóch istniejących wpisów (np. KORA: FSC + PEFC tego samego dnia). Zostaje bieżący, drugi usuwany.
+function findMergePartner(a) {
+  if (!a || isMeeting(a)) return null;
+  const d = (x) => String(x.AuditDateStart || x.PlannedCUDate || "").substring(0, 10);
+  return (allAudits || []).find(b => b.Id !== a.Id && bodyKey(b) === bodyKey(a) && !isMeeting(b)
+    && ((a.ProjectID && String(a.ProjectID) === String(b.ProjectID)) || (a.Title && b.Title && a.Title.trim().toLowerCase() === b.Title.trim().toLowerCase()))
+    && d(a) && d(a) === d(b) && normProgramKey(a.Program) !== normProgramKey(b.Program) && !a.Program.includes("+") && !String(b.Program || "").includes("+")) || null;
+}
+function refreshMergeButton(a) {
+  const btn = document.getElementById("btn-merge-audit"); if (!btn) return;
+  const p = findMergePartner(a);
+  btn.classList.toggle("hidden", !p);
+  if (p) btn.title = "Scal z wpisem: " + (p.Title || "") + " · " + (p.Program || "") + " · " + formatDate(p.AuditDateStart || p.PlannedCUDate);
+}
+async function mergeCurrentAudit() {
+  const a = currentAudit; const b = a && findMergePartner(a); if (!b) return;
+  const progs = [a, b].sort((x, y) => (normProgramKey(x.Program) === "FSC" ? -1 : 1) - (normProgramKey(y.Program) === "FSC" ? -1 : 1)).map(x => x.Program);
+  const label = (a.Title || "—") + "\n" + progs.join(" + ") + " · " + formatDate(a.AuditDateStart || a.PlannedCUDate);
+  if (!confirm("Scalić w jeden audyt łączony?\n\n" + label + "\n\nDrugi wpis zostanie usunięty, jego koszty i notatki przeniesione (gdy w tym wpisie puste).")) return;
+  const fields = { Program: progs.join(" + "), Standard: [a.Standard, b.Standard].filter(Boolean).join(" / ") || null,
+    AuditDays: Math.max(settleNum(a.AuditDays), settleNum(b.AuditDays)) || null, Notes: [a.Notes, b.Notes].filter(Boolean).join("\n") || null };
+  if (!window.settleFieldsMissing) ["SettleRoute", "SettleKm", "SettleKmRate", "SettleHotel", "SettleHighway", "SettleOther", "SettleTickets", "SettleFee", "SettleFeeBasis", "SettleNote"]
+    .forEach(k => { if ((a[k] == null || a[k] === "") && b[k] != null && b[k] !== "") fields[k] = b[k]; });
+  if ((a.ProjectID == null || a.ProjectID === "") && b.ProjectID) fields.ProjectID = b.ProjectID;
+  const btn = document.getElementById("btn-merge-audit"); btn.disabled = true;
+  try {
+    await updateAudit(a.Id, fields); await deleteAudit(b.Id);
+    Object.assign(a, fields); allAudits = allAudits.filter(x => x.Id !== b.Id);
+    closeModal(); renderTable(); showToast("🔗 Scalono w audyt łączony: " + (a.Title || ""), "success");
+  } catch (e) { showToast("Nie udało się scalić: " + (e.message || e), "error"); }
+  finally { btn.disabled = false; }
 }
 
 // Usunięcie wpisu (np. duplikat po imporcie). Potwierdzenie z nazwą i datą — bez cofania.
@@ -1090,6 +1135,7 @@ async function saveChanges() {
         fields.SettleOther    = num("e-s-other");
         fields.SettleTickets  = num("e-s-tickets");
         fields.SettleFee      = num("e-s-fee");
+        if (!window.settleRateFieldMissing) fields.SettleDayRate = num("e-s-dayrate");
         fields.SettleFeeBasis = gs("e-s-basis").trim() || null;
         fields.SettleNote     = gs("e-s-note").trim() || null;
       }
@@ -1374,7 +1420,26 @@ function parseImportRows(rows, filename) {
       CreatedFrom:    "WebImport",
     });
   });
-  return records;
+  return mergeCombinedRecords(records);
+}
+
+// Plan CU podaje audyt łączony FSC+PEFC jako dwa wiersze (ten sam PRJ, ta sama data) → jeden wpis „FSC CoC + PEFC CoC”,
+// dni liczone raz, stawka łączona (Michał 2026-10-07)
+function mergeCombinedRecords(records) {
+  const groups = new Map();
+  records.forEach(r => { const k = `${r.CertBody}_${r.ProjectID}_${String(r.PlannedCUDate || "").substring(0, 10)}`; (groups.get(k) || groups.set(k, []).get(k)).push(r); });
+  const out = [];
+  groups.forEach(g => {
+    const fsc = g.find(r => normProgramKey(r.Program) === "FSC"), pefc = g.find(r => normProgramKey(r.Program) === "PEFC");
+    if (g.length >= 2 && fsc && pefc) {
+      const m = Object.assign({}, fsc, { Program: COMBINED_PROGRAM,
+        Standard: [fsc.Standard, pefc.Standard].filter(Boolean).join(" / ") || null,
+        AuditDays: Math.max(fsc.AuditDays || 0, pefc.AuditDays || 0) || fsc.AuditDays,
+        Notes: [fsc.Notes, pefc.Notes].filter(Boolean).join("\n") || null });
+      out.push(m); g.filter(r => r !== fsc && r !== pefc).forEach(r => out.push(r));
+    } else g.forEach(r => out.push(r));
+  });
+  return out;
 }
 
 // Wykryj dominujący Kwartał+Rok z parsowanego pliku
@@ -2001,7 +2066,7 @@ function syncKindType(kindId, typeRowId) {
 // Stawka dzienna wg umowy z jednostką (CU: 1500 zł). Wartość NIE trafia do raportów, tylko iloczyn dni × stawka.
 const DAY_RATES_KEY = "lfa-day-rates";
 function getDayRates() {
-  const def = { CUC: 1500, SGS: 800, LF: null };   // wg umów (Michał 2026-09-30); nadpisanie w panelu Rozliczenie zapisuje się lokalnie
+  const def = { CUC: 1500, CUC_COMBO: 2100, SGS: 800, LF: null };   // CUC_COMBO = audyt łączony FSC+PEFC u CU (Michał 2026-10-07)   // wg umów (Michał 2026-09-30); nadpisanie w panelu Rozliczenie zapisuje się lokalnie
   try { const saved = JSON.parse(localStorage.getItem(DAY_RATES_KEY) || "{}"); Object.keys(saved).forEach(k => { if (saved[k] != null && !isNaN(+saved[k])) def[k] = +saved[k]; }); } catch {}
   return def;
 }
@@ -2009,7 +2074,17 @@ function setDayRate(body, value) {
   const r = getDayRates(); r[body] = (value === "" || value == null || isNaN(+value)) ? null : +value;
   try { localStorage.setItem(DAY_RATES_KEY, JSON.stringify(r)); } catch {}
 }
-function dayRateOf(a) { const r = getDayRates()[certBodyOf(a)]; return r == null ? null : settleNum(r); }
+// Stawka dzienna audytu: 1) wpisana w audycie (SettleDayRate), 2) łączony FSC+PEFC u CU → CUC_COMBO, 3) stawka podmiotu
+function dayRateOf(a) {
+  if (a.SettleDayRate != null && a.SettleDayRate !== "" && !isNaN(+a.SettleDayRate)) return +a.SettleDayRate;
+  const r = getDayRates(); const k = bodyKey(a);
+  const v = (k === "CUC" && isCombinedAudit(a)) ? r.CUC_COMBO : r[k];
+  return v == null ? null : settleNum(v);
+}
+function dayRateSource(a) {
+  if (a.SettleDayRate != null && a.SettleDayRate !== "" && !isNaN(+a.SettleDayRate)) return "stawka audytu";
+  return (bodyKey(a) === "CUC" && isCombinedAudit(a)) ? "stawka łączona CU" : "stawka " + bodyLabel(a);
+}
 // Wynagrodzenie audytu: ręcznie wpisane SettleFee ma pierwszeństwo; inaczej dni × stawka jednostki; spotkanie = 0
 function settleFeeOf(a) {
   if (a.SettleFee != null && a.SettleFee !== "") return { fee: settleNum(a.SettleFee), auto: false };
@@ -2056,6 +2131,7 @@ function programBadge(p) {
     "SURE": "sure",
     "EUDR": "eudr",
   };
+  if (p && p.includes("+")) return p.split("+").map(x => programBadge(x.trim())).join(" ") + ' <span class="badge badge-combo" title="Audyt łączony — jeden dzień, stawka łączona">łączony</span>';
   const label = p === "FSC" ? "FSC CoC" : p === "PEFC" ? "PEFC CoC" : (p || "—");
   return `<span class="badge badge-${cls[p] || 'fsc'}">${label}</span>`;
 }
@@ -2996,7 +3072,7 @@ const MapModule = (function () {
       if (statuses.length > 0 && !statuses.includes(a.AuditStatus)) return false;
       if (years.length    > 0 && !years.includes(String(a.Year))) return false;
       if (quarters.length > 0 && !quarters.includes(a.Quarter)) return false;
-      if (programs.length > 0 && !programs.some(p => normProgramKey(p) === normProgramKey(a.Program))) return false;
+      if (programs.length > 0 && !programs.some(p => hasProgram(a, p))) return false;
       return true;
     });
   }
@@ -4542,7 +4618,7 @@ const SettleModule = (function () {
     allAudits = await fetchAllAudits(); renderTable(); renderMonthSummary(); renderReports();
   }
 
-  function refreshSetupBox() { const b = $("settle-setup-box"); if (b) b.classList.toggle("hidden", !window.settleFieldsMissing); }
+  function refreshSetupBox() { const b = $("settle-setup-box"); if (b) b.classList.toggle("hidden", !(window.settleFieldsMissing || window.settleRateFieldMissing)); }
 
   function open() {
     show("settle-overlay");
@@ -4559,8 +4635,8 @@ const SettleModule = (function () {
     const ex = $("settle-export-btn"); if (ex) ex.onclick = exportMonth;
     const eo = $("settle-export-open-btn"); if (eo) eo.onclick = exportOpen;
     const pb = $("settle-pdf-btn"); if (pb) pb.onclick = exportPdf;
-    BODY_KEYS.forEach(bk => { const inp = $("settle-rate-" + bk); if (!inp) return; const r = getDayRates()[bk]; inp.value = r == null ? "" : r;
-      inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + BODY_INFO[bk].label + " zapisana (na tym urządzeniu)", "success"); }; });
+    BODY_KEYS.concat(["CUC_COMBO"]).forEach(bk => { const inp = $("settle-rate-" + bk); if (!inp) return; const r = getDayRates()[bk]; inp.value = r == null ? "" : r;
+      inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + (bk === "CUC_COMBO" ? "CU łączony FSC+PEFC" : BODY_INFO[bk].label) + " zapisana (na tym urządzeniu)", "success"); }; });
     const mo = $("settle-month"); if (mo) mo.onchange = renderMonthSummary;
     const bd = $("settle-body-select"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
     const yr = $("settle-year"); if (yr) yr.onchange = renderReports;
@@ -4696,4 +4772,112 @@ const WsadModule = (function () {
   return { setup, parseCsv, toRecords, buildPlan };
 })();
 window.WsadModule = WsadModule;
+
+// ============================================================
+// MODUŁ: FINANSE — plan finansowy (prognoza) i rozliczenia (wykonanie) per miesiąc i zleceniodawca
+// Kategorie: done = Rozliczony · sent = Wysłany do zleceniodawcy · open = wykonane (DONE) nierozliczone ·
+//            plan = SCHEDULED (prognoza twarda) · tent = PLANNED (wstępnie). Spotkania: tylko koszty.
+// ============================================================
+const FinanceModule = (function () {
+  const $ = id => document.getElementById(id);
+  const MIES = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
+  const MIES_FULL = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
+  const CATS = ["done", "sent", "open", "plan", "tent"];
+  const CAT_LABEL = { done: "Rozliczone", sent: "Wysłane", open: "Do rozliczenia", plan: "Prognoza", tent: "Wstępnie" };
+  let year = new Date().getFullYear(), body = "all", selMonth = null;
+
+  function catOf(a) {
+    const st = a.AuditStatus, ss = settleStatusOf(a);
+    if (ss === "Rozliczony") return "done";
+    if (ss === "Wysłany do CU") return "sent";
+    if (st === "DONE") return "open";
+    if (st === "SCHEDULED" || st === "CHANGE") return "plan";
+    if (st === "PLANNED") return "tent";
+    return null;                                   // REJECTED i inne — poza finansami
+  }
+  function dateOf(a) { return a.AuditDateStart || a.PlannedCUDate || null; }
+  function rows() {
+    return (allAudits || []).filter(a => a.AuditorName === MY_AUDITOR && dateOf(a) && String(dateOf(a)).substring(0, 4) === String(year) && (body === "all" || bodyKey(a) === body) && catOf(a));
+  }
+  const r2 = x => Math.round((x || 0) * 100) / 100;
+  function agg(list) {
+    const o = { n: 0, days: 0, fee: 0, costs: 0, total: 0 };
+    list.forEach(a => { const c = settleCalc(a); o.n++; if (!isMeeting(a)) o.days += settleNum(a.AuditDays); o.fee += c.fee; o.costs += c.costs; o.total += c.total; });
+    ["days", "fee", "costs", "total"].forEach(k => o[k] = r2(o[k]));
+    return o;
+  }
+  const money = n => fmtPLN(n);
+  const dni = d => (Number.isInteger(d) ? d : d.toFixed(2).replace(".", ",")) + (d === 1 ? " dzień" : " dni");
+
+  function renderKpis(all) {
+    const box = $("fin-kpis"); if (!box) return;
+    const by = {}; CATS.forEach(c => by[c] = agg(all.filter(a => catOf(a) === c)));
+    const kpi = (c, label, sub) => { const o = by[c]; return `<div class="fin-kpi ${c}"><span class="k-label">${label}</span><span class="k-val">${money(o.fee)}</span><span class="k-sub">${o.n} audytów · ${dni(o.days)} · koszty ${money(o.costs)}${sub ? " · " + sub : ""}</span></div>`; };
+    const yearAll = agg(all);
+    box.innerHTML = kpi("plan", "Prognoza (SCHEDULED)") + kpi("tent", "Wstępnie (PLANNED)") + kpi("open", "Do rozliczenia") + kpi("sent", "Wysłane do zleceniodawcy") + kpi("done", "Rozliczone") +
+      `<div class="fin-kpi"><span class="k-label">Razem ${year}</span><span class="k-val">${money(yearAll.fee)}</span><span class="k-sub">${yearAll.n} pozycji · ${dni(yearAll.days)} · koszty ${money(yearAll.costs)} · z kosztami ${money(yearAll.total)}</span></div>`;
+  }
+  function monthData(all) {
+    return Array.from({ length: 12 }, (_, m) => { const inM = all.filter(a => parseInt(String(dateOf(a)).substring(5, 7)) - 1 === m);
+      const d = { m, all: agg(inM), cats: {} }; CATS.forEach(c => d.cats[c] = agg(inM.filter(a => catOf(a) === c))); return d; });
+  }
+  function renderChart(md) {
+    const box = $("fin-chart"); if (!box) return;
+    const W = 720, H = 220, L = 46, R = 8, T = 14, B = 26, pw = W - L - R, ph = H - T - B;
+    const max = Math.max(1, ...md.map(d => CATS.reduce((s, c) => s + d.cats[c].fee, 0)));
+    const nice = Math.pow(10, Math.floor(Math.log10(max))); const top = Math.ceil(max / nice) * nice;
+    const y = v => T + ph - (v / top) * ph;
+    const cw = pw / 12, bw = Math.min(34, cw * 0.62);
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wynagrodzenie wg miesięcy">`;
+    for (let i = 0; i <= 4; i++) { const v = top * i / 4; svg += `<line class="axis" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="lbl" x="${L - 6}" y="${y(v) + 3}" text-anchor="end">${v >= 1000 ? Math.round(v / 1000) + "k" : v}</text>`; }
+    md.forEach(d => { const x0 = L + d.m * cw, x = x0 + (cw - bw) / 2;
+      if (selMonth === d.m) svg += `<rect class="sel-bg" x="${x0}" y="${T - 4}" width="${cw}" height="${ph + 8}" rx="4"/>`;
+      let acc = 0;
+      CATS.forEach(c => { const v = d.cats[c].fee; if (!v) return; const h = (v / top) * ph; acc += v; svg += `<rect class="bar ${c}" data-m="${d.m}" x="${x}" y="${y(acc)}" width="${bw}" height="${Math.max(h, 1)}"><title>${MIES_FULL[d.m]} · ${CAT_LABEL[c]}: ${money(v)}</title></rect>`; });
+      if (acc) svg += `<text class="val" x="${x + bw / 2}" y="${y(acc) - 3}" text-anchor="middle">${acc >= 1000 ? (acc / 1000).toFixed(1).replace(".", ",") + "k" : Math.round(acc)}</text>`;
+      svg += `<text class="lbl${selMonth === d.m ? " sel" : ""}" x="${x0 + cw / 2}" y="${H - 8}" text-anchor="middle">${MIES[d.m]}</text>`;
+      svg += `<rect class="bar" data-m="${d.m}" x="${x0}" y="${T}" width="${cw}" height="${ph}" fill="transparent"/>`; });
+    svg += "</svg>"; box.innerHTML = svg;
+    box.querySelectorAll("rect.bar").forEach(r => r.onclick = () => selectMonth(parseInt(r.dataset.m)));
+  }
+  function renderBodies(all) {
+    const box = $("fin-bodies"); if (!box) return;
+    const keys = body === "all" ? BODY_KEYS : [body];
+    box.innerHTML = keys.map(k => { const its = all.filter(a => bodyKey(a) === k); if (!its.length) return ""; const o = agg(its);
+      const parts = CATS.map(c => agg(its.filter(a => catOf(a) === c)).fee); const sum = parts.reduce((a, b) => a + b, 0) || 1;
+      return `<div class="fin-body"><b>${BODY_INFO[k].label}</b><span class="n">${money(o.fee)}</span><small>${o.n} pozycji · ${dni(o.days)} · koszty ${money(o.costs)} · rozliczone ${money(parts[0])}</small><div class="fin-bar">${CATS.map((c, i) => `<i class="fin-sw ${c}" style="width:${(parts[i] / sum * 100).toFixed(1)}%;border-radius:0"></i>`).join("")}</div></div>`; }).join("") || '<div class="settle-empty">Brak danych w tym roku.</div>';
+  }
+  function renderTable(md) {
+    const t = $("fin-table"); if (!t) return;
+    const head = `<thead><tr><th>Miesiąc</th><th class="num">Poz.</th><th class="num">Dni</th><th class="num">Rozliczone</th><th class="num">Wysłane</th><th class="num">Do rozl.</th><th class="num">Prognoza</th><th class="num">Wstępnie</th><th class="num">Wynagrodzenie</th><th class="num">Koszty</th><th class="num">Razem</th></tr></thead>`;
+    const tot = { n: 0, days: 0, fee: 0, costs: 0, total: 0, c: {} }; CATS.forEach(c => tot.c[c] = 0);
+    const body_ = md.map(d => { if (!d.all.n) return ""; tot.n += d.all.n; tot.days += d.all.days; tot.fee += d.all.fee; tot.costs += d.all.costs; tot.total += d.all.total; CATS.forEach(c => tot.c[c] += d.cats[c].fee);
+      return `<tr class="m${selMonth === d.m ? " sel" : ""}" data-m="${d.m}"><td>${MIES_FULL[d.m]}</td><td class="num">${d.all.n}</td><td class="num">${d.all.days}</td>${CATS.map(c => `<td class="num">${d.cats[c].fee ? money(d.cats[c].fee) : "—"}</td>`).join("")}<td class="num"><strong>${money(d.all.fee)}</strong></td><td class="num">${money(d.all.costs)}</td><td class="num">${money(d.all.total)}</td></tr>`; }).join("");
+    t.innerHTML = head + "<tbody>" + (body_ || `<tr><td colspan="11" class="settle-empty">Brak pozycji w ${year}.</td></tr>`) +
+      (tot.n ? `<tr class="total"><td>Razem ${year}</td><td class="num">${tot.n}</td><td class="num">${r2(tot.days)}</td>${CATS.map(c => `<td class="num">${money(tot.c[c])}</td>`).join("")}<td class="num">${money(tot.fee)}</td><td class="num">${money(tot.costs)}</td><td class="num">${money(tot.total)}</td></tr>` : "") + "</tbody>";
+    t.querySelectorAll("tr.m").forEach(tr => tr.onclick = () => selectMonth(parseInt(tr.dataset.m)));
+  }
+  function renderMonthList(all) {
+    const box = $("fin-month-list"), ttl = $("fin-month-title"); if (!box) return;
+    if (selMonth == null) { ttl.textContent = "Audyty w miesiącu"; box.className = "settle-empty"; box.textContent = "Wybierz miesiąc na wykresie lub w tabeli."; return; }
+    const its = all.filter(a => parseInt(String(dateOf(a)).substring(5, 7)) - 1 === selMonth).sort((x, y) => String(dateOf(x)).localeCompare(String(dateOf(y))));
+    ttl.textContent = `Audyty — ${MIES_FULL[selMonth]} ${year} (${its.length})`; box.className = "";
+    box.innerHTML = its.map(a => { const c = settleCalc(a), cat = catOf(a);
+      return `<div class="fin-list-row" data-id="${a.Id}"><span class="d">${formatDate(dateOf(a))}</span><span class="t">${escHtml(a.Title || "—")}<small>${bodyLabel(a)} · ${escHtml(a.Program || "")}${isMeeting(a) ? " · " + escHtml(a.AuditType) : " · " + (settleNum(a.AuditDays) || "?") + " dni"} · <span class="fin-sw ${cat}" style="width:8px;height:8px;vertical-align:middle"></span> ${CAT_LABEL[cat]}</small></span><span class="n hide-m">koszty ${money(c.costs)}</span><span class="n"><strong>${money(c.fee)}</strong></span></div>`; }).join("") || '<div class="settle-empty">Brak pozycji.</div>';
+    box.querySelectorAll(".fin-list-row").forEach(r => r.onclick = () => openModal(parseInt(r.dataset.id)));
+  }
+  function selectMonth(m) { selMonth = (selMonth === m) ? null : m; render(); }
+  function render() {
+    const all = rows(); const yl = $("fin-year"); if (yl) yl.textContent = String(year);
+    renderKpis(all); const md = monthData(all); renderChart(md); renderBodies(all); renderTable(md); renderMonthList(all);
+  }
+  function setup() {
+    const p = $("fin-prev"), n = $("fin-next"); if (p) p.onclick = () => { year--; selMonth = null; render(); }; if (n) n.onclick = () => { year++; selMonth = null; render(); };
+    document.querySelectorAll("#fin-body-switch .op-view-btn").forEach(b => b.onclick = () => { body = b.dataset.body; document.querySelectorAll("#fin-body-switch .op-view-btn").forEach(x => x.classList.toggle("active", x === b)); render(); });
+    const t = $("fin-tools"); if (t) t.onclick = () => SettleModule.open();
+  }
+  return { setup, render };
+})();
+window.FinanceModule = FinanceModule;
+
 
