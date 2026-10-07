@@ -1781,3 +1781,8 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 
 /* Wsad CSV w oknie importu */
 .wsad-box { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--lfa-border); text-align: left; }
+
+/* Status „Zaplanowany” (SCHEDULED): wypełniony granat — odróżnia się od „Do planowania” (jasny tint) */
+.badge-scheduled { background: var(--lfa-primary); color: var(--lfa-on-primary); }
+.stat-card.toplan { background: var(--lfa-surface); border-color: var(--lfa-primary); border-top-color: var(--lfa-primary); }
+.stat-card.toplan .stat-num { color: var(--lfa-primary); }

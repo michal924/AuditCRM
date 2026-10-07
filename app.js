@@ -206,7 +206,7 @@ function bodyLabel(a) { return BODY_INFO[bodyKey(a)].label; }
 
 // Status → token CSS (gradacja jasności wiersza). Puste = planned (najmocniejszy).
 function statusKey(s) {
-  const map = { PLANNED: "planned", CHANGE: "change", Invoice: "invoice", DONE: "done", REJECTED: "rejected" };
+  const map = { PLANNED: "planned", SCHEDULED: "planned", CHANGE: "change", Invoice: "invoice", DONE: "done", REJECTED: "rejected" };
   return map[s] || "planned";
 }
 
@@ -697,7 +697,8 @@ async function renderDayBusy(boxId, dateStr) {
 function updateStats(audits) {
   document.getElementById("stat-total").textContent = audits.length;
   document.getElementById("stat-planned").textContent =
-    audits.filter(a => a.AuditStatus === "PLANNED").length;
+    audits.filter(a => a.AuditStatus === "SCHEDULED").length;
+  { const el = document.getElementById("stat-toplan"); if (el) el.textContent = audits.filter(a => a.AuditStatus === "PLANNED").length; }
   document.getElementById("stat-done").textContent =
     audits.filter(a => a.AuditStatus === "DONE").length;
   document.getElementById("stat-proforma").textContent =
@@ -2052,9 +2053,12 @@ function certBodyBadge(a) {
   return `<span class="badge badge-body-${bodyCls(a)}">${bodyLabel(a)}</span>`;
 }
 
+// Statusy: PLANNED = „Do planowania” (termin CU, bez daty LF), SCHEDULED = „Zaplanowany” (termin uzgodniony) — rozdzielone na prośbę Michała 2026-10-07
+const STATUS_LABELS = { PLANNED: "Do planowania", SCHEDULED: "Zaplanowany", DONE: "DONE", REJECTED: "REJECTED", CHANGE: "CHANGE", Invoice: "Invoice" };
+function statusLabel(s) { return STATUS_LABELS[s] || s || "—"; }
 function statusBadge(s) {
-  const cls = { PLANNED:"planned", DONE:"done", REJECTED:"rejected", CHANGE:"change", Invoice:"invoice" };
-  return `<span class="badge badge-${cls[s] || 'planned'}">${s || "—"}</span>`;
+  const cls = { PLANNED:"planned", SCHEDULED:"scheduled", DONE:"done", REJECTED:"rejected", CHANGE:"change", Invoice:"invoice" };
+  return `<span class="badge badge-${cls[s] || 'planned'}">${statusLabel(s)}</span>`;
 }
 
 function proformaBadge(p) {
@@ -2803,6 +2807,7 @@ const MapModule = (function () {
   // Kolory statusów z tokenów LF Assurance (wersja jasna — markery leżą na jasnych kaflach OSM)
   const STATUS_TOKENS = {
     PLANNED:  "--lfa-map-planned",
+    SCHEDULED: "--lfa-map-planned",
     DONE:     "--lfa-map-done",
     REJECTED: "--lfa-map-rejected",
     CHANGE:   "--lfa-map-change",
@@ -4598,7 +4603,7 @@ const WsadModule = (function () {
         Title: o.title, CertBody: mapBody(o.body), Program: o.program || null, AuditType: mapType(o.kind, o.type), Standard: o.standard || null,
         AuditDateStart: date ? safeDate(date) : null, AuditDays: parseFloat(String(o.days || "").replace(",", ".")) || 1,
         AuditMode: /online|zdal/i.test(o.mode || "") ? "Online" : "On-site",
-        AuditStatus: ["PLANNED", "DONE", "REJECTED", "CHANGE"].includes(status) ? status : status === "INVOICE" ? "Invoice" : "PLANNED",
+        AuditStatus: ["PLANNED", "SCHEDULED", "DONE", "REJECTED", "CHANGE"].includes(status) ? status : status === "INVOICE" ? "Invoice" : /^ZAPLAN/.test(status) ? "SCHEDULED" : "PLANNED",
         Proforma: "Brak", Address: o.address || null, City: o.city || null, PostalCode: o.postal || null, ClientEmail: o.email || null, Phone: o.phone || null, Mobile: o.mobile || null,
         Quarter: /^Q[1-4]$/i.test(o.quarter || "") ? o.quarter.toUpperCase() : (date ? detectQuarter(date) : null),
         Year: parseInt(o.year) || (date ? parseInt(date.substring(0, 4)) : new Date().getFullYear()),

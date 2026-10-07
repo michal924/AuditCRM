@@ -147,7 +147,8 @@
       <div class="filter-multi-wrap" id="filter-status-wrap">
         <button class="filter-select filter-multi-btn" id="filter-status-btn">Status</button>
         <div class="filter-multi-panel hidden" id="filter-status-panel">
-          <label class="filter-multi-opt"><input type="checkbox" value="PLANNED"> PLANNED</label>
+          <label class="filter-multi-opt"><input type="checkbox" value="PLANNED"> Do planowania</label>
+          <label class="filter-multi-opt"><input type="checkbox" value="SCHEDULED"> Zaplanowany</label>
           <label class="filter-multi-opt"><input type="checkbox" value="DONE"> DONE</label>
           <label class="filter-multi-opt"><input type="checkbox" value="REJECTED"> REJECTED</label>
           <label class="filter-multi-opt"><input type="checkbox" value="CHANGE"> CHANGE</label>
@@ -179,6 +180,10 @@
       <div class="stat-card">
         <span class="stat-num" id="stat-total">—</span>
         <span class="stat-label">Łącznie</span>
+      </div>
+      <div class="stat-card toplan">
+        <span class="stat-num" id="stat-toplan">—</span>
+        <span class="stat-label">Do planowania</span>
       </div>
       <div class="stat-card planned">
         <span class="stat-num" id="stat-planned">—</span>
@@ -690,7 +695,8 @@
         <div class="action-group">
           <label>Status</label>
           <div class="btn-group" id="status-buttons">
-            <button class="status-btn" data-val="PLANNED">PLANNED</button>
+            <button class="status-btn" data-val="PLANNED">Do planowania</button>
+            <button class="status-btn" data-val="SCHEDULED">Zaplanowany</button>
             <button class="status-btn" data-val="DONE">DONE</button>
             <button class="status-btn" data-val="REJECTED">REJECTED</button>
             <button class="status-btn" data-val="CHANGE">CHANGE</button>
@@ -928,7 +934,8 @@
           <div class="form-row">
             <label>Status</label>
             <select id="new-status" class="form-input">
-              <option value="PLANNED">PLANNED</option>
+              <option value="PLANNED">Do planowania</option>
+              <option value="SCHEDULED">Zaplanowany</option>
               <option value="DONE">DONE</option>
             </select>
           </div>
