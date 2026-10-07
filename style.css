@@ -1840,3 +1840,10 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .fin-list-row .t small { display: block; font-weight: 400; color: var(--lfa-text-muted); font-size: 11.5px; }
 .fin-list-row .n { font-family: var(--lfa-font-data); font-variant-numeric: tabular-nums; font-size: 12.5px; text-align: right; }
 @media (max-width: 900px) { .fin-grid { grid-template-columns: 1fr; } .fin-list-row { grid-template-columns: 60px minmax(0, 1fr) auto; } .fin-list-row .n.hide-m { display: none; } }
+
+/* Finanse: filtry (chipy z panelami jak w Audytach) */
+.fin-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.fin-filters .filter-multi-btn { min-width: 0; }
+.fin-filters .filter-multi-panel.cols { display: grid; grid-template-columns: 1fr 1fr; min-width: 220px; }
+.fin-filters .filter-multi-panel.hidden { display: none; }
+@media (max-width: 768px) { .fin-filters .filter-multi-panel { position: fixed; left: 12px; right: 12px; top: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); max-height: 50vh; overflow-y: auto; } }

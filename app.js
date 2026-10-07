@@ -4784,7 +4784,46 @@ const FinanceModule = (function () {
   const MIES_FULL = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
   const CATS = ["done", "sent", "open", "plan", "tent"];
   const CAT_LABEL = { done: "Rozliczone", sent: "Wysłane", open: "Do rozliczenia", plan: "Prognoza", tent: "Wstępnie" };
-  let year = new Date().getFullYear(), body = "all", selMonth = null;
+  let body = "all", selMonth = null;
+  // Filtry (maksymalna segregacja): lata, miesiące, kwartały, programy, kategorie, rodzaj wpisu — wielokrotny wybór
+  const F = { year: [String(new Date().getFullYear())], month: [], quarter: [], program: [], cat: [], kind: [] };
+  const F_LABEL = { year: "Rok", month: "Miesiąc", quarter: "Kwartał", program: "Program", cat: "Kategoria", kind: "Rodzaj" };
+  const KIND_OPTS = [["Audyt", "Audyt"], ["Spotkanie", "Spotkanie"], ["Szkolenie", "Szkolenie"]];
+  function yearsAvailable() { const ys = new Set([new Date().getFullYear()]); (allAudits || []).forEach(a => { const d = dateOf(a); if (d) ys.add(parseInt(String(d).substring(0, 4))); }); return [...ys].filter(y => !isNaN(y)).sort((a, b) => b - a).map(String); }
+  function programsAvailable() { const ps = new Set(); (allAudits || []).forEach(a => programsOf(a).forEach(p => ps.add(p))); return [...ps].sort(); }
+  function options(key) {
+    if (key === "year") return yearsAvailable().map(y => [y, y]);
+    if (key === "month") return MIES_FULL.map((m, i) => [String(i + 1).padStart(2, "0"), String(i + 1).padStart(2, "0") + " " + MIES[i]]);
+    if (key === "quarter") return ["Q1", "Q2", "Q3", "Q4"].map(q => [q, q]);
+    if (key === "program") return programsAvailable().map(p => [p, p]);
+    if (key === "cat") return CATS.map(c => [c, CAT_LABEL[c]]);
+    return KIND_OPTS;
+  }
+  function renderFilters() {
+    const box = $("fin-filters"); if (!box) return;
+    box.innerHTML = Object.keys(F).map(key => {
+      const sel = F[key]; const lbl = sel.length === 0 ? F_LABEL[key] : sel.length === 1 ? (options(key).find(o => o[0] === sel[0]) || [sel[0], sel[0]])[1] : F_LABEL[key] + " (" + sel.length + ")";
+      return `<div class="filter-multi-wrap" data-key="${key}"><button class="filter-select filter-multi-btn${sel.length ? " filter-multi-active" : ""}" type="button">${escHtml(lbl)}</button>
+        <div class="filter-multi-panel hidden${key === "month" ? " cols" : ""}">${options(key).map(([v, l]) => `<label class="filter-multi-opt"><input type="checkbox" value="${escHtml(v)}"${sel.includes(v) ? " checked" : ""}> ${escHtml(l)}</label>`).join("")}</div></div>`; }).join("");
+    box.querySelectorAll(".filter-multi-wrap").forEach(w => {
+      const key = w.dataset.key, btn = w.querySelector("button"), panel = w.querySelector(".filter-multi-panel");
+      btn.onclick = e => { e.stopPropagation(); const open = !panel.classList.contains("hidden"); box.querySelectorAll(".filter-multi-panel").forEach(p => p.classList.add("hidden")); if (!open) panel.classList.remove("hidden"); };
+      panel.onclick = e => e.stopPropagation();
+      panel.querySelectorAll("input").forEach(cb => cb.onchange = () => { F[key] = [...panel.querySelectorAll("input:checked")].map(i => i.value); selMonth = null; render(); const w2 = $("fin-filters").querySelector(`[data-key="${key}"] .filter-multi-panel`); if (w2) w2.classList.remove("hidden"); });
+    });
+  }
+  document.addEventListener("click", () => { const b = $("fin-filters"); if (b) b.querySelectorAll(".filter-multi-panel").forEach(p => p.classList.add("hidden")); });
+  function passes(a) {
+    const d = String(dateOf(a)); const y = d.substring(0, 4), m = d.substring(5, 7), q = "Q" + (Math.floor((parseInt(m) - 1) / 3) + 1);
+    if (F.year.length && !F.year.includes(y)) return false;
+    if (F.month.length && !F.month.includes(m)) return false;
+    if (F.quarter.length && !F.quarter.includes(q)) return false;
+    if (F.program.length && !F.program.some(p => hasProgram(a, p))) return false;
+    if (F.cat.length && !F.cat.includes(catOf(a))) return false;
+    if (F.kind.length && !F.kind.includes(kindOf(a))) return false;
+    return true;
+  }
+  const yearLabel = () => F.year.length ? F.year.slice().sort().join(", ") : "wszystkie lata";
 
   function catOf(a) {
     const st = a.AuditStatus, ss = settleStatusOf(a);
@@ -4797,7 +4836,7 @@ const FinanceModule = (function () {
   }
   function dateOf(a) { return a.AuditDateStart || a.PlannedCUDate || null; }
   function rows() {
-    return (allAudits || []).filter(a => a.AuditorName === MY_AUDITOR && dateOf(a) && String(dateOf(a)).substring(0, 4) === String(year) && (body === "all" || bodyKey(a) === body) && catOf(a));
+    return (allAudits || []).filter(a => a.AuditorName === MY_AUDITOR && dateOf(a) && (body === "all" || bodyKey(a) === body) && catOf(a) && passes(a));
   }
   const r2 = x => Math.round((x || 0) * 100) / 100;
   function agg(list) {
@@ -4815,7 +4854,7 @@ const FinanceModule = (function () {
     const kpi = (c, label, sub) => { const o = by[c]; return `<div class="fin-kpi ${c}"><span class="k-label">${label}</span><span class="k-val">${money(o.fee)}</span><span class="k-sub">${o.n} audytów · ${dni(o.days)} · koszty ${money(o.costs)}${sub ? " · " + sub : ""}</span></div>`; };
     const yearAll = agg(all);
     box.innerHTML = kpi("plan", "Prognoza (SCHEDULED)") + kpi("tent", "Wstępnie (PLANNED)") + kpi("open", "Do rozliczenia") + kpi("sent", "Wysłane do zleceniodawcy") + kpi("done", "Rozliczone") +
-      `<div class="fin-kpi"><span class="k-label">Razem ${year}</span><span class="k-val">${money(yearAll.fee)}</span><span class="k-sub">${yearAll.n} pozycji · ${dni(yearAll.days)} · koszty ${money(yearAll.costs)} · z kosztami ${money(yearAll.total)}</span></div>`;
+      `<div class="fin-kpi"><span class="k-label">Razem (${escHtml(yearLabel())})</span><span class="k-val">${money(yearAll.fee)}</span><span class="k-sub">${yearAll.n} pozycji · ${dni(yearAll.days)} · koszty ${money(yearAll.costs)} · z kosztami ${money(yearAll.total)}</span></div>`;
   }
   function monthData(all) {
     return Array.from({ length: 12 }, (_, m) => { const inM = all.filter(a => parseInt(String(dateOf(a)).substring(5, 7)) - 1 === m);
@@ -4853,26 +4892,26 @@ const FinanceModule = (function () {
     const tot = { n: 0, days: 0, fee: 0, costs: 0, total: 0, c: {} }; CATS.forEach(c => tot.c[c] = 0);
     const body_ = md.map(d => { if (!d.all.n) return ""; tot.n += d.all.n; tot.days += d.all.days; tot.fee += d.all.fee; tot.costs += d.all.costs; tot.total += d.all.total; CATS.forEach(c => tot.c[c] += d.cats[c].fee);
       return `<tr class="m${selMonth === d.m ? " sel" : ""}" data-m="${d.m}"><td>${MIES_FULL[d.m]}</td><td class="num">${d.all.n}</td><td class="num">${d.all.days}</td>${CATS.map(c => `<td class="num">${d.cats[c].fee ? money(d.cats[c].fee) : "—"}</td>`).join("")}<td class="num"><strong>${money(d.all.fee)}</strong></td><td class="num">${money(d.all.costs)}</td><td class="num">${money(d.all.total)}</td></tr>`; }).join("");
-    t.innerHTML = head + "<tbody>" + (body_ || `<tr><td colspan="11" class="settle-empty">Brak pozycji w ${year}.</td></tr>`) +
-      (tot.n ? `<tr class="total"><td>Razem ${year}</td><td class="num">${tot.n}</td><td class="num">${r2(tot.days)}</td>${CATS.map(c => `<td class="num">${money(tot.c[c])}</td>`).join("")}<td class="num">${money(tot.fee)}</td><td class="num">${money(tot.costs)}</td><td class="num">${money(tot.total)}</td></tr>` : "") + "</tbody>";
+    t.innerHTML = head + "<tbody>" + (body_ || `<tr><td colspan="11" class="settle-empty">Brak pozycji dla wybranych filtrów.</td></tr>`) +
+      (tot.n ? `<tr class="total"><td>Razem</td><td class="num">${tot.n}</td><td class="num">${r2(tot.days)}</td>${CATS.map(c => `<td class="num">${money(tot.c[c])}</td>`).join("")}<td class="num">${money(tot.fee)}</td><td class="num">${money(tot.costs)}</td><td class="num">${money(tot.total)}</td></tr>` : "") + "</tbody>";
     t.querySelectorAll("tr.m").forEach(tr => tr.onclick = () => selectMonth(parseInt(tr.dataset.m)));
   }
   function renderMonthList(all) {
     const box = $("fin-month-list"), ttl = $("fin-month-title"); if (!box) return;
     if (selMonth == null) { ttl.textContent = "Audyty w miesiącu"; box.className = "settle-empty"; box.textContent = "Wybierz miesiąc na wykresie lub w tabeli."; return; }
     const its = all.filter(a => parseInt(String(dateOf(a)).substring(5, 7)) - 1 === selMonth).sort((x, y) => String(dateOf(x)).localeCompare(String(dateOf(y))));
-    ttl.textContent = `Audyty — ${MIES_FULL[selMonth]} ${year} (${its.length})`; box.className = "";
+    ttl.textContent = `Audyty — ${MIES_FULL[selMonth]} ${yearLabel()} (${its.length})`; box.className = "";
     box.innerHTML = its.map(a => { const c = settleCalc(a), cat = catOf(a);
       return `<div class="fin-list-row" data-id="${a.Id}"><span class="d">${formatDate(dateOf(a))}</span><span class="t">${escHtml(a.Title || "—")}<small>${bodyLabel(a)} · ${escHtml(a.Program || "")}${isMeeting(a) ? " · " + escHtml(a.AuditType) : " · " + (settleNum(a.AuditDays) || "?") + " dni"} · <span class="fin-sw ${cat}" style="width:8px;height:8px;vertical-align:middle"></span> ${CAT_LABEL[cat]}</small></span><span class="n hide-m">koszty ${money(c.costs)}</span><span class="n"><strong>${money(c.fee)}</strong></span></div>`; }).join("") || '<div class="settle-empty">Brak pozycji.</div>';
     box.querySelectorAll(".fin-list-row").forEach(r => r.onclick = () => openModal(parseInt(r.dataset.id)));
   }
   function selectMonth(m) { selMonth = (selMonth === m) ? null : m; render(); }
   function render() {
-    const all = rows(); const yl = $("fin-year"); if (yl) yl.textContent = String(year);
+    const all = rows(); renderFilters();
     renderKpis(all); const md = monthData(all); renderChart(md); renderBodies(all); renderTable(md); renderMonthList(all);
   }
   function setup() {
-    const p = $("fin-prev"), n = $("fin-next"); if (p) p.onclick = () => { year--; selMonth = null; render(); }; if (n) n.onclick = () => { year++; selMonth = null; render(); };
+    const c = $("fin-clear"); if (c) c.onclick = () => { Object.keys(F).forEach(k => F[k] = []); F.year = [String(new Date().getFullYear())]; body = "all"; document.querySelectorAll("#fin-body-switch .op-view-btn").forEach(x => x.classList.toggle("active", x.dataset.body === "all")); selMonth = null; render(); };
     document.querySelectorAll("#fin-body-switch .op-view-btn").forEach(b => b.onclick = () => { body = b.dataset.body; document.querySelectorAll("#fin-body-switch .op-view-btn").forEach(x => x.classList.toggle("active", x === b)); render(); });
     const t = $("fin-tools"); if (t) t.onclick = () => SettleModule.open();
   }
