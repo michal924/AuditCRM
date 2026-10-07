@@ -1847,3 +1847,17 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .fin-filters .filter-multi-panel.cols { display: grid; grid-template-columns: 1fr 1fr; min-width: 220px; }
 .fin-filters .filter-multi-panel.hidden { display: none; }
 @media (max-width: 768px) { .fin-filters .filter-multi-panel { position: fixed; left: 12px; right: 12px; top: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); max-height: 50vh; overflow-y: auto; } }
+
+/* Finanse: zaległe statusy (audyt po terminie bez DONE) — bordo, kreskowane */
+.fin-late { background: var(--lfa-danger-bg); border: 1px solid var(--lfa-accent); border-left-width: 4px; border-radius: var(--lfa-radius-lg); padding: 12px 14px; margin-bottom: 12px; }
+.fin-late-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; font-size: 13px; color: var(--lfa-text); }
+.fin-late-head > b { color: var(--lfa-accent); }
+.fin-late-head span { color: var(--lfa-text-muted); font-size: 12.5px; }
+.fin-list-row.late { grid-template-columns: 70px minmax(0, 1fr) auto; border-bottom-color: color-mix(in srgb, var(--lfa-accent) 20%, transparent); cursor: default; }
+.fin-list-row.late .t, .fin-list-row.late .d { cursor: pointer; }
+.fin-late-actions { display: flex; gap: 6px; }
+.btn-ghost.sm { padding: 4px 9px; font-size: 12px; }
+.btn-ghost.sm.danger { color: var(--lfa-accent); border-color: var(--lfa-accent); }
+.fin-kpi.late { border-top-color: var(--lfa-accent); border-style: dashed; } .fin-kpi.late .k-val { color: var(--lfa-accent); }
+.fin-chart .bar.late { fill: var(--lfa-danger-bg); stroke: var(--lfa-accent); stroke-width: 1.2; stroke-dasharray: 3 2; }
+.fin-sw.late { background: var(--lfa-danger-bg); border: 1px dashed var(--lfa-accent); }

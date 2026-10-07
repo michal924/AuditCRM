@@ -4782,8 +4782,12 @@ const FinanceModule = (function () {
   const $ = id => document.getElementById(id);
   const MIES = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
   const MIES_FULL = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
-  const CATS = ["done", "sent", "open", "plan", "tent"];
-  const CAT_LABEL = { done: "Rozliczone", sent: "Wysłane", open: "Do rozliczenia", plan: "Prognoza", tent: "Wstępnie" };
+  const CATS = ["done", "sent", "open", "late", "plan", "tent"];
+  const CAT_LABEL = { done: "Rozliczone", sent: "Wysłane", open: "Do rozliczenia", late: "Zaległe (bez DONE)", plan: "Prognoza", tent: "Wstępnie" };
+  const todayKey = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  // Audyt z datą w przeszłości, który wciąż ma status PLANNED/SCHEDULED/CHANGE — ktoś zapomniał przestawić na DONE/REJECTED.
+  // Nie wlicza się do prognozy (Michał 2026-10-07: „to teraz jest bardzo mylące”).
+  function isLate(a) { const d = String(dateOf(a) || "").substring(0, 10); return d && d < todayKey() && ["PLANNED", "SCHEDULED", "CHANGE"].includes(a.AuditStatus) && settleStatusOf(a) === "Nierozliczony"; }
   let body = "all", selMonth = null;
   // Filtry (maksymalna segregacja): lata, miesiące, kwartały, programy, kategorie, rodzaj wpisu — wielokrotny wybór
   const F = { year: [String(new Date().getFullYear())], month: [], quarter: [], program: [], cat: [], kind: [] };
@@ -4830,6 +4834,7 @@ const FinanceModule = (function () {
     if (ss === "Rozliczony") return "done";
     if (ss === "Wysłany do CU") return "sent";
     if (st === "DONE") return "open";
+    if (isLate(a)) return "late";
     if (st === "SCHEDULED" || st === "CHANGE") return "plan";
     if (st === "PLANNED") return "tent";
     return null;                                   // REJECTED i inne — poza finansami
@@ -4853,7 +4858,7 @@ const FinanceModule = (function () {
     const by = {}; CATS.forEach(c => by[c] = agg(all.filter(a => catOf(a) === c)));
     const kpi = (c, label, sub) => { const o = by[c]; return `<div class="fin-kpi ${c}"><span class="k-label">${label}</span><span class="k-val">${money(o.fee)}</span><span class="k-sub">${o.n} audytów · ${dni(o.days)} · koszty ${money(o.costs)}${sub ? " · " + sub : ""}</span></div>`; };
     const yearAll = agg(all);
-    box.innerHTML = kpi("plan", "Prognoza (SCHEDULED)") + kpi("tent", "Wstępnie (PLANNED)") + kpi("open", "Do rozliczenia") + kpi("sent", "Wysłane do zleceniodawcy") + kpi("done", "Rozliczone") +
+    box.innerHTML = kpi("plan", "Prognoza (SCHEDULED)") + kpi("tent", "Wstępnie (PLANNED)") + kpi("open", "Do rozliczenia") + kpi("sent", "Wysłane do zleceniodawcy") + kpi("done", "Rozliczone") + (by.late.n ? kpi("late", "Zaległe — brak statusu DONE") : "") +
       `<div class="fin-kpi"><span class="k-label">Razem (${escHtml(yearLabel())})</span><span class="k-val">${money(yearAll.fee)}</span><span class="k-sub">${yearAll.n} pozycji · ${dni(yearAll.days)} · koszty ${money(yearAll.costs)} · z kosztami ${money(yearAll.total)}</span></div>`;
   }
   function monthData(all) {
@@ -4888,13 +4893,27 @@ const FinanceModule = (function () {
   }
   function renderTable(md) {
     const t = $("fin-table"); if (!t) return;
-    const head = `<thead><tr><th>Miesiąc</th><th class="num">Poz.</th><th class="num">Dni</th><th class="num">Rozliczone</th><th class="num">Wysłane</th><th class="num">Do rozl.</th><th class="num">Prognoza</th><th class="num">Wstępnie</th><th class="num">Wynagrodzenie</th><th class="num">Koszty</th><th class="num">Razem</th></tr></thead>`;
+    const head = `<thead><tr><th>Miesiąc</th><th class="num">Poz.</th><th class="num">Dni</th><th class="num">Rozliczone</th><th class="num">Wysłane</th><th class="num">Do rozl.</th><th class="num">Zaległe</th><th class="num">Prognoza</th><th class="num">Wstępnie</th><th class="num">Wynagrodzenie</th><th class="num">Koszty</th><th class="num">Razem</th></tr></thead>`;
     const tot = { n: 0, days: 0, fee: 0, costs: 0, total: 0, c: {} }; CATS.forEach(c => tot.c[c] = 0);
     const body_ = md.map(d => { if (!d.all.n) return ""; tot.n += d.all.n; tot.days += d.all.days; tot.fee += d.all.fee; tot.costs += d.all.costs; tot.total += d.all.total; CATS.forEach(c => tot.c[c] += d.cats[c].fee);
       return `<tr class="m${selMonth === d.m ? " sel" : ""}" data-m="${d.m}"><td>${MIES_FULL[d.m]}</td><td class="num">${d.all.n}</td><td class="num">${d.all.days}</td>${CATS.map(c => `<td class="num">${d.cats[c].fee ? money(d.cats[c].fee) : "—"}</td>`).join("")}<td class="num"><strong>${money(d.all.fee)}</strong></td><td class="num">${money(d.all.costs)}</td><td class="num">${money(d.all.total)}</td></tr>`; }).join("");
-    t.innerHTML = head + "<tbody>" + (body_ || `<tr><td colspan="11" class="settle-empty">Brak pozycji dla wybranych filtrów.</td></tr>`) +
+    t.innerHTML = head + "<tbody>" + (body_ || `<tr><td colspan="12" class="settle-empty">Brak pozycji dla wybranych filtrów.</td></tr>`) +
       (tot.n ? `<tr class="total"><td>Razem</td><td class="num">${tot.n}</td><td class="num">${r2(tot.days)}</td>${CATS.map(c => `<td class="num">${money(tot.c[c])}</td>`).join("")}<td class="num">${money(tot.fee)}</td><td class="num">${money(tot.costs)}</td><td class="num">${money(tot.total)}</td></tr>` : "") + "</tbody>";
     t.querySelectorAll("tr.m").forEach(tr => tr.onclick = () => selectMonth(parseInt(tr.dataset.m)));
+  }
+  function renderLate(all) {
+    const box = $("fin-late"); if (!box) return;
+    const its = all.filter(a => catOf(a) === "late").sort((x, y) => String(dateOf(x)).localeCompare(String(dateOf(y))));
+    if (!its.length) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+    box.classList.remove("hidden");
+    box.innerHTML = `<div class="fin-late-head"><b>⚠ ${its.length} ${its.length === 1 ? "audyt z minionego terminu nadal ma" : "audytów z minionych terminów nadal ma"} status PLANNED / SCHEDULED</b>
+      <span>Nie wliczam ich do prognozy ani do wykonania. Ustaw status: odbył się → <b>DONE</b>, nie doszedł do skutku → <b>REJECTED</b>.</span></div>` +
+      its.map(a => `<div class="fin-list-row late" data-id="${a.Id}"><span class="d">${formatDate(dateOf(a))}</span><span class="t">${escHtml(a.Title || "—")}<small>${bodyLabel(a)} · ${escHtml(a.Program || "")} · ${statusLabel(a.AuditStatus)} · ${settleNum(a.AuditDays) || "?"} dni</small></span>
+        <span class="fin-late-actions"><button class="btn-ghost sm" data-act="DONE" data-id="${a.Id}">✓ DONE</button><button class="btn-ghost sm danger" data-act="REJECTED" data-id="${a.Id}">REJECTED</button></span></div>`).join("");
+    box.querySelectorAll(".fin-list-row .t, .fin-list-row .d").forEach(el => el.onclick = () => openModal(parseInt(el.parentElement.dataset.id)));
+    box.querySelectorAll("button[data-act]").forEach(b => b.onclick = async e => { e.stopPropagation(); const id = parseInt(b.dataset.id), a = (allAudits || []).find(x => x.Id === id); if (!a) return;
+      b.disabled = true; try { await updateAudit(id, { AuditStatus: b.dataset.act }); a.AuditStatus = b.dataset.act; showToast((a.Title || "") + " → " + b.dataset.act, "success"); render(); if (typeof renderTable === "function") renderTable(); }
+      catch (err) { b.disabled = false; showToast("Nie udało się zmienić statusu: " + (err.message || err), "error"); } });
   }
   function renderMonthList(all) {
     const box = $("fin-month-list"), ttl = $("fin-month-title"); if (!box) return;
@@ -4908,7 +4927,7 @@ const FinanceModule = (function () {
   function selectMonth(m) { selMonth = (selMonth === m) ? null : m; render(); }
   function render() {
     const all = rows(); renderFilters();
-    renderKpis(all); const md = monthData(all); renderChart(md); renderBodies(all); renderTable(md); renderMonthList(all);
+    renderKpis(all); renderLate(all); const md = monthData(all); renderChart(md); renderBodies(all); renderTable(md); renderMonthList(all);
   }
   function setup() {
     const c = $("fin-clear"); if (c) c.onclick = () => { Object.keys(F).forEach(k => F[k] = []); F.year = [String(new Date().getFullYear())]; body = "all"; document.querySelectorAll("#fin-body-switch .op-view-btn").forEach(x => x.classList.toggle("active", x.dataset.body === "all")); selMonth = null; render(); };
