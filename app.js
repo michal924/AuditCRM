@@ -4787,7 +4787,14 @@ const FinanceModule = (function () {
   const todayKey = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
   // Audyt z datą w przeszłości, który wciąż ma status PLANNED/SCHEDULED/CHANGE — ktoś zapomniał przestawić na DONE/REJECTED.
   // Nie wlicza się do prognozy (Michał 2026-10-07: „to teraz jest bardzo mylące”).
-  function isLate(a) { const d = String(dateOf(a) || "").substring(0, 10); return d && d < todayKey() && ["PLANNED", "SCHEDULED", "CHANGE"].includes(a.AuditStatus) && settleStatusOf(a) === "Nierozliczony"; }
+  // Granica = koniec audytu: start + (dni audytowe zaokrąglone w górę) − 1; audyt 5-dniowy trwający dziś nie jest zaległy
+  function endKey(a) {
+    const d = String(dateOf(a) || "").substring(0, 10); if (!d) return "";
+    const days = Math.max(1, Math.ceil(settleNum(a.AuditDays) || 1));
+    const e = new Date(d + "T12:00:00"); e.setDate(e.getDate() + days - 1);
+    return e.getFullYear() + "-" + String(e.getMonth() + 1).padStart(2, "0") + "-" + String(e.getDate()).padStart(2, "0");
+  }
+  function isLate(a) { const e = endKey(a); return e && e < todayKey() && ["PLANNED", "SCHEDULED", "CHANGE"].includes(a.AuditStatus) && settleStatusOf(a) === "Nierozliczony"; }
   let body = "all", selMonth = null;
   // Filtry (maksymalna segregacja): lata, miesiące, kwartały, programy, kategorie, rodzaj wpisu — wielokrotny wybór
   const F = { year: [String(new Date().getFullYear())], month: [], quarter: [], program: [], cat: [], kind: [] };
