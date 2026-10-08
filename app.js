@@ -148,8 +148,10 @@ async function init() {
   SettleModule.setup();
   WsadModule.setup();
   FinanceModule.setup();
+  DashboardModule.setup();
 
   await loadAudits();
+  try { DashboardModule.render(); } catch (e) { console.warn("Pulpit:", e); }
 }
 
 // ============================================================
@@ -170,6 +172,7 @@ function setupNav() {
       if (view === "mapa")       MapModule.render();
       if (view === "kalendarz")  AuditCalModule.render();
       if (view === "finanse")    FinanceModule.render();
+      if (view === "pulpit")     DashboardModule.render();
     };
   });
 }
@@ -195,6 +198,7 @@ async function loadAudits() {
     renderTable();
     try { SideCalModule.render(); } catch {}
     migrateInvoiceStatus();
+    try { if (!document.getElementById("view-pulpit").classList.contains("hidden")) DashboardModule.render(); } catch {}
   } catch (e) {
     document.getElementById("audits-tbody").innerHTML =
       `<tr><td colspan="13" class="loading">Błąd: ${e.message}</td></tr>`;
@@ -4941,8 +4945,118 @@ const FinanceModule = (function () {
     document.querySelectorAll("#fin-body-switch .op-view-btn").forEach(b => b.onclick = () => { body = b.dataset.body; document.querySelectorAll("#fin-body-switch .op-view-btn").forEach(x => x.classList.toggle("active", x === b)); render(); });
     const t = $("fin-tools"); if (t) t.onclick = () => SettleModule.open();
   }
-  return { setup, render };
+  return { setup, render, catOf, agg, CATS, CAT_LABEL };
 })();
 window.FinanceModule = FinanceModule;
+
+// ============================================================
+// MODUŁ: PULPIT — ekran startowy (dziś · 14 dni · do zrobienia · rok w liczbach). Tylko odczyt, każda liczba to link.
+// ============================================================
+const DashboardModule = (function () {
+  const $ = id => document.getElementById(id);
+  const DNI = ["Nd", "Pn", "Wt", "Śr", "Cz", "Pt", "So"], DNI_FULL = ["niedziela", "poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota"];
+  const MIES_D = ["sty", "lut", "mar", "kwi", "maj", "cze", "lip", "sie", "wrz", "paź", "lis", "gru"];
+  const key = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const mine = () => (allAudits || []).filter(a => a.AuditorName === MY_AUDITOR);
+  const startOf = a => String(a.AuditDateStart || "").substring(0, 10);
+  const spanDays = a => Math.max(1, Math.ceil(settleNum(a.AuditDays) || 1));
+  function onDay(a, k) { const s0 = startOf(a); if (!s0) return false; if (s0 === k) return true; const e = addDays(new Date(s0 + "T12:00:00"), spanDays(a) - 1); return s0 < k && k <= key(e); }
+  const custodyOf = k => { try { const i = OpiekaModule.dayInfo(new Date(k + "T12:00:00")); return i.father ? (i.reason || "opieka") : null; } catch { return null; } };
+  const outlookOf = k => { try { return (SideCalModule.dayExtras(k) || {}).outlook || []; } catch { return []; } };
+  const isOff = d => d.getDay() === 0 || d.getDay() === 6;
+
+  // Przejście do Audytów z ustawionymi filtrami (czyści poprzednie)
+  function goAudits(preset) {
+    try { localStorage.removeItem(FILTERS_KEY); } catch {}
+    const search = $("search"); if (search) search.value = preset.search || "";
+    MULTI_KEYS.forEach(k => { document.querySelectorAll(`#filter-${k}-panel input[type=checkbox]`).forEach(cb => { cb.checked = !!(preset[k] && preset[k].includes(cb.value)); }); updateMultiBtn(k); });
+    saveFilters();
+    const b = document.querySelector('.nav-btn[data-view="myaudits"]'); if (b) b.click();
+  }
+  function goFinance() { const b = document.querySelector('.nav-btn[data-view="finanse"]'); if (b) b.click(); }
+
+  function renderToday(today, tk) {
+    const box = $("dash-today"); if (!box) return;
+    const audits = mine().filter(a => onDay(a, tk) && a.AuditStatus !== "REJECTED");
+    const custody = custodyOf(tk), outlook = outlookOf(tk);
+    let main, sub;
+    if (audits.length) { const a = audits[0]; main = (isMeeting(a) ? a.AuditType + ": " : "Audyt: ") + (a.Title || "—"); sub = [bodyLabel(a), a.Program, a.City, spanDays(a) > 1 ? spanDays(a) + " dni" : null].filter(Boolean).join(" · ") + (audits.length > 1 ? ` · +${audits.length - 1} więcej` : ""); }
+    else { main = isOff(today) ? "Weekend" : "Dzień bez audytu"; sub = isOff(today) ? "" : "wolny termin — można planować"; }
+    box.innerHTML = `<div class="d-date">${DNI_FULL[today.getDay()]} · ${today.getDate()} ${MIES_D[today.getMonth()]} ${today.getFullYear()}</div>
+      <div class="d-main">${escHtml(main)}</div>${sub ? `<div class="d-sub">${escHtml(sub)}</div>` : ""}
+      <div class="d-row"><span>👨‍👦</span><span>${custody ? "<b>Szymon u Ciebie</b> · " + escHtml(custody) : "Szymon u mamy"}</span></div>
+      <div class="d-row"><span>📆</span><span>${outlook.length ? outlook.slice(0, 4).map(o => `<span class="d-chip">${escHtml((o.time ? o.time + " " : "") + o.subject)}</span>`).join("") + (outlook.length > 4 ? `<span class="d-chip">+${outlook.length - 4}</span>` : "") : "Outlook: brak wydarzeń" + (outlook.length === 0 && !window.__outlookLoaded ? "" : "")}</span></div>`;
+    if (audits.length) { box.style.cursor = "pointer"; box.onclick = () => openModal(audits[0].Id); } else { box.style.cursor = ""; box.onclick = null; }
+  }
+  function renderTimeline(today) {
+    const box = $("dash-timeline"); if (!box) return;
+    const rows = [];
+    for (let i = 0; i < 14; i++) {
+      const d = addDays(today, i), k = key(d);
+      const audits = mine().filter(a => onDay(a, k) && a.AuditStatus !== "REJECTED");
+      const custody = custodyOf(k), outlook = outlookOf(k);
+      const conflict = custody && audits.some(a => !isMeeting(a));
+      const items = audits.map(a => `<span class="ac-chip ${bodyCls(a)}${startOf(a) !== k ? " cont" : ""}" data-id="${a.Id}" title="${escHtml(a.Program || "")}">${startOf(a) !== k ? "↳ " : ""}${escHtml(a.Title || "Audyt")}${isMeeting(a) ? " · " + escHtml(a.AuditType) : ""}</span>`)
+        .concat(custody ? [`<span class="ac-chip ext" title="${escHtml(custody)}">👨‍👦 opieka</span>`] : [])
+        .concat(outlook.slice(0, 3).map(o => `<span class="ac-chip ext">📆 ${escHtml((o.time ? o.time + " " : "") + o.subject)}</span>`))
+        .concat(conflict ? ['<span class="dash-tl-conflict">⚠ kolizja z opieką</span>'] : []);
+      rows.push(`<div class="dash-tl-row${i === 0 ? " today" : ""}${isOff(d) ? " weekend" : ""}"><div class="dash-tl-day"><b>${d.getDate()} ${MIES_D[d.getMonth()]}</b>${DNI[d.getDay()]}</div><div class="dash-tl-items">${items.length ? items.join("") : `<span class="dash-tl-free">${isOff(d) ? "weekend" : "wolny"}</span>`}</div></div>`);
+    }
+    box.innerHTML = rows.join("");
+    box.querySelectorAll(".ac-chip[data-id]").forEach(c => c.onclick = () => openModal(parseInt(c.dataset.id)));
+  }
+  function renderTodo(today, tk) {
+    const box = $("dash-todo"); if (!box) return;
+    const all = mine(), in14 = key(addDays(today, 14)), in30 = key(addDays(today, 30)), in60 = key(addDays(today, 60));
+    const cuDate = a => String(a.PlannedCUDate || "").substring(0, 10);
+    const cards = [];
+    const card = (cls, n, label, sub, list, preset, fmt) => { if (!n) return; cards.push({ cls, n, label, sub, list: list.slice(0, 4).map(fmt), more: Math.max(0, list.length - 4), preset }); };
+    // 1) do zaplanowania: PLANNED z terminem CU w 30 dni, bez daty LF
+    const toPlan = all.filter(a => a.AuditStatus === "PLANNED" && !a.AuditDateStart && cuDate(a) && cuDate(a) <= in30).sort((x, y) => cuDate(x).localeCompare(cuDate(y)));
+    card("", toPlan.length, "Do zaplanowania", "termin CU w ciągu 30 dni, brak daty LF", toPlan, { status: ["PLANNED"] }, a => `<span><small>${formatDate(a.PlannedCUDate)}</small> ${escHtml(a.Title || "")}</span>`);
+    // 2) plan audytu niewysłany: SCHEDULED w 14 dni bez PlanSentDate
+    const noPlan = all.filter(a => a.AuditStatus === "SCHEDULED" && !isMeeting(a) && startOf(a) >= tk && startOf(a) <= in14 && !a.PlanSentDate).sort((x, y) => startOf(x).localeCompare(startOf(y)));
+    card("warn", noPlan.length, "Plan audytu niewysłany", "audyt w ciągu 14 dni", noPlan, { status: ["SCHEDULED"], plan: ["Niewysłany"] }, a => `<span><small>${formatDate(a.AuditDateStart)}</small> ${escHtml(a.Title || "")}</span>`);
+    // 3) zaległe statusy (jak w Finansach)
+    const late = all.filter(a => FinanceModule.catOf(a) === "late").sort((x, y) => startOf(x).localeCompare(startOf(y)));
+    card("", late.length, "Zaległe statusy", "po terminie, nadal PLANNED / SCHEDULED", late, { status: ["PLANNED", "SCHEDULED", "CHANGE"] }, a => `<span><small>${formatDate(a.AuditDateStart || a.PlannedCUDate)}</small> ${escHtml(a.Title || "")}</span>`);
+    // 4) do rozliczenia: DONE nierozliczone
+    const toSettle = all.filter(a => a.AuditStatus === "DONE" && settleStatusOf(a) === "Nierozliczony").sort((x, y) => startOf(x).localeCompare(startOf(y)));
+    const sumFee = toSettle.reduce((s2, a) => s2 + settleCalc(a).total, 0);
+    card("", toSettle.length, "Do rozliczenia", fmtPLN(sumFee) + " z kosztami", toSettle, { status: ["DONE"], settle: ["Nierozliczony"] }, a => `<span><small>${formatDate(a.AuditDateStart)}</small> ${escHtml(a.Title || "")} <small>${fmtPLN(settleCalc(a).total)}</small></span>`);
+    // 5) proforma do wysłania
+    const noPro = all.filter(a => a.AuditStatus === "DONE" && (!a.Proforma || a.Proforma === "Brak") && !isMeeting(a)).sort((x, y) => startOf(x).localeCompare(startOf(y)));
+    card("warn", noPro.length, "Proforma do wysłania", "wykonane, proforma „Brak”", noPro, { status: ["DONE"] }, a => `<span><small>${formatDate(a.AuditDateStart)}</small> ${escHtml(a.Title || "")}</span>`);
+    // 6) certyfikaty wygasające w 60 dni bez zaplanowanego audytu
+    const hasFuture = t => all.some(b => (b.Title || "").trim().toLowerCase() === t && startOf(b) >= tk && ["PLANNED", "SCHEDULED"].includes(b.AuditStatus));
+    const seen = new Set();
+    const expiring = all.filter(a => { const v = String(a.CertValidTo || "").substring(0, 10); if (!v || v < tk || v > in60) return false; const t = (a.Title || "").trim().toLowerCase(); if (seen.has(t) || hasFuture(t)) return false; seen.add(t); return true; })
+      .sort((x, y) => String(x.CertValidTo).localeCompare(String(y.CertValidTo)));
+    card("info", expiring.length, "Certyfikaty wygasają", "w ciągu 60 dni, bez zaplanowanego audytu", expiring, { search: expiring.length === 1 ? (expiring[0].Title || "") : "" }, a => `<span><small>${formatDate(a.CertValidTo)}</small> ${escHtml(a.Title || "")} <small>${bodyLabel(a)}</small></span>`);
+    if (!cards.length) { box.innerHTML = '<div class="dash-empty">✓ Nic nie czeka — wszystkie statusy, plany i rozliczenia są na bieżąco.</div>'; return; }
+    box.innerHTML = cards.map((c, i) => `<div class="dash-todo-card ${c.cls}" data-i="${i}"><div class="t-num">${c.n}</div><div class="t-label">${c.label}</div><div class="t-sub">${c.sub}</div><div class="t-list">${c.list.join("")}${c.more ? `<span><small>…i ${c.more} więcej</small></span>` : ""}</div></div>`).join("");
+    box.querySelectorAll(".dash-todo-card").forEach(el => el.onclick = () => goAudits(cards[parseInt(el.dataset.i)].preset));
+  }
+  function renderYear(today) {
+    const box = $("dash-year-box"), yl = $("dash-year"); if (!box) return;
+    const y = String(today.getFullYear()); if (yl) yl.textContent = y;
+    const rows = mine().filter(a => { const d = a.AuditDateStart || a.PlannedCUDate; return d && String(d).substring(0, 4) === y && FinanceModule.catOf(a); });
+    const by = {}; FinanceModule.CATS.forEach(c => by[c] = FinanceModule.agg(rows.filter(a => FinanceModule.catOf(a) === c)));
+    const all = FinanceModule.agg(rows); const sum = all.fee || 1;
+    const kpi = (c, label) => `<div class="fin-kpi ${c}"><span class="k-label">${label}</span><span class="k-val">${fmtPLN(by[c].fee)}</span><span class="k-sub">${by[c].n} poz. · ${by[c].days} dni</span></div>`;
+    const bodies = BODY_KEYS.map(k => { const its = rows.filter(a => bodyKey(a) === k && !isMeeting(a)); if (!its.length) return ""; const done = its.filter(a => a.AuditStatus === "DONE" || ["Rozliczony", "Wysłany do CU"].includes(settleStatusOf(a))); return `<span>${BODY_INFO[k].label}: <b>${done.reduce((s2, a) => s2 + settleNum(a.AuditDays), 0)}</b> / ${its.reduce((s2, a) => s2 + settleNum(a.AuditDays), 0)} dni</span>`; }).join("");
+    box.innerHTML = kpi("done", "Rozliczone") + kpi("sent", "Wysłane") + kpi("open", "Do rozliczenia") + kpi("plan", "Prognoza") + (by.late.n ? kpi("late", "Zaległe") : "") +
+      `<div class="dash-bar"><div class="b-head"><span>Wynagrodzenie ${y}: wykonane vs plan</span><b>${fmtPLN(all.fee)}</b></div>
+       <div class="b-track">${FinanceModule.CATS.map(c => `<i class="fin-sw ${c}" style="width:${(by[c].fee / sum * 100).toFixed(1)}%;border-radius:0"></i>`).join("")}</div>
+       <div class="b-legend">${FinanceModule.CATS.filter(c => by[c].fee).map(c => `<span><i class="fin-sw ${c}"></i> ${FinanceModule.CAT_LABEL[c]} ${fmtPLN(by[c].fee)}</span>`).join("")}</div>
+       <div class="dash-bodies">Dni audytowe wykonane / wszystkie: ${bodies || "—"}</div></div>`;
+    box.querySelectorAll(".fin-kpi, .dash-bar").forEach(el => { el.style.cursor = "pointer"; el.onclick = goFinance; });
+  }
+  function render() { const today = new Date(); const tk = key(today); renderToday(today, tk); renderTimeline(today); renderTodo(today, tk); renderYear(today); }
+  function setup() { const b = $("dash-to-fin"); if (b) b.onclick = goFinance; }
+  return { setup, render };
+})();
+window.DashboardModule = DashboardModule;
 
 

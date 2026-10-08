@@ -70,7 +70,8 @@
       </div>
     </div>
     <div class="nav-links">
-      <button class="nav-btn active" data-view="myaudits"><span class="nav-ico">📋</span><span class="nav-lbl">Audyty</span></button>
+      <button class="nav-btn active" data-view="pulpit"><span class="nav-ico">🏠</span><span class="nav-lbl">Pulpit</span></button>
+      <button class="nav-btn" data-view="myaudits"><span class="nav-ico">📋</span><span class="nav-lbl">Audyty</span></button>
       <button class="nav-btn" data-view="kalendarz"><span class="nav-ico">📅</span><span class="nav-lbl">Kalendarz</span></button>
       <button class="nav-btn" data-view="checkaudit"><span class="nav-ico">✅</span><span class="nav-lbl">Check Audyt</span></button>
       <button class="nav-btn" data-view="changes"><span class="nav-ico">🔄</span><span class="nav-lbl">Zmiany Audytora</span></button>
@@ -90,7 +91,22 @@
 
   <main class="app-main">
   <!-- WIDOK: AUDYTY -->
-  <div id="view-myaudits" class="view">
+  <!-- WIDOK: PULPIT — ekran startowy: dziś, 14 dni, do zrobienia, rok w liczbach -->
+  <div id="view-pulpit" class="view">
+    <div class="dash-top">
+      <div class="dash-card dash-today" id="dash-today"></div>
+      <div class="dash-card dash-timeline">
+        <div class="fin-card-head"><h3>Najbliższe 14 dni</h3><span class="fin-hint">audyty · opieka · Outlook</span></div>
+        <div id="dash-timeline"></div>
+      </div>
+    </div>
+    <div class="dash-section-head"><h3>Do zrobienia</h3><span class="fin-hint">kafle znikają, gdy nie ma nic do zrobienia</span></div>
+    <div class="dash-todo" id="dash-todo"></div>
+    <div class="dash-section-head"><h3>Rok <span id="dash-year"></span> w liczbach</h3><button class="btn-ghost sm" id="dash-to-fin">Finanse →</button></div>
+    <div class="dash-year" id="dash-year-box"></div>
+  </div>
+
+  <div id="view-myaudits" class="view hidden">
     <div class="filters-bar">
       <input id="search" type="text" placeholder="🔍 Szukaj firmy..." class="search-input">
       <div class="filter-multi-wrap" id="filter-quarter-wrap">
