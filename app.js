@@ -149,6 +149,7 @@ async function init() {
   WsadModule.setup();
   FinanceModule.setup();
   DashboardModule.setup();
+  DelegModule.setup();
 
   await loadAudits();
   try { DashboardModule.render(); } catch (e) { console.warn("Pulpit:", e); }
@@ -171,7 +172,7 @@ function setupNav() {
       if (view === "opieka")     OpiekaModule.render();
       if (view === "mapa")       MapModule.render();
       if (view === "kalendarz")  AuditCalModule.render();
-      if (view === "finanse")    FinanceModule.render();
+      if (view === "finanse")    { FinanceModule.render(); DelegModule.render(); }
       if (view === "pulpit")     DashboardModule.render();
     };
   });
@@ -266,6 +267,7 @@ function renderSettleView(a) {
   settleSetText("m-s-other",   has(a.SettleOther)   ? fmtPLN(a.SettleOther)   : "—");
   settleSetText("m-s-tickets", has(a.SettleTickets) ? fmtPLN(a.SettleTickets) : "—");
   settleSetText("m-s-fee",     has(a.SettleFee) ? fmtPLN(a.SettleFee) : isMeeting(a) ? "— (spotkanie: tylko koszty)" : c.fee ? fmtPLN(c.fee) + " (" + settleNum(a.AuditDays) + " dni × " + dayRateSource(a) + ")" : "— (brak stawki dziennej)");
+  settleSetText("m-s-travel",  has(a.SettleTravelDays) && settleNum(a.SettleTravelDays) ? "+" + settleNum(a.SettleTravelDays) + " dni" : "—");
   settleSetText("m-s-dayrate", has(a.SettleDayRate) ? fmtPLN(a.SettleDayRate) : (dayRateOf(a) != null ? fmtPLN(dayRateOf(a)) + " (" + dayRateSource(a) + ")" : "—"));
   settleSetText("m-s-basis",   a.SettleFeeBasis || "—");
   settleSetText("m-s-note",    a.SettleNote || "—");
@@ -1005,7 +1007,7 @@ function enterEditMode() {
   document.getElementById("e-s-other").value   = hv(a.SettleOther);
   document.getElementById("e-s-tickets").value = hv(a.SettleTickets);
   document.getElementById("e-s-fee").value     = hv(a.SettleFee);
-  { const el = document.getElementById("e-s-dayrate"); if (el) el.value = hv(a.SettleDayRate); }
+  { const el = document.getElementById("e-s-dayrate"); if (el) el.value = hv(a.SettleDayRate); const t = document.getElementById("e-s-travel"); if (t) t.value = hv(a.SettleTravelDays); }
   document.getElementById("e-s-basis").value   = a.SettleFeeBasis || "";
   document.getElementById("e-s-note").value    = a.SettleNote || "";
   updateSettleCalcFromInputs();
@@ -1139,7 +1141,7 @@ async function saveChanges() {
         fields.SettleOther    = num("e-s-other");
         fields.SettleTickets  = num("e-s-tickets");
         fields.SettleFee      = num("e-s-fee");
-        if (!window.settleRateFieldMissing) fields.SettleDayRate = num("e-s-dayrate");
+        if (!window.settleRateFieldMissing) { fields.SettleDayRate = num("e-s-dayrate"); fields.SettleTravelDays = num("e-s-travel"); }
         fields.SettleFeeBasis = gs("e-s-basis").trim() || null;
         fields.SettleNote     = gs("e-s-note").trim() || null;
       }
@@ -5102,5 +5104,142 @@ const DashboardModule = (function () {
   return { setup, render };
 })();
 window.DashboardModule = DashboardModule;
+
+// ============================================================
+// MODUŁ: DELEGACJE — dni poza Warszawą do oświadczeń o delegacji (Michał, nagranie 2026-10-09)
+// Zasady: 1 wiersz = 1 wyjazd; dni = ceil(dni audytu) + dni dojazdu; tylko On-site poza Warszawą; spotkania/szkolenia też (przełącznik).
+// Zakres „Zrealizowane” = DONE / wysłane / rozliczone; zaległe (po terminie bez DONE) NIE wchodzą — osobne ostrzeżenie.
+// ============================================================
+const DelegModule = (function () {
+  const $ = id => document.getElementById(id);
+  const MIES_FULL = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
+  const pad = n => String(n).padStart(2, "0");
+  let scope = "done";
+  const HOME = /warszaw/i;
+  const isHome = a => HOME.test(String(a.City || "")) || (!a.City && HOME.test(String(a.Address || "")));
+  const startOf = a => String(a.AuditDateStart || "").substring(0, 10);
+  const auditDays = a => Math.max(1, Math.ceil(settleNum(a.AuditDays) || 1));
+  const travelDays = a => Math.max(0, Math.round(settleNum(a.SettleTravelDays)));
+  const totalDays = a => auditDays(a) + travelDays(a);
+  const endOf = a => { const d = new Date(startOf(a) + "T12:00:00"); d.setDate(d.getDate() + auditDays(a) - 1); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  const fmtD = k => k ? k.substring(8, 10) + "." + k.substring(5, 7) + "." + k.substring(0, 4) : "—";
+  const range = a => auditDays(a) > 1 ? fmtD(startOf(a)).substring(0, 5) + " – " + fmtD(endOf(a)) : fmtD(startOf(a));
+  const realized = a => a.AuditStatus === "DONE" || ["Rozliczony", "Wysłany do CU"].includes(settleStatusOf(a));
+  const planned = a => !realized(a) && ["SCHEDULED", "PLANNED", "CHANGE"].includes(a.AuditStatus) && FinanceModule.catOf(a) !== "late";
+
+  function period() {
+    const t = $("deleg-ptype").value, v = $("deleg-pval").value || "";
+    if (t === "month") { const [y, m] = v.split("-"); return { label: MIES_FULL[+m - 1] + " " + y, from: v + "-01", to: v + "-" + pad(new Date(+y, +m, 0).getDate()), nr: y + "/" + m }; }
+    if (t === "quarter") { const [y, q] = v.split("-Q"); const m0 = (+q - 1) * 3 + 1; return { label: "Q" + q + " " + y, from: y + "-" + pad(m0) + "-01", to: y + "-" + pad(m0 + 2) + "-" + pad(new Date(+y, m0 + 2, 0).getDate()), nr: y + "/Q" + q }; }
+    return { label: "rok " + v, from: v + "-01-01", to: v + "-12-31", nr: v };
+  }
+  function fillPeriodValues(keep) {
+    const t = $("deleg-ptype").value, sel = $("deleg-pval"); const years = new Set([new Date().getFullYear()]);
+    (allAudits || []).forEach(a => { const d = startOf(a); if (d) years.add(parseInt(d.substring(0, 4))); });
+    const ys = [...years].filter(Boolean).sort((a, b) => b - a); const now = new Date(); let opts = [], def = "";
+    if (t === "month") { ys.forEach(y => { for (let m = 12; m >= 1; m--) opts.push([y + "-" + pad(m), MIES_FULL[m - 1] + " " + y]); }); def = now.getFullYear() + "-" + pad(now.getMonth() + 1); }
+    else if (t === "quarter") { ys.forEach(y => { for (let q = 4; q >= 1; q--) opts.push([y + "-Q" + q, "Q" + q + " " + y]); }); def = now.getFullYear() + "-Q" + (Math.floor(now.getMonth() / 3) + 1); }
+    else { ys.forEach(y => opts.push([String(y), String(y)])); def = String(now.getFullYear()); }
+    sel.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+    sel.value = (keep && opts.some(o => o[0] === keep)) ? keep : def;
+  }
+  function pick() {
+    const P = period(), withMeet = $("deleg-meetings").checked;
+    const base = (allAudits || []).filter(a => a.AuditorName === MY_AUDITOR && startOf(a) && startOf(a) >= P.from && startOf(a) <= P.to && a.AuditStatus !== "REJECTED" && (withMeet || !isMeeting(a)));
+    const inScope = a => scope === "done" ? realized(a) : scope === "plan" ? planned(a) : (realized(a) || planned(a));
+    const skipped = base.filter(a => inScope(a) && (a.AuditMode === "Online" || isHome(a)));
+    const rows = base.filter(a => inScope(a) && a.AuditMode !== "Online" && !isHome(a)).sort((x, y) => startOf(x).localeCompare(startOf(y)));
+    const late = base.filter(a => FinanceModule.catOf(a) === "late" && a.AuditMode !== "Online" && !isHome(a));
+    return { P, rows, skipped, late };
+  }
+  function render() {
+    const { P, rows, skipped, late } = pick();
+    const days = rows.reduce((s2, a) => s2 + totalDays(a), 0), km = rows.reduce((s2, a) => s2 + settleNum(a.SettleKm), 0), hotels = rows.filter(a => settleNum(a.SettleHotel) > 0).length;
+    $("deleg-kpis").innerHTML = [["wyjazdów", rows.length], ["dni delegacji", days], ["km łącznie", km ? km.toLocaleString("pl-PL") : "—"], ["noclegi (hotel)", hotels], ["pominięte", skipped.length]]
+      .map(([l, v]) => `<div class="fin-kpi"><span class="k-label">${l}</span><span class="k-val">${v}</span></div>`).join("");
+    const lateBox = $("deleg-late");
+    if (scope === "done" && late.length) { lateBox.classList.remove("hidden"); lateBox.innerHTML = `<div class="fin-late-head"><b>⚠ ${late.length} ${late.length === 1 ? "wyjazd po terminie nie ma" : "wyjazdów po terminie nie ma"} statusu DONE — nie ujęte w zestawieniu</b><span>Oświadczenie o delegacji opieraj tylko na potwierdzonych audytach. Ustaw status w oknie audytu lub w banerze wyżej.</span></div>` + late.map(a => `<div class="fin-list-row late" data-id="${a.Id}"><span class="d">${fmtD(startOf(a))}</span><span class="t" style="cursor:pointer">${escHtml(a.Title || "")}<small>${escHtml(a.City || "")} · ${statusLabel(a.AuditStatus)}</small></span><span></span></div>`).join(""); lateBox.querySelectorAll(".t").forEach(el => el.onclick = () => openModal(parseInt(el.parentElement.dataset.id))); }
+    else { lateBox.classList.add("hidden"); lateBox.innerHTML = ""; }
+    const t = $("deleg-table");
+    t.innerHTML = `<thead><tr><th>Od – do</th><th class="num">Dni</th><th class="num">+dojazd</th><th>Klient</th><th>Miejscowość</th><th>Zlec.</th><th>Rodzaj · program</th><th>Trasa</th><th class="num">Km</th><th>Nocleg</th></tr></thead><tbody>` +
+      (rows.map(a => `<tr class="m" data-id="${a.Id}"><td class="num">${range(a)}</td><td class="num"><strong>${totalDays(a)}</strong></td><td class="num">${travelDays(a) ? "+" + travelDays(a) : "—"}</td><td class="wrap"><strong>${escHtml(a.Title || "—")}</strong></td><td>${escHtml(a.City || "—")}</td><td>${bodyLabel(a)}</td><td>${isMeeting(a) ? escHtml(a.AuditType) : shortType(a.AuditType || "")} · ${escHtml(a.Program || "")}</td><td class="wrap">${escHtml(a.SettleRoute || "—")}</td><td class="num">${settleNum(a.SettleKm) || "—"}</td><td>${settleNum(a.SettleHotel) > 0 ? "tak" : "—"}</td></tr>`).join("") || `<tr><td colspan="10" class="settle-empty">Brak wyjazdów w okresie: ${escHtml(P.label)}.</td></tr>`) +
+      (rows.length ? `<tr class="total"><td>Razem</td><td class="num">${days}</td><td class="num">${rows.reduce((s2, a) => s2 + travelDays(a), 0) || "—"}</td><td colspan="5">${rows.length} wyjazdów · ${BODY_KEYS.map(k => { const r = rows.filter(a => bodyKey(a) === k); return r.length ? BODY_INFO[k].short + " " + r.length + " (" + r.reduce((s2, a) => s2 + totalDays(a), 0) + " dni)" : ""; }).filter(Boolean).join(" · ")}</td><td class="num">${km ? km.toLocaleString("pl-PL") : "—"}</td><td>${hotels || "—"}</td></tr>` : "") + "</tbody>";
+    t.querySelectorAll("tr.m").forEach(tr => tr.onclick = () => openModal(parseInt(tr.dataset.id)));
+    $("deleg-skipped").textContent = skipped.length ? "Pominięte (nie są delegacją): " + skipped.map(a => (a.Title || "") + " · " + fmtD(startOf(a)) + " · " + (a.AuditMode === "Online" ? "Online" : a.City || "Warszawa")).join("; ") : "";
+  }
+
+  // ── PDF: zestawienie do druku (A4 poziomo), bez kwot ──
+  async function exportPdf() {
+    const { P, rows, skipped } = pick();
+    if (!rows.length) { showToast("Brak wyjazdów w wybranym okresie", "warn"); return; }
+    const btn = $("deleg-pdf"); btn.disabled = true; const old = btn.textContent; btn.textContent = "Generuję PDF…";
+    try {
+      await loadPdfFonts();
+      const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" }); registerPdfFonts(doc);
+      const F = pdfFontRegular ? "Archivo" : "helvetica"; const T = t => LfaTheme.triplet(t, "light");
+      const GRANAT = T("--lfa-granat"), BORDO = T("--lfa-bordo"), MOS = T("--lfa-mosiadz-text"), INK = T("--lfa-atrament"), MUTED = T("--lfa-szary"), PAPIER = T("--lfa-papier"), LINE = T("--lfa-border"), TINT = T("--lfa-info-bg"), DISK = T("--lfa-surface-2"), WHITE = T("--lfa-surface");
+      const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), MX = 14;
+      const now = new Date(), issued = pad(now.getDate()) + "." + pad(now.getMonth() + 1) + "." + now.getFullYear();
+      const nr = "D/" + P.nr.replace("/", "/") + "-001"; const auditor = String(MY_AUDITOR || "").split(" ").reverse().join(" ");
+      const k = 14 / 535.69, x0 = MX, y0 = 11, px = v => x0 + v * k, py = v => y0 + v * k;
+      doc.setLineCap("round"); doc.setDrawColor(...BORDO); doc.setLineWidth(54 * k); doc.line(px(320), py(332.6), px(449.3), py(476.2)); doc.setFillColor(...BORDO); doc.circle(px(449.3), py(476.2), 33.5 * k, "F");
+      doc.setFillColor(...DISK); doc.circle(px(206), py(206), 156 * k, "F"); doc.setDrawColor(...GRANAT); doc.setLineWidth(10 * k); doc.circle(px(206), py(206), 130 * k, "S");
+      doc.line(px(76), py(206), px(336), py(206)); doc.line(px(91.7), py(144), px(320.3), py(144)); doc.line(px(91.7), py(268), px(320.3), py(268)); doc.line(px(206), py(76), px(206), py(336));
+      doc.ellipse(px(206), py(206), 45 * k, 130 * k, "S"); doc.ellipse(px(206), py(206), 88 * k, 130 * k, "S"); doc.setDrawColor(...BORDO); doc.setLineWidth(24 * k); doc.circle(px(206), py(206), 168 * k, "S"); doc.setLineCap("butt");
+      doc.setFont(F, "bold"); doc.setFontSize(11.5); doc.setTextColor(...BORDO); doc.text("LF", MX + 16, 18.5); doc.setTextColor(...GRANAT); doc.text("ASSURANCE", MX + 16 + doc.getTextWidth("LF "), 18.5);
+      doc.setFont(F, "normal"); doc.setFontSize(6.5); doc.setTextColor(...MOS); doc.text("AUDIT SYSTEM", MX + 16, 22.6, { charSpace: 0.5 });
+      doc.setFont(F, "bold"); doc.setFontSize(9); doc.setTextColor(...GRANAT); doc.text("ZESTAWIENIE DELEGACJI", W - MX, 15, { align: "right" });
+      doc.setFont(F, "normal"); doc.setFontSize(7.5); doc.setTextColor(...MUTED); doc.text("Nr " + nr, W - MX, 19.5, { align: "right" }); doc.text("Wystawiono " + issued, W - MX, 23.5, { align: "right" });
+      doc.setDrawColor(...MOS); doc.setLineWidth(0.3); doc.line(MX, 28.5, W - MX, 28.5);
+      doc.setFont(F, "bold"); doc.setFontSize(15); doc.setTextColor(...GRANAT); doc.text("Dni delegacji — " + P.label, MX, 38.5);
+      doc.setFont(F, "normal"); doc.setFontSize(8.5); doc.setTextColor(...MUTED);
+      doc.text(auditor + " · LF Assurance · " + (scope === "done" ? "zrealizowane audyty i spotkania poza Warszawą" : scope === "plan" ? "zaplanowane wyjazdy (prognoza)" : "zrealizowane i zaplanowane wyjazdy") , MX, 44);
+      const days = rows.reduce((s2, a) => s2 + totalDays(a), 0), km = rows.reduce((s2, a) => s2 + settleNum(a.SettleKm), 0), hotels = rows.filter(a => settleNum(a.SettleHotel) > 0).length;
+      const meta = [["Okres", fmtD(P.from) + " – " + fmtD(P.to)], ["Zakres", scope === "done" ? "Zrealizowane (DONE, wysłane, rozliczone)" : scope === "plan" ? "Zaplanowane (SCHEDULED)" : "Wszystko"], ["Wyjazdy", rows.length + " · " + days + " dni delegacji"], ["Miejsce pracy", "Warszawa (wyjazdy liczone od/do)"]];
+      doc.setFillColor(...PAPIER); doc.roundedRect(MX, 48, W - 2 * MX, 12, 1.5, 1.5, "F"); const cw = (W - 2 * MX) / meta.length;
+      meta.forEach((m, i) => { const x = MX + 4 + i * cw; doc.setFont(F, "normal"); doc.setFontSize(6); doc.setTextColor(...MOS); doc.text(m[0].toUpperCase(), x, 52.6, { charSpace: 0.4 }); doc.setFont(F, "bold"); doc.setFontSize(8.5); doc.setTextColor(...INK); doc.text(m[1], x, 57.2); });
+      const num2 = n => String(Math.round(n * 10) / 10).replace(".", ",");
+      doc.autoTable({
+        startY: 64, margin: { left: MX, right: MX, bottom: 20 }, theme: "plain",
+        styles: { font: F, fontSize: 7.6, textColor: INK, lineColor: LINE, lineWidth: { bottom: 0.15 }, cellPadding: { top: 2.2, right: 2.4, bottom: 2.2, left: 2.4 }, overflow: "linebreak", valign: "top" },
+        headStyles: { font: F, fontStyle: "bold", fontSize: 6.6, fillColor: WHITE, textColor: GRANAT, lineWidth: 0 }, footStyles: { font: F, fontStyle: "bold", fontSize: 7.6, fillColor: TINT, textColor: GRANAT, lineWidth: 0 }, showFoot: "lastPage",
+        didDrawCell: d => { if (d.section === "head") { doc.setDrawColor(...BORDO); doc.setLineWidth(0.5); doc.line(d.cell.x, d.cell.y + d.cell.height, d.cell.x + d.cell.width, d.cell.y + d.cell.height); } },
+        head: [["Lp", "Od – do", "Dni", "MD", "Klient", "Miejscowość", "Zlec.", "Rodzaj · program", "Trasa", "Km", "Nocleg", "Nr PRJ"]],
+        body: rows.map((a, i) => [String(i + 1), range(a), String(totalDays(a)) + (travelDays(a) ? " (+" + travelDays(a) + ")" : ""), isMeeting(a) ? "—" : num2(settleNum(a.AuditDays) || 1), a.Title || "—", a.City || "—", BODY_INFO[bodyKey(a)].short, (isMeeting(a) ? a.AuditType : shortType(a.AuditType || "")) + " · " + (a.Program || ""), a.SettleRoute || "—", settleNum(a.SettleKm) ? num2(settleNum(a.SettleKm)) : "—", settleNum(a.SettleHotel) > 0 ? "tak" : "—", a.ProjectID ? String(a.ProjectID) : "—"]),
+        foot: [[{ content: "Razem", colSpan: 2 }, String(days), "", { content: rows.length + " wyjazdów · " + BODY_KEYS.map(bk => { const r = rows.filter(a => bodyKey(a) === bk); return r.length ? BODY_INFO[bk].short + " " + r.length + " (" + r.reduce((s2, a) => s2 + totalDays(a), 0) + " dni)" : ""; }).filter(Boolean).join(" · "), colSpan: 5 }, km ? num2(km) : "—", String(hotels || "—"), ""]],
+        columnStyles: { 0: { cellWidth: 8, halign: "right" }, 1: { cellWidth: 30 }, 2: { cellWidth: 14, halign: "right", fontStyle: "bold" }, 3: { cellWidth: 10, halign: "right" }, 4: { cellWidth: 52, fontStyle: "bold", textColor: GRANAT }, 5: { cellWidth: 28 }, 6: { cellWidth: 11 }, 7: { cellWidth: 36 }, 8: { cellWidth: "auto", textColor: MUTED }, 9: { cellWidth: 14, halign: "right" }, 10: { cellWidth: 13 }, 11: { cellWidth: 18 } },
+        didParseCell: d => { if (d.section !== "body" && [2, 3, 9].includes(d.column.index) && !(d.cell.colSpan > 1)) d.cell.styles.halign = "right"; },
+      });
+      let y = doc.lastAutoTable.finalY + 8; if (y + 40 > H - 18) { doc.addPage(); y = 20; }
+      const bw = 92, bx = W - MX - bw, rh = 7; let yl = y;
+      const line = (label, val, strong) => { if (strong) { doc.setFillColor(...GRANAT); doc.rect(bx, yl, bw, rh + 2, "F"); doc.setTextColor(...PAPIER); doc.setFont(F, "bold"); doc.setFontSize(9.5); doc.text(label, bx + 4, yl + 5.9); doc.text(val, bx + bw - 4, yl + 5.9, { align: "right" }); yl += rh + 2; }
+        else { doc.setTextColor(...INK); doc.setFont(F, "normal"); doc.setFontSize(8.2); doc.text(label, bx + 4, yl + 4.8); doc.text(val, bx + bw - 4, yl + 4.8, { align: "right" }); doc.setDrawColor(...LINE); doc.setLineWidth(0.15); doc.line(bx, yl + rh, bx + bw, yl + rh); yl += rh; } };
+      BODY_KEYS.forEach(bk => { const r = rows.filter(a => bodyKey(a) === bk); if (r.length) line("Dni delegacji — " + BODY_INFO[bk].full, String(r.reduce((s2, a) => s2 + totalDays(a), 0)), false); });
+      line("Razem dni delegacji", String(days), true); doc.setDrawColor(...LINE); doc.setLineWidth(0.2); doc.rect(bx, y, bw, yl - y, "S");
+      doc.setFont(F, "normal"); doc.setFontSize(7.2); doc.setTextColor(...MUTED);
+      const notes = ["Zasada liczenia: dni delegacji = dni trwania audytu u klienta (data audytu LF + liczba dni, zaokrąglone w górę) + dni dojazdu wpisane w audycie. Źródło: LF Assurance Audit System, lista Audits."]
+        .concat(skipped.length ? ["Pominięte (nie są delegacją): " + skipped.map(a => (a.Title || "") + ", " + fmtD(startOf(a)) + ", " + (a.AuditMode === "Online" ? "Online" : a.City || "Warszawa")).join("; ") + "."] : []);
+      let ny = y + 4; notes.forEach(t => { const ls = doc.splitTextToSize(t, bx - MX - 10); doc.text(ls, MX, ny); ny += ls.length * 3.4 + 1.5; });
+      const sy = Math.max(yl, ny) + 20; doc.setDrawColor(...INK); doc.setLineWidth(0.2); doc.line(MX, sy, MX + 78, sy); doc.setFontSize(6.5); doc.setTextColor(...MUTED); doc.text("SPORZĄDZIŁ · " + auditor.toUpperCase(), MX, sy + 3.6);
+      const pages = doc.internal.getNumberOfPages();
+      for (let p2 = 1; p2 <= pages; p2++) { doc.setPage(p2); doc.setDrawColor(...LINE); doc.setLineWidth(0.2); doc.line(MX, H - 13, W - MX, H - 13); doc.setFont(F, "normal"); doc.setFontSize(6.3); doc.setTextColor(...MUTED);
+        doc.text("LF Assurance · Gocławska 9B/7, 03-810 Warszawa · NIP 9182077986 · REGON 527791960", MX, H - 9); doc.text("Wygenerowano z LF Assurance Audit System · " + issued + " · strona " + p2 + " / " + pages, W - MX, H - 9, { align: "right" }); }
+      await saveBlobFile(doc.output("blob"), "Delegacje_" + P.nr.replace("/", "-") + (scope === "done" ? "" : "_" + scope) + ".pdf");
+      showToast("⬇ Zestawienie delegacji gotowe (" + rows.length + " wyjazdów, " + days + " dni)", "success");
+    } catch (e) { console.error(e); showToast("Nie udało się wygenerować PDF: " + String(e.message || e).substring(0, 90), "error"); }
+    finally { btn.disabled = false; btn.textContent = old; }
+  }
+  function setup() {
+    const pt = $("deleg-ptype"); if (!pt) return;
+    pt.onchange = () => { fillPeriodValues(); render(); };
+    $("deleg-pval").onchange = render; $("deleg-meetings").onchange = render; $("deleg-pdf").onclick = exportPdf;
+    document.querySelectorAll("#deleg-scope .op-view-btn").forEach(b => b.onclick = () => { scope = b.dataset.scope; document.querySelectorAll("#deleg-scope .op-view-btn").forEach(x => x.classList.toggle("active", x === b)); render(); });
+    fillPeriodValues();
+  }
+  function renderAll() { if ($("deleg-pval")) { fillPeriodValues($("deleg-pval").value); render(); } }
+  return { setup, render: renderAll, exportPdf };
+})();
+window.DelegModule = DelegModule;
+
 
 

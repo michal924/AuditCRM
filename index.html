@@ -574,6 +574,23 @@
       <div class="table-wrapper settle-table-wrap"><table class="settle-table fin-table" id="fin-table"></table></div>
     </div>
 
+    <div class="fin-card" id="deleg-card">
+      <div class="fin-card-head"><h3>🧳 Delegacje — dni poza Warszawą</h3><span class="fin-hint">dni = czas trwania audytu (+ dni dojazdu) · do oświadczeń o delegacji</span></div>
+      <div class="settle-toolbar deleg-toolbar">
+        <div class="form-row"><label for="deleg-ptype">Okres</label>
+          <select id="deleg-ptype" class="form-input"><option value="month" selected>Miesiąc</option><option value="quarter">Kwartał</option><option value="year">Rok</option></select></div>
+        <div class="form-row"><label for="deleg-pval">Wartość</label><select id="deleg-pval" class="form-input"></select></div>
+        <div class="form-row"><label>Zakres</label>
+          <div class="op-view-switcher" id="deleg-scope"><button class="op-view-btn active" data-scope="done">Zrealizowane</button><button class="op-view-btn" data-scope="plan">Zaplanowane</button><button class="op-view-btn" data-scope="all">Wszystko</button></div></div>
+        <label class="settle-import-opt"><input type="checkbox" id="deleg-meetings" checked> spotkania i szkolenia</label>
+        <div class="settle-toolbar-actions"><button id="deleg-pdf" class="btn-primary" style="width:auto">⬇ Zestawienie PDF</button></div>
+      </div>
+      <div id="deleg-kpis" class="fin-kpis"></div>
+      <div id="deleg-late" class="fin-late hidden"></div>
+      <div class="table-wrapper settle-table-wrap"><table class="settle-table fin-table" id="deleg-table"></table></div>
+      <div id="deleg-skipped" class="fin-hint" style="margin-top:8px"></div>
+    </div>
+
     <div class="fin-card" id="fin-month-card">
       <div class="fin-card-head"><h3 id="fin-month-title">Audyty w miesiącu</h3><span class="fin-hint">kliknij wiersz, aby otworzyć audyt</span></div>
       <div id="fin-month-list" class="settle-empty">Wybierz miesiąc na wykresie lub w tabeli.</div>
@@ -736,6 +753,7 @@
           <div class="field-row"><label>Inne koszty</label><span id="m-s-other" class="view-val">—</span><input id="e-s-other" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="0"></div>
           <div class="field-row"><label>Bilety PKP/LOT</label><span id="m-s-tickets" class="view-val">—</span><input id="e-s-tickets" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="0"></div>
           <div class="field-row"><label>Stawka dzienna</label><span id="m-s-dayrate" class="view-val">—</span><input id="e-s-dayrate" type="number" step="50" min="0" class="edit-val field-input field-input-sm" placeholder="wg cennika" title="Puste = stawka podmiotu z cennika (CU 1500, CU łączony FSC+PEFC 2100, SGS 800). Wpisana ma pierwszeństwo."></div>
+          <div class="field-row"><label>Dni dojazdu (+)</label><span id="m-s-travel" class="view-val">—</span><input id="e-s-travel" type="number" step="1" min="0" max="10" class="edit-val field-input field-input-sm" placeholder="0" title="Dodatkowe dni delegacji poza dniami audytu, np. dojazd z noclegiem dzień wcześniej. Liczone w zestawieniu delegacji, nie w wynagrodzeniu."></div>
           <div class="field-row"><label>Wynagrodzenie</label><span id="m-s-fee" class="view-val">—</span><input id="e-s-fee" type="number" step="0.01" min="0" class="edit-val field-input field-input-sm" placeholder="dni × stawka" title="Puste = dni audytowe × stawka dzienna. Wpisana kwota ma pierwszeństwo."></div>
           <div class="field-row"><label>Obrót AAF / opłata</label><span id="m-s-basis" class="view-val">—</span><input id="e-s-basis" type="text" class="edit-val field-input" placeholder="np. AAF, 2168888.16"></div>
           <div class="field-row settle-wide"><label>Uwagi</label><span id="m-s-note" class="view-val">—</span><textarea id="e-s-note" class="edit-val field-textarea" rows="2" placeholder="np. 1/2 kosztów dojazdu, koszty odniesione do PRJ…"></textarea></div>

@@ -64,8 +64,9 @@ const SETTLE_FIELDS = [
     choices: ["Nierozliczony", "Wysłany do CU", "Rozliczony"], defaultValue: "Nierozliczony" },
   { name: "SettleDate",     label: "Data rozliczenia",    type: "DateTime" },
   { name: "SettleDayRate",  label: "Stawka dzienna (audyt)", type: "Number" },   // nadpisanie stawki podmiotu (np. audyt łączony FSC+PEFC = 2100) — dodane 2026-10-07
+  { name: "SettleTravelDays", label: "Dni dojazdu (delegacja)", type: "Number" }, // dodatkowe dni delegacji poza dniami audytu (np. nocleg dzień wcześniej) — 2026-10-09
 ];
-const SETTLE_NEWER_FIELDS = ["SettleDayRate"];   // pola dodane później: gdy ich brak, reszta rozliczeń nadal działa
+const SETTLE_NEWER_FIELDS = ["SettleDayRate", "SettleTravelDays"];   // pola dodane później: gdy ich brak, reszta rozliczeń nadal działa
 window.settleRateFieldMissing = false;
 const SETTLE_FIELD_NAMES = SETTLE_FIELDS.map(f => f.name);
 // true gdy lista nie ma jeszcze kolumn rozliczeń → UI pokaże przycisk konfiguracji, zapis pomija te pola
