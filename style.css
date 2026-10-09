@@ -1916,3 +1916,13 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .deleg-toolbar { align-items: flex-end; }
 .deleg-toolbar .settle-import-opt { align-self: flex-end; padding-bottom: 8px; }
 #deleg-table td.wrap { white-space: normal; min-width: 160px; }
+
+/* Oświadczenie o delegacji */
+.deleg-modal { max-width: 720px; }
+.deleg-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 14px; }
+.deleg-form .deleg-wide { grid-column: 1 / -1; }
+.btn-deleg-audit { color: var(--lfa-primary); border-color: var(--lfa-primary); }
+.btn-deleg-audit:hover { background: var(--lfa-primary); color: var(--lfa-on-primary); }
+.btn-deleg-row { background: transparent; border: 1px solid var(--lfa-border); border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 12px; color: var(--lfa-primary); }
+.btn-deleg-row:hover { background: var(--lfa-info-bg); }
+.btn-deleg-row.has { border-color: var(--lfa-primary); font-weight: 700; }

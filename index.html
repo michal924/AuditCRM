@@ -583,7 +583,7 @@
         <div class="form-row"><label>Zakres</label>
           <div class="op-view-switcher" id="deleg-scope"><button class="op-view-btn active" data-scope="done">Zrealizowane</button><button class="op-view-btn" data-scope="plan">Zaplanowane</button><button class="op-view-btn" data-scope="all">Wszystko</button></div></div>
         <label class="settle-import-opt"><input type="checkbox" id="deleg-meetings" checked> spotkania i szkolenia</label>
-        <div class="settle-toolbar-actions"><button id="deleg-pdf" class="btn-primary" style="width:auto">⬇ Zestawienie PDF</button></div>
+        <div class="settle-toolbar-actions"><button id="deleg-pdf" class="btn-primary" style="width:auto">⬇ Zestawienie PDF</button><button id="deleg-batch" class="btn-action" title="Jeden PDF: oświadczenie o podróży służbowej na każdy wyjazd z okresu">📄 Oświadczenia za okres</button></div>
       </div>
       <div id="deleg-kpis" class="fin-kpis"></div>
       <div id="deleg-late" class="fin-late hidden"></div>
@@ -807,6 +807,7 @@
         </div>
         <button id="btn-delete-audit" class="btn-ghost btn-delete-audit" title="Usuń ten wpis z listy Audits (np. duplikat)">🗑 Usuń wpis</button>
         <button id="btn-merge-audit" class="btn-ghost btn-merge-audit hidden" title="Scal z drugim wpisem tego samego dnia w audyt łączony">🔗 Scal w audyt łączony</button>
+        <button id="btn-deleg-audit" class="btn-ghost btn-deleg-audit hidden" title="Oświadczenie o podróży służbowej (PDF z pieczęciami i podpisem)">📄 Oświadczenie o delegacji</button>
         <button id="btn-save" class="btn-primary">💾 Zapisz zmiany</button>
       </div>
     </div>
@@ -1153,6 +1154,35 @@
         </div>
       </div>
       <div id="settle-reports"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: OŚWIADCZENIE O PODRÓŻY SŁUŻBOWEJ -->
+<div id="deleg-overlay" class="modal-overlay hidden">
+  <div class="modal deleg-modal">
+    <div class="modal-header">
+      <h2>📄 Oświadczenie o podróży służbowej</h2>
+      <button id="deleg-close" class="btn-ghost">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="settle-import-hint" id="deleg-f-info"></div>
+      <div class="deleg-form">
+        <div class="form-row"><label for="deleg-f-depart-d">Wyjazd — data</label><input type="date" id="deleg-f-depart-d" class="form-input"></div>
+        <div class="form-row"><label for="deleg-f-depart-t">Wyjazd — godzina</label><input type="time" id="deleg-f-depart-t" class="form-input"></div>
+        <div class="form-row"><label for="deleg-f-return-d">Powrót — data</label><input type="date" id="deleg-f-return-d" class="form-input"></div>
+        <div class="form-row"><label for="deleg-f-return-t">Powrót — godzina</label><input type="time" id="deleg-f-return-t" class="form-input"></div>
+        <div class="form-row"><label for="deleg-f-place">Miejsce wyjazdu / powrotu</label><input type="text" id="deleg-f-place" class="form-input" value="Warszawa"></div>
+        <div class="form-row"><label for="deleg-f-dest">Docelowe miejsce podróży</label><input type="text" id="deleg-f-dest" class="form-input"></div>
+        <div class="form-row deleg-wide"><label for="deleg-f-purpose">Cel podróży</label><input type="text" id="deleg-f-purpose" class="form-input"></div>
+        <div class="form-row"><label for="deleg-f-transport">Środek transportu</label>
+          <select id="deleg-f-transport" class="form-input"><option>samochód osobowy</option><option>pociąg</option><option>samolot</option><option>samochód i pociąg</option></select></div>
+        <div class="form-row"><label>Nr oświadczenia</label><div class="form-input settle-rate" id="deleg-f-no" style="width:auto">—</div></div>
+      </div>
+      <div class="settle-toolbar-actions" style="margin-top:14px">
+        <button id="deleg-f-pdf" class="btn-primary" style="width:auto">⬇ Oświadczenie PDF</button>
+        <span class="fin-hint">Godziny i numer zapisują się w audycie — ponowny wydruk będzie identyczny.</span>
+      </div>
     </div>
   </div>
 </div>

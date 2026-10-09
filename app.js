@@ -857,6 +857,7 @@ function setupModal() {
   document.getElementById("btn-save").onclick = saveChanges;
   document.getElementById("btn-delete-audit").onclick = deleteCurrentAudit;
   document.getElementById("btn-merge-audit").onclick = mergeCurrentAudit;
+  document.getElementById("btn-deleg-audit").onclick = () => { if (currentAudit) DelegModule.openStatement(currentAudit); };
 
   // Zmiana daty w trybie edycji → aktualizuj kwartał i rok
   document.getElementById("e-date").addEventListener("change", e => {
@@ -907,6 +908,7 @@ function openModal(id) {
   if (!a) return;
   currentAudit = a;
   refreshMergeButton(a);
+  { const b = document.getElementById("btn-deleg-audit"); if (b) { const ok = DelegModule.eligible(a); b.classList.toggle("hidden", !ok); if (ok) b.textContent = a.DelegNo ? "📄 Oświadczenie " + a.DelegNo : "📄 Oświadczenie o delegacji"; } }
   currentStatus = a.AuditStatus;
   currentProforma = a.Proforma;
   currentPlanSent = !!a.PlanSentDate;
@@ -5161,10 +5163,11 @@ const DelegModule = (function () {
     if (scope === "done" && late.length) { lateBox.classList.remove("hidden"); lateBox.innerHTML = `<div class="fin-late-head"><b>⚠ ${late.length} ${late.length === 1 ? "wyjazd po terminie nie ma" : "wyjazdów po terminie nie ma"} statusu DONE — nie ujęte w zestawieniu</b><span>Oświadczenie o delegacji opieraj tylko na potwierdzonych audytach. Ustaw status w oknie audytu lub w banerze wyżej.</span></div>` + late.map(a => `<div class="fin-list-row late" data-id="${a.Id}"><span class="d">${fmtD(startOf(a))}</span><span class="t" style="cursor:pointer">${escHtml(a.Title || "")}<small>${escHtml(a.City || "")} · ${statusLabel(a.AuditStatus)}</small></span><span></span></div>`).join(""); lateBox.querySelectorAll(".t").forEach(el => el.onclick = () => openModal(parseInt(el.parentElement.dataset.id))); }
     else { lateBox.classList.add("hidden"); lateBox.innerHTML = ""; }
     const t = $("deleg-table");
-    t.innerHTML = `<thead><tr><th>Od – do</th><th class="num">Dni</th><th class="num">+dojazd</th><th>Klient</th><th>Miejscowość</th><th>Zlec.</th><th>Rodzaj · program</th><th>Trasa</th><th class="num">Km</th><th>Nocleg</th></tr></thead><tbody>` +
-      (rows.map(a => `<tr class="m" data-id="${a.Id}"><td class="num">${range(a)}</td><td class="num"><strong>${totalDays(a)}</strong></td><td class="num">${travelDays(a) ? "+" + travelDays(a) : "—"}</td><td class="wrap"><strong>${escHtml(a.Title || "—")}</strong></td><td>${escHtml(a.City || "—")}</td><td>${bodyLabel(a)}</td><td>${isMeeting(a) ? escHtml(a.AuditType) : shortType(a.AuditType || "")} · ${escHtml(a.Program || "")}</td><td class="wrap">${escHtml(a.SettleRoute || "—")}</td><td class="num">${settleNum(a.SettleKm) || "—"}</td><td>${settleNum(a.SettleHotel) > 0 ? "tak" : "—"}</td></tr>`).join("") || `<tr><td colspan="10" class="settle-empty">Brak wyjazdów w okresie: ${escHtml(P.label)}.</td></tr>`) +
-      (rows.length ? `<tr class="total"><td>Razem</td><td class="num">${days}</td><td class="num">${rows.reduce((s2, a) => s2 + travelDays(a), 0) || "—"}</td><td colspan="5">${rows.length} wyjazdów · ${BODY_KEYS.map(k => { const r = rows.filter(a => bodyKey(a) === k); return r.length ? BODY_INFO[k].short + " " + r.length + " (" + r.reduce((s2, a) => s2 + totalDays(a), 0) + " dni)" : ""; }).filter(Boolean).join(" · ")}</td><td class="num">${km ? km.toLocaleString("pl-PL") : "—"}</td><td>${hotels || "—"}</td></tr>` : "") + "</tbody>";
+    t.innerHTML = `<thead><tr><th>Od – do</th><th class="num">Dni</th><th class="num">+dojazd</th><th>Klient</th><th>Miejscowość</th><th>Zlec.</th><th>Rodzaj · program</th><th>Trasa</th><th class="num">Km</th><th>Nocleg</th><th>Oświadczenie</th></tr></thead><tbody>` +
+      (rows.map(a => `<tr class="m" data-id="${a.Id}"><td class="num">${range(a)}</td><td class="num"><strong>${totalDays(a)}</strong></td><td class="num">${travelDays(a) ? "+" + travelDays(a) : "—"}</td><td class="wrap"><strong>${escHtml(a.Title || "—")}</strong></td><td>${escHtml(a.City || "—")}</td><td>${bodyLabel(a)}</td><td>${isMeeting(a) ? escHtml(a.AuditType) : shortType(a.AuditType || "")} · ${escHtml(a.Program || "")}</td><td class="wrap">${escHtml(a.SettleRoute || "—")}</td><td class="num">${settleNum(a.SettleKm) || "—"}</td><td>${settleNum(a.SettleHotel) > 0 ? "tak" : "—"}</td><td><button class="btn-deleg-row${a.DelegNo ? " has" : ""}" data-id="${a.Id}" title="${a.DelegNo ? "Wydrukuj ponownie " + escHtml(a.DelegNo) : "Wystaw oświadczenie o podróży służbowej"}">📄 ${a.DelegNo ? escHtml(a.DelegNo) : "wystaw"}</button></td></tr>`).join("") || `<tr><td colspan="11" class="settle-empty">Brak wyjazdów w okresie: ${escHtml(P.label)}.</td></tr>`) +
+      (rows.length ? `<tr class="total"><td>Razem</td><td class="num">${days}</td><td class="num">${rows.reduce((s2, a) => s2 + travelDays(a), 0) || "—"}</td><td colspan="5">${rows.length} wyjazdów · ${BODY_KEYS.map(k => { const r = rows.filter(a => bodyKey(a) === k); return r.length ? BODY_INFO[k].short + " " + r.length + " (" + r.reduce((s2, a) => s2 + totalDays(a), 0) + " dni)" : ""; }).filter(Boolean).join(" · ")}</td><td class="num">${km ? km.toLocaleString("pl-PL") : "—"}</td><td>${hotels || "—"}</td><td></td></tr>` : "") + "</tbody>";
     t.querySelectorAll("tr.m").forEach(tr => tr.onclick = () => openModal(parseInt(tr.dataset.id)));
+    t.querySelectorAll(".btn-deleg-row").forEach(b => b.onclick = e => { e.stopPropagation(); const a = (allAudits || []).find(x => x.Id === parseInt(b.dataset.id)); if (a) openStatement(a); });
     $("deleg-skipped").textContent = skipped.length ? "Pominięte (nie są delegacją): " + skipped.map(a => (a.Title || "") + " · " + fmtD(startOf(a)) + " · " + (a.AuditMode === "Online" ? "Online" : a.City || "Warszawa")).join("; ") : "";
   }
 
@@ -5229,15 +5232,170 @@ const DelegModule = (function () {
     } catch (e) { console.error(e); showToast("Nie udało się wygenerować PDF: " + String(e.message || e).substring(0, 90), "error"); }
     finally { btn.disabled = false; btn.textContent = old; }
   }
+
+  // ══════════ OŚWIADCZENIE O PODRÓŻY SŁUŻBOWEJ (wzór inFakt → LF Assurance) ══════════
+  // Decyzje Michała 2026-10-09: godziny domyślne 06:00/20:00 (dojazd dzień wcześniej 16:00), jeden dokument na wyjazd
+  // (lista miast), także spotkania/szkolenia, podpis zawsze, zbiorczy PDF za okres.
+  const eligible = a => !!(a && startOf(a) && a.AuditMode !== "Online" && !isHome(a) && a.AuditStatus !== "REJECTED");
+  const addD = (k, n) => { const d = new Date(k + "T12:00:00"); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  function defaults(a) {
+    const tv = travelDays(a), dep = tv > 0 ? [addD(startOf(a), -1), "16:00"] : [startOf(a), "06:00"];
+    const ret = [endOf(a), "20:00"];
+    const dest = a.City || "";
+    const purpose = (isMeeting(a) ? a.AuditType : "Audyt " + (a.Program || "") + (a.AuditType ? " (" + shortType(a.AuditType) + ")" : "")) + " — " + (a.Title || "") + (a.ProjectID ? ", PRJ " + a.ProjectID : "") + ", na zlecenie " + BODY_INFO[bodyKey(a)].full;
+    const parse = v => { const m = String(v || "").match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/); return m ? [m[1], m[2]] : null; };
+    return { depart: parse(a.DelegDepart) || dep, ret: parse(a.DelegReturn) || ret, place: "Warszawa", dest, purpose, transport: settleNum(a.SettleKm) > 0 || !a.SettleTickets ? "samochód osobowy" : "pociąg" };
+  }
+  function nextNo(k) { // OD/RRRR/MM/nnn — kolejny numer w miesiącu wyjazdu
+    const pre = "OD/" + k.substring(0, 4) + "/" + k.substring(5, 7) + "/";
+    const used = (allAudits || []).map(a => String(a.DelegNo || "")).filter(n => n.startsWith(pre)).map(n => parseInt(n.substring(pre.length)) || 0);
+    return pre + pad(Math.max(0, ...used) + 1).padStart(3, "0");
+  }
+  let stmtAudit = null;
+  function openStatement(a) {
+    if (!eligible(a)) { showToast("Ten wpis nie jest delegacją (Online, Warszawa lub odwołany)", "warn"); return; }
+    stmtAudit = a; const d = defaults(a);
+    $("deleg-f-info").textContent = (a.Title || "") + " · " + range(a) + " · " + bodyLabel(a) + " · " + (a.Program || "") + (travelDays(a) ? " · dojazd +" + travelDays(a) + " dni" : "");
+    $("deleg-f-depart-d").value = d.depart[0]; $("deleg-f-depart-t").value = d.depart[1]; $("deleg-f-return-d").value = d.ret[0]; $("deleg-f-return-t").value = d.ret[1];
+    $("deleg-f-place").value = d.place; $("deleg-f-dest").value = d.dest; $("deleg-f-purpose").value = d.purpose; $("deleg-f-transport").value = d.transport;
+    $("deleg-f-no").textContent = a.DelegNo || (nextNo(startOf(a)) + " (zostanie nadany)");
+    show("deleg-overlay");
+  }
+  function closeStatement() { hide("deleg-overlay"); stmtAudit = null; }
+
+  // Pieczęcie i podpis — render w przeglądarce (jsPDF nie czyta SVG): lockup bordo + tekst w Archivo na canvas
+  const assets = {};
+  const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("Nie wczytano " + src)); i.src = src; });
+  async function stampCompany() {
+    if (assets.company) return assets.company;
+    await document.fonts.load("600 46px Archivo").catch(() => {});
+    const img = await loadImg("design/assets/stamps/lockup_bordo.svg");
+    const c = document.createElement("canvas"); c.width = 1200; c.height = 520; const g = c.getContext("2d");
+    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 1200, 520);   // lfa-allow: białe tło dokumentu (JPEG bez przezroczystości)
+    const lw = 1000, lh = Math.round(lw * img.height / img.width); g.drawImage(img, (1200 - lw) / 2, 40, lw, lh);
+    g.strokeStyle = "#6E1F2C"; g.lineWidth = 4; g.setLineDash([14, 10]); [285, 460].forEach(y => { g.beginPath(); g.moveTo(60, y); g.lineTo(1140, y); g.stroke(); });   // lfa-allow: kolor tuszu pieczęci
+    g.fillStyle = "#6E1F2C"; g.textAlign = "center"; g.font = "600 46px Archivo, Arial"; g.fillText("ul. Gocławska 9B/7, 03-810 Warszawa", 600, 345);   // lfa-allow
+    g.font = "600 44px Archivo, Arial"; g.fillText("NIP 918-207-79-86  ·  REGON 527791960", 600, 412);
+    return (assets.company = c.toDataURL("image/jpeg", 0.88));
+  }
+  async function stampName() {
+    if (assets.name) return assets.name;
+    await document.fonts.load("700 92px Archivo").catch(() => {});
+    const c = document.createElement("canvas"); c.width = 1200; c.height = 300; const g = c.getContext("2d");
+    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 1200, 300);   // lfa-allow: białe tło
+    g.fillStyle = "#6E1F2C"; g.strokeStyle = "#6E1F2C"; g.textAlign = "center";   // lfa-allow: kolor tuszu pieczęci
+    g.font = "700 92px Archivo, Arial"; g.fillText("MICHAŁ RZEŹNIK", 600, 110); g.lineWidth = 5; g.beginPath(); g.moveTo(120, 160); g.lineTo(1080, 160); g.stroke();
+    g.font = "600 58px Archivo, Arial"; g.fillText("LF ASSURANCE", 600, 240);
+    return (assets.name = c.toDataURL("image/jpeg", 0.88));
+  }
+  async function signature() {
+    if (assets.sig) return assets.sig;
+    const img = await loadImg("design/assets/stamps/podpis_michal.png"); const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const g = c.getContext("2d");
+    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0);   // lfa-allow: białe tło
+    return (assets.sig = c.toDataURL("image/jpeg", 0.9));
+  }
+  const fmtDT = (d, t) => fmtD(d) + ", " + t;
+
+  // Jedna strona A4 pionowo na wyjazd
+  async function drawStatementPage(doc, F, a, f, no, T) {
+    const GRANAT = T("--lfa-granat"), BORDO = T("--lfa-bordo"), MOS = T("--lfa-mosiadz-text"), INK = T("--lfa-atrament"), MUTED = T("--lfa-szary"), LINE = T("--lfa-border"), DISK = T("--lfa-surface-2");
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), MX = 20;
+    const k = 14 / 535.69, x0 = MX, y0 = 14, px = v => x0 + v * k, py = v => y0 + v * k;
+    doc.setLineCap("round"); doc.setDrawColor(...BORDO); doc.setLineWidth(54 * k); doc.line(px(320), py(332.6), px(449.3), py(476.2)); doc.setFillColor(...BORDO); doc.circle(px(449.3), py(476.2), 33.5 * k, "F");
+    doc.setFillColor(...DISK); doc.circle(px(206), py(206), 156 * k, "F"); doc.setDrawColor(...GRANAT); doc.setLineWidth(10 * k); doc.circle(px(206), py(206), 130 * k, "S");
+    doc.line(px(76), py(206), px(336), py(206)); doc.line(px(91.7), py(144), px(320.3), py(144)); doc.line(px(91.7), py(268), px(320.3), py(268)); doc.line(px(206), py(76), px(206), py(336));
+    doc.ellipse(px(206), py(206), 45 * k, 130 * k, "S"); doc.ellipse(px(206), py(206), 88 * k, 130 * k, "S"); doc.setDrawColor(...BORDO); doc.setLineWidth(24 * k); doc.circle(px(206), py(206), 168 * k, "S"); doc.setLineCap("butt");
+    doc.setFont(F, "bold"); doc.setFontSize(11.5); doc.setTextColor(...BORDO); doc.text("LF", MX + 16, 21.5); doc.setTextColor(...GRANAT); doc.text("ASSURANCE", MX + 16 + doc.getTextWidth("LF "), 21.5);
+    doc.setFont(F, "normal"); doc.setFontSize(6.5); doc.setTextColor(...MOS); doc.text("INDEPENDENT VERIFICATION", MX + 16, 25.6, { charSpace: 0.5 });
+    doc.setFont(F, "bold"); doc.setFontSize(8.5); doc.setTextColor(...GRANAT); doc.text("OŚWIADCZENIE O PODRÓŻY SŁUŻBOWEJ", W - MX, 18, { align: "right" });
+    doc.setFont(F, "normal"); doc.setFontSize(7.5); doc.setTextColor(...MUTED); doc.text("Nr " + no, W - MX, 22.5, { align: "right" });
+    doc.text("Dotyczy: " + (a.Title || "") + (a.ProjectID ? " · PRJ " + a.ProjectID : ""), W - MX, 26.5, { align: "right" });
+    doc.setDrawColor(...MOS); doc.setLineWidth(0.3); doc.line(MX, 31, W - MX, 31);
+    // Dane firmy (pieczęć) + miejscowość, data
+    doc.setFontSize(8); doc.setTextColor(...MUTED); doc.text("Dane firmy", MX, 42);
+    doc.addImage(await stampCompany(), "JPEG", MX, 44, 72, 31.2);
+    const now = new Date(); const issued = pad(now.getDate()) + "." + pad(now.getMonth() + 1) + "." + now.getFullYear();
+    doc.setFontSize(10); doc.setTextColor(...INK); doc.text(f.place + ", " + issued, W - MX, 47, { align: "right" });
+    doc.setFontSize(7.5); doc.setTextColor(...MUTED); doc.text("(miejscowość, data)", W - MX, 51.5, { align: "right" });
+    // Oświadczenie
+    doc.setFont(F, "bold"); doc.setFontSize(15); doc.setTextColor(...GRANAT); doc.text("Oświadczenie", W / 2, 98, { align: "center" });
+    doc.setFont(F, "normal"); doc.setFontSize(10.5); doc.setTextColor(...INK);
+    const lineH = 6.2; let y = 112;
+    const para = (txt) => { const ls = doc.splitTextToSize(txt, W - 2 * MX); doc.text(ls, MX, y); y += ls.length * lineH + 2; };
+    para(`Oświadczam, że w dniach od ${fmtD(f.depart[0])} do ${fmtD(f.ret[0])} przebywałem w podróży służbowej krajowej.`);
+    y += 2;
+    const items = [`Docelowe miejsce podróży (miasto): ${f.dest || "—"}`, `Godzina i miejsce wyjazdu środkami komunikacji lądowej: ${fmtDT(f.depart[0], f.depart[1])}, ${f.place}`,
+      `Godzina i miejsce powrotu środkami komunikacji lądowej: ${fmtDT(f.ret[0], f.ret[1])}, ${f.place}`, `Cel podróży: ${f.purpose}`];
+    items.forEach((t, i) => { const ls = doc.splitTextToSize(t, W - 2 * MX - 10); doc.text(String(i + 1) + ".", MX + 2, y); doc.text(ls, MX + 10, y); y += ls.length * lineH + 2.5; });
+    y += 4; doc.setFontSize(8.5); doc.setTextColor(...MUTED);
+    const extra = [`Środek transportu: ${f.transport}` + (a.SettleRoute ? `, trasa ${a.SettleRoute}` : "") + (settleNum(a.SettleKm) ? `, ${settleNum(a.SettleKm)} km` : "") + ".",
+      `Nocleg: ${settleNum(a.SettleHotel) > 0 ? "tak" : "nie"}. Dni delegacji wg LFA CRM System: ${totalDays(a)}` + (travelDays(a) ? ` (w tym dojazd ${travelDays(a)})` : "") + "."];
+    extra.forEach(t => para(t));
+    // Podpis + pieczęć imienna
+    const sx = W - MX - 70, sy = Math.max(y + 18, 200);
+    doc.addImage(await signature(), "JPEG", sx + 6, sy, 58, 58 * 182 / 445);           // podpis
+    doc.addImage(await stampName(), "JPEG", sx, sy + 24.5, 70, 70 * 300 / 1200);        // pieczęć imienna pod podpisem
+    doc.setDrawColor(...MUTED); doc.setLineWidth(0.2); doc.setLineDashPattern([0.6, 0.8], 0); doc.line(sx, sy + 43.5, sx + 70, sy + 43.5); doc.setLineDashPattern([], 0);
+    doc.setFontSize(7.5); doc.setTextColor(...MUTED); doc.text("(podpis i pieczęć)", sx + 35, sy + 47.5, { align: "center" });
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.2); doc.line(MX, H - 16, W - MX, H - 16);
+    doc.setFont(F, "normal"); doc.setFontSize(6.3); doc.setTextColor(...MUTED);
+    doc.text("LF Assurance · Gocławska 9B/7, 03-810 Warszawa · NIP 9182077986 · REGON 527791960", MX, H - 11); doc.text("Wygenerowano z LFA CRM System · " + issued, W - MX, H - 11, { align: "right" });
+  }
+  function readForm() {
+    return { depart: [$("deleg-f-depart-d").value, $("deleg-f-depart-t").value || "06:00"], ret: [$("deleg-f-return-d").value, $("deleg-f-return-t").value || "20:00"],
+      place: $("deleg-f-place").value.trim() || "Warszawa", dest: $("deleg-f-dest").value.trim(), purpose: $("deleg-f-purpose").value.trim(), transport: $("deleg-f-transport").value };
+  }
+  async function persist(a, f, no) {
+    if (window.settleRateFieldMissing) return false;   // kolumn jeszcze nie ma — PDF i tak wychodzi, numer nie zostaje
+    const fields = { DelegDepart: f.depart[0] + " " + f.depart[1], DelegReturn: f.ret[0] + " " + f.ret[1], DelegNo: no };
+    try { await updateAudit(a.Id, fields); Object.assign(a, fields); return true; } catch (e) { console.warn("Deleg save", e); return false; }
+  }
+  async function newDoc() {
+    await loadPdfFonts(); const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" }); registerPdfFonts(doc);
+    return { doc, F: pdfFontRegular ? "Archivo" : "helvetica", T: t => LfaTheme.triplet(t, "light") };
+  }
+  async function exportStatement() {
+    const a = stmtAudit; if (!a) return; const f = readForm();
+    if (!f.depart[0] || !f.ret[0]) { showToast("Podaj daty wyjazdu i powrotu", "warn"); return; }
+    const btn = $("deleg-f-pdf"); btn.disabled = true; const old = btn.textContent; btn.textContent = "Generuję…";
+    try {
+      const no = a.DelegNo || nextNo(startOf(a));
+      const { doc, F, T } = await newDoc(); await drawStatementPage(doc, F, a, f, no, T);
+      const saved = await persist(a, f, no);
+      await saveBlobFile(doc.output("blob"), "Oswiadczenie_" + no.replace(/\//g, "-") + "_" + String(a.Title || "").replace(/[^\wąćęłńóśźż]+/gi, "_").substring(0, 30) + ".pdf");
+      showToast("⬇ Oświadczenie " + no + (saved ? " zapisane w audycie" : " (numer niezapisany — brak kolumn, kliknij „Skonfiguruj kolumny rozliczeń”)"), saved ? "success" : "warn");
+      closeStatement(); render(); if (typeof renderTable === "function") renderTable();
+    } catch (e) { console.error(e); showToast("Nie udało się wygenerować oświadczenia: " + String(e.message || e).substring(0, 90), "error"); }
+    finally { btn.disabled = false; btn.textContent = old; }
+  }
+  // Zbiorczo: strona na każdy wyjazd z okresu, wartości domyślne (lub zapisane), numery nadawane po kolei
+  async function exportBatch() {
+    const { P, rows } = pick(); const list = rows.filter(eligible);
+    if (!list.length) { showToast("Brak wyjazdów w okresie", "warn"); return; }
+    if (!confirm(`Wygenerować ${list.length} oświadczeń za ${P.label}?\n\nWyjazdy bez zapisanych godzin dostaną domyślne (06:00 / 20:00, dojazd dzień wcześniej 16:00). Numery zostaną nadane i zapisane.`)) return;
+    const btn = $("deleg-batch"); btn.disabled = true; const old = btn.textContent;
+    try {
+      const { doc, F, T } = await newDoc(); let first = true, saved = 0;
+      for (const a of list) { if (!first) doc.addPage(); first = false; btn.textContent = `Oświadczenie ${saved + 1}/${list.length}…`;
+        const f = defaults(a); const no = a.DelegNo || nextNo(startOf(a)); await drawStatementPage(doc, F, a, f, no, T); if (await persist(a, f, no)) saved++; else a.DelegNo = a.DelegNo || no; }
+      await saveBlobFile(doc.output("blob"), "Oswiadczenia_" + P.nr.replace("/", "-") + ".pdf");
+      showToast(`⬇ ${list.length} oświadczeń za ${P.label}` + (saved < list.length ? ` (zapisano numery: ${saved})` : ""), "success"); render();
+    } catch (e) { console.error(e); showToast("Błąd generowania: " + String(e.message || e).substring(0, 90), "error"); }
+    finally { btn.disabled = false; btn.textContent = old; }
+  }
   function setup() {
     const pt = $("deleg-ptype"); if (!pt) return;
+    const bb = $("deleg-batch"); if (bb) bb.onclick = exportBatch;
+    const fp = $("deleg-f-pdf"); if (fp) fp.onclick = exportStatement;
+    const cl = $("deleg-close"); if (cl) cl.onclick = closeStatement;
+    const ov = $("deleg-overlay"); if (ov) ov.onclick = e => { if (e.target === ov) closeStatement(); };
     pt.onchange = () => { fillPeriodValues(); render(); };
     $("deleg-pval").onchange = render; $("deleg-meetings").onchange = render; $("deleg-pdf").onclick = exportPdf;
     document.querySelectorAll("#deleg-scope .op-view-btn").forEach(b => b.onclick = () => { scope = b.dataset.scope; document.querySelectorAll("#deleg-scope .op-view-btn").forEach(x => x.classList.toggle("active", x === b)); render(); });
     fillPeriodValues();
   }
   function renderAll() { if ($("deleg-pval")) { fillPeriodValues($("deleg-pval").value); render(); } }
-  return { setup, render: renderAll, exportPdf };
+  return { setup, render: renderAll, exportPdf, openStatement, eligible };
 })();
 window.DelegModule = DelegModule;
 
