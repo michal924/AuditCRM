@@ -2121,8 +2121,8 @@ function syncKindType(kindId, typeRowId) {
 // Stawka dzienna wg umowy z jednostką (CU: 1500 zł). Wartość NIE trafia do raportów, tylko iloczyn dni × stawka.
 const DAY_RATES_KEY = "lfa-day-rates";
 function getDayRates() {
-  const def = { CUC: 1500, CUC_COMBO: 2100, CUC_TRAIN_EUDR: 2100, SGS: 800, LF: null };   // CUC_TRAIN_EUDR = szkolenie EUDR dla CU (Michał 2026-10-09)   // CUC_COMBO = audyt łączony FSC+PEFC u CU (Michał 2026-10-07)   // wg umów (Michał 2026-09-30); nadpisanie w panelu Rozliczenie zapisuje się lokalnie
-  try { const saved = JSON.parse(localStorage.getItem(DAY_RATES_KEY) || "{}"); Object.keys(saved).forEach(k => { if (saved[k] != null && !isNaN(+saved[k])) def[k] = +saved[k]; }); } catch {}
+  const def = { CUC: 1500, CUC_COMBO: 2100, CUC_EUDR: 2100, SGS: 800, LF: null };   // CUC_EUDR = każda praca EUDR dla CU (audyt/weryfikacja/szkolenie) = 2100 (Michał 2026-10-09)   // CUC_COMBO = audyt łączony FSC+PEFC u CU (Michał 2026-10-07)   // wg umów (Michał 2026-09-30); nadpisanie w panelu Rozliczenie zapisuje się lokalnie
+  try { const saved = JSON.parse(localStorage.getItem(DAY_RATES_KEY) || "{}"); if (saved.CUC_TRAIN_EUDR != null && saved.CUC_EUDR == null) saved.CUC_EUDR = saved.CUC_TRAIN_EUDR; Object.keys(saved).forEach(k => { if (k in def && saved[k] != null && !isNaN(+saved[k])) def[k] = +saved[k]; }); } catch {}
   return def;
 }
 function setDayRate(body, value) {
@@ -2133,12 +2133,12 @@ function setDayRate(body, value) {
 function dayRateOf(a) {
   if (a.SettleDayRate != null && a.SettleDayRate !== "" && !isNaN(+a.SettleDayRate)) return +a.SettleDayRate;
   const r = getDayRates(); const k = bodyKey(a);
-  const v = isPaidTraining(a) ? r.CUC_TRAIN_EUDR : (k === "CUC" && isCombinedAudit(a)) ? r.CUC_COMBO : r[k];
+  const v = (k === "CUC" && hasProgram(a, "EUDR")) ? r.CUC_EUDR : (k === "CUC" && isCombinedAudit(a)) ? r.CUC_COMBO : r[k];
   return v == null ? null : settleNum(v);
 }
 function dayRateSource(a) {
   if (a.SettleDayRate != null && a.SettleDayRate !== "" && !isNaN(+a.SettleDayRate)) return "stawka audytu";
-  if (isPaidTraining(a)) return "stawka szkolenia EUDR (CU)";
+  if (bodyKey(a) === "CUC" && hasProgram(a, "EUDR")) return "stawka EUDR (CU)";
   return (bodyKey(a) === "CUC" && isCombinedAudit(a)) ? "stawka łączona CU" : "stawka " + bodyLabel(a);
 }
 // Wynagrodzenie audytu: ręcznie wpisane SettleFee ma pierwszeństwo; inaczej dni × stawka jednostki; spotkanie = 0
@@ -4692,8 +4692,8 @@ const SettleModule = (function () {
     const ex = $("settle-export-btn"); if (ex) ex.onclick = exportMonth;
     const eo = $("settle-export-open-btn"); if (eo) eo.onclick = exportOpen;
     const pb = $("settle-pdf-btn"); if (pb) pb.onclick = exportPdf;
-    BODY_KEYS.concat(["CUC_COMBO", "CUC_TRAIN_EUDR"]).forEach(bk => { const inp = $("settle-rate-" + bk); if (!inp) return; const r = getDayRates()[bk]; inp.value = r == null ? "" : r;
-      inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + (bk === "CUC_COMBO" ? "CU łączony FSC+PEFC" : bk === "CUC_TRAIN_EUDR" ? "szkolenie EUDR (CU)" : BODY_INFO[bk].label) + " zapisana (na tym urządzeniu)", "success"); }; });
+    BODY_KEYS.concat(["CUC_COMBO", "CUC_EUDR"]).forEach(bk => { const inp = $("settle-rate-" + bk); if (!inp) return; const r = getDayRates()[bk]; inp.value = r == null ? "" : r;
+      inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + (bk === "CUC_COMBO" ? "CU łączony FSC+PEFC" : bk === "CUC_EUDR" ? "EUDR (CU)" : BODY_INFO[bk].label) + " zapisana (na tym urządzeniu)", "success"); }; });
     const mo = $("settle-month"); if (mo) mo.onchange = renderMonthSummary;
     const bd = $("settle-body-select"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
     const yr = $("settle-year"); if (yr) yr.onchange = renderReports;
