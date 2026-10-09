@@ -266,7 +266,7 @@ function renderSettleView(a) {
   settleSetText("m-s-highway", has(a.SettleHighway) ? fmtPLN(a.SettleHighway) : "—");
   settleSetText("m-s-other",   has(a.SettleOther)   ? fmtPLN(a.SettleOther)   : "—");
   settleSetText("m-s-tickets", has(a.SettleTickets) ? fmtPLN(a.SettleTickets) : "—");
-  settleSetText("m-s-fee",     has(a.SettleFee) ? fmtPLN(a.SettleFee) : isMeeting(a) ? "— (spotkanie: tylko koszty)" : c.fee ? fmtPLN(c.fee) + " (" + settleNum(a.AuditDays) + " dni × " + dayRateSource(a) + ")" : "— (brak stawki dziennej)");
+  settleSetText("m-s-fee",     has(a.SettleFee) ? fmtPLN(a.SettleFee) : (isMeeting(a) && !isPaidTraining(a)) ? "— (spotkanie: tylko koszty)" : c.fee ? fmtPLN(c.fee) + " (" + settleNum(a.AuditDays) + " dni × " + dayRateSource(a) + ")" : "— (brak stawki dziennej)");
   settleSetText("m-s-travel",  has(a.SettleTravelDays) && settleNum(a.SettleTravelDays) ? "+" + settleNum(a.SettleTravelDays) + " dni" : "—");
   settleSetText("m-s-dayrate", has(a.SettleDayRate) ? fmtPLN(a.SettleDayRate) : (dayRateOf(a) != null ? fmtPLN(dayRateOf(a)) + " (" + dayRateSource(a) + ")" : "—"));
   settleSetText("m-s-basis",   a.SettleFeeBasis || "—");
@@ -2107,6 +2107,9 @@ function shortType(t) {
 const MEETING_TYPES = ["Spotkanie", "Szkolenie"];
 function isMeeting(a) { return MEETING_TYPES.includes(String((a && a.AuditType) || "").trim()); }
 function kindOf(a) { return isMeeting(a) ? a.AuditType.trim() : "Audyt"; }
+// Szkolenie EUDR prowadzone dla CU jest płatne jak dzień audytowy (stawka CUC_TRAIN_EUDR); inne spotkania/szkolenia = tylko koszty
+function isPaidTraining(a) { return isMeeting(a) && String(a.AuditType).trim() === "Szkolenie" && bodyKey(a) === "CUC" && hasProgram(a, "EUDR"); }
+function feeEligible(a) { return !isMeeting(a) || isPaidTraining(a); }
 // Pole „Typ audytu” aktywne tylko dla rodzaju Audyt (spotkanie/szkolenie nie ma typu)
 function syncKindType(kindId, typeRowId) {
   const k = document.getElementById(kindId), row = document.getElementById(typeRowId);
@@ -2118,7 +2121,7 @@ function syncKindType(kindId, typeRowId) {
 // Stawka dzienna wg umowy z jednostką (CU: 1500 zł). Wartość NIE trafia do raportów, tylko iloczyn dni × stawka.
 const DAY_RATES_KEY = "lfa-day-rates";
 function getDayRates() {
-  const def = { CUC: 1500, CUC_COMBO: 2100, SGS: 800, LF: null };   // CUC_COMBO = audyt łączony FSC+PEFC u CU (Michał 2026-10-07)   // wg umów (Michał 2026-09-30); nadpisanie w panelu Rozliczenie zapisuje się lokalnie
+  const def = { CUC: 1500, CUC_COMBO: 2100, CUC_TRAIN_EUDR: 2100, SGS: 800, LF: null };   // CUC_TRAIN_EUDR = szkolenie EUDR dla CU (Michał 2026-10-09)   // CUC_COMBO = audyt łączony FSC+PEFC u CU (Michał 2026-10-07)   // wg umów (Michał 2026-09-30); nadpisanie w panelu Rozliczenie zapisuje się lokalnie
   try { const saved = JSON.parse(localStorage.getItem(DAY_RATES_KEY) || "{}"); Object.keys(saved).forEach(k => { if (saved[k] != null && !isNaN(+saved[k])) def[k] = +saved[k]; }); } catch {}
   return def;
 }
@@ -2130,17 +2133,18 @@ function setDayRate(body, value) {
 function dayRateOf(a) {
   if (a.SettleDayRate != null && a.SettleDayRate !== "" && !isNaN(+a.SettleDayRate)) return +a.SettleDayRate;
   const r = getDayRates(); const k = bodyKey(a);
-  const v = (k === "CUC" && isCombinedAudit(a)) ? r.CUC_COMBO : r[k];
+  const v = isPaidTraining(a) ? r.CUC_TRAIN_EUDR : (k === "CUC" && isCombinedAudit(a)) ? r.CUC_COMBO : r[k];
   return v == null ? null : settleNum(v);
 }
 function dayRateSource(a) {
   if (a.SettleDayRate != null && a.SettleDayRate !== "" && !isNaN(+a.SettleDayRate)) return "stawka audytu";
+  if (isPaidTraining(a)) return "stawka szkolenia EUDR (CU)";
   return (bodyKey(a) === "CUC" && isCombinedAudit(a)) ? "stawka łączona CU" : "stawka " + bodyLabel(a);
 }
 // Wynagrodzenie audytu: ręcznie wpisane SettleFee ma pierwszeństwo; inaczej dni × stawka jednostki; spotkanie = 0
 function settleFeeOf(a) {
   if (a.SettleFee != null && a.SettleFee !== "") return { fee: settleNum(a.SettleFee), auto: false };
-  if (isMeeting(a)) return { fee: 0, auto: true };
+  if (isMeeting(a) && !isPaidTraining(a)) return { fee: 0, auto: true };
   const rate = dayRateOf(a), days = settleNum(a.AuditDays);
   return { fee: rate != null && days ? Math.round(days * rate * 100) / 100 : 0, auto: true };
 }
@@ -4335,7 +4339,7 @@ const SettleModule = (function () {
       km: has(a.SettleKm) ? settleNum(a.SettleKm) : null, kmCost: has(a.SettleKm) ? c.kmCost : 0,
       hotel: settleNum(a.SettleHotel), highway: settleNum(a.SettleHighway), other: settleNum(a.SettleOther), tickets: settleNum(a.SettleTickets) }; });
     const sum = k => r2(items.reduce((s, i) => s + (i[k] || 0), 0));
-    const audits = items.filter(i => !isMeeting(i.a)), meetings = items.filter(i => isMeeting(i.a));
+    const audits = items.filter(i => feeEligible(i.a)), meetings = items.filter(i => !feeEligible(i.a));
     const costs = r2(items.reduce((s, i) => s + i.c.costs, 0)), fee = r2(audits.reduce((s, i) => s + i.c.fee, 0));
     const days = r2(audits.reduce((s, i) => s + (i.days || 0), 0));
     const rates = [...new Set(items.filter(i => i.km != null).map(i => i.c.rate))];
@@ -4400,7 +4404,7 @@ const SettleModule = (function () {
       doc.autoTable({
         startY: 64, margin: { left: MX, right: MX, bottom: 20 }, theme: "plain", styles: tStyles, headStyles: tHead, footStyles: tFoot, showFoot: "lastPage", didDrawCell: bordoUnderHead,
         head: [["Data", "Klient", "PRJ", "Program", "Dni", "Trasa", "Km", "Km zł", "Hotel", "Autostr.", "Inne", "Bilety", "Koszty"].concat(multi ? ["Jedn."] : [])],
-        body: items.map(i => { const r = costRow(i); return [r[0], i.a.Title || "—", i.a.ProjectID || "—", isMeeting(i.a) ? i.a.AuditType : (i.a.Program || "—"), (!isMeeting(i.a) && i.days) ? String(i.days) : "—", r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]].concat(multi ? [bodyShort(i.a)] : []); }),
+        body: items.map(i => { const r = costRow(i); return [r[0], i.a.Title || "—", i.a.ProjectID || "—", isMeeting(i.a) ? i.a.AuditType + (isPaidTraining(i.a) ? " · " + (i.a.Program || "") : "") : (i.a.Program || "—"), (feeEligible(i.a) && i.days) ? String(i.days) : "—", r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]].concat(multi ? [bodyShort(i.a)] : []); }),
         foot: [[{ content: "Razem koszty", colSpan: 4 }, String(days), "", costFoot[3], costFoot[4], costFoot[5], costFoot[6], costFoot[7], costFoot[8], costFoot[9]].concat(multi ? [""] : [])],
         columnStyles: { 0: { cellWidth: 19 }, 1: { cellWidth: multi ? 44 : 52, fontStyle: "bold", textColor: GRANAT }, 2: { cellWidth: 17 }, 3: { cellWidth: 22 }, 4: { cellWidth: 11, ...R }, 5: { cellWidth: "auto", textColor: MUTED },
           6: { cellWidth: 13, ...R }, 7: { cellWidth: 18, ...R }, 8: { cellWidth: 17, ...R }, 9: { cellWidth: 17, ...R }, 10: { cellWidth: 15, ...R }, 11: { cellWidth: 15, ...R }, 12: { cellWidth: 20, ...R, fontStyle: "bold" }, 13: { cellWidth: 12, fontStyle: "bold", textColor: MOS } },
@@ -4445,7 +4449,7 @@ const SettleModule = (function () {
     let yl = y;
     if (multi) {
       BODY_KEYS.forEach(bk => { const its = items.filter(i => bodyKey(i.a) === bk); if (!its.length) return;
-        const bc = r2(its.reduce((s2, i) => s2 + i.c.costs, 0)), bf = r2(its.filter(i => !isMeeting(i.a)).reduce((s2, i) => s2 + i.c.fee, 0));
+        const bc = r2(its.reduce((s2, i) => s2 + i.c.costs, 0)), bf = r2(its.filter(i => feeEligible(i.a)).reduce((s2, i) => s2 + i.c.fee, 0));
         line(PDF_BODIES[bk].short + " · koszty", num2(bc) + " zł", yl, false); yl += rh;
         line(PDF_BODIES[bk].short + " · wynagrodzenie wg umowy", num2(bf) + " zł", yl, false); yl += rh; });
     } else {
@@ -4458,6 +4462,7 @@ const SettleModule = (function () {
     doc.setFont(F, "normal"); doc.setFontSize(7.2); doc.setTextColor(...MUTED);
     const noteTxt = ["Wynagrodzenie za dni audytowe zgodnie z umową o współpracy. Stawka dzienna nie jest wykazywana w raporcie."]
       .concat(meetings.length ? ["Spotkania i szkolenia (" + meetings.map(i => i.a.Title).join(", ") + ") rozliczane wyłącznie z kosztów, bez dnia audytowego."] : [])
+      .concat(audits.some(i => isPaidTraining(i.a)) ? ["Szkolenia EUDR prowadzone dla Control Union rozliczane jak dni audytowe, wg stawki umownej."] : [])
       .concat(notes.length ? ["Uwagi: " + notes.join("; ")] : []);
     let ny = y + 4; noteTxt.forEach(t => { const ls = doc.splitTextToSize(t, bx - MX - 10); doc.text(ls, MX, ny); ny += ls.length * 3.4 + 1.5; });
     if (layout !== "A") {
@@ -4687,8 +4692,8 @@ const SettleModule = (function () {
     const ex = $("settle-export-btn"); if (ex) ex.onclick = exportMonth;
     const eo = $("settle-export-open-btn"); if (eo) eo.onclick = exportOpen;
     const pb = $("settle-pdf-btn"); if (pb) pb.onclick = exportPdf;
-    BODY_KEYS.concat(["CUC_COMBO"]).forEach(bk => { const inp = $("settle-rate-" + bk); if (!inp) return; const r = getDayRates()[bk]; inp.value = r == null ? "" : r;
-      inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + (bk === "CUC_COMBO" ? "CU łączony FSC+PEFC" : BODY_INFO[bk].label) + " zapisana (na tym urządzeniu)", "success"); }; });
+    BODY_KEYS.concat(["CUC_COMBO", "CUC_TRAIN_EUDR"]).forEach(bk => { const inp = $("settle-rate-" + bk); if (!inp) return; const r = getDayRates()[bk]; inp.value = r == null ? "" : r;
+      inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + (bk === "CUC_COMBO" ? "CU łączony FSC+PEFC" : bk === "CUC_TRAIN_EUDR" ? "szkolenie EUDR (CU)" : BODY_INFO[bk].label) + " zapisana (na tym urządzeniu)", "success"); }; });
     const mo = $("settle-month"); if (mo) mo.onchange = renderMonthSummary;
     const bd = $("settle-body-select"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
     const yr = $("settle-year"); if (yr) yr.onchange = renderReports;
@@ -4905,7 +4910,7 @@ const FinanceModule = (function () {
   const r2 = x => Math.round((x || 0) * 100) / 100;
   function agg(list) {
     const o = { n: 0, days: 0, fee: 0, costs: 0, total: 0 };
-    list.forEach(a => { const c = settleCalc(a); o.n++; if (!isMeeting(a)) o.days += settleNum(a.AuditDays); o.fee += c.fee; o.costs += c.costs; o.total += c.total; });
+    list.forEach(a => { const c = settleCalc(a); o.n++; if (feeEligible(a)) o.days += settleNum(a.AuditDays); o.fee += c.fee; o.costs += c.costs; o.total += c.total; });
     ["days", "fee", "costs", "total"].forEach(k => o[k] = r2(o[k]));
     return o;
   }
@@ -5093,7 +5098,7 @@ const DashboardModule = (function () {
     const by = {}; FinanceModule.CATS.forEach(c => by[c] = FinanceModule.agg(rows.filter(a => FinanceModule.catOf(a) === c)));
     const all = FinanceModule.agg(rows); const sum = all.fee || 1;
     const kpi = (c, label) => `<div class="fin-kpi ${c}"><span class="k-label">${label}</span><span class="k-val">${fmtPLN(by[c].fee)}</span><span class="k-sub">${by[c].n} poz. · ${by[c].days} dni</span></div>`;
-    const bodies = BODY_KEYS.map(k => { const its = rows.filter(a => bodyKey(a) === k && !isMeeting(a)); if (!its.length) return ""; const done = its.filter(a => a.AuditStatus === "DONE" || ["Rozliczony", "Wysłany do CU"].includes(settleStatusOf(a))); return `<span>${BODY_INFO[k].label}: <b>${done.reduce((s2, a) => s2 + settleNum(a.AuditDays), 0)}</b> / ${its.reduce((s2, a) => s2 + settleNum(a.AuditDays), 0)} dni</span>`; }).join("");
+    const bodies = BODY_KEYS.map(k => { const its = rows.filter(a => bodyKey(a) === k && feeEligible(a)); if (!its.length) return ""; const done = its.filter(a => a.AuditStatus === "DONE" || ["Rozliczony", "Wysłany do CU"].includes(settleStatusOf(a))); return `<span>${BODY_INFO[k].label}: <b>${done.reduce((s2, a) => s2 + settleNum(a.AuditDays), 0)}</b> / ${its.reduce((s2, a) => s2 + settleNum(a.AuditDays), 0)} dni</span>`; }).join("");
     box.innerHTML = kpi("done", "Rozliczone") + kpi("sent", "Wysłane") + kpi("open", "Do rozliczenia") + kpi("plan", "Prognoza") + (by.late.n ? kpi("late", "Zaległe") : "") +
       `<div class="dash-bar"><div class="b-head"><span>Wynagrodzenie ${y}: wykonane vs plan</span><b>${fmtPLN(all.fee)}</b></div>
        <div class="b-track">${FinanceModule.CATS.map(c => `<i class="fin-sw ${c}" style="width:${(by[c].fee / sum * 100).toFixed(1)}%;border-radius:0"></i>`).join("")}</div>
