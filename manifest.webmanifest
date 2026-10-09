@@ -1,7 +1,7 @@
 {
- "name": "LF Assurance Audit System",
- "short_name": "Audit System",
- "description": "Planowanie i rozliczanie audytów — LF Assurance",
+ "name": "LFA CRM System",
+ "short_name": "LFA CRM",
+ "description": "LFA CRM System — planowanie i rozliczanie audytów LF Assurance",
  "start_url": "/",
  "scope": "/",
  "display": "standalone",

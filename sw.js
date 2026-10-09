@@ -1,4 +1,4 @@
-// Service worker — LF Assurance Audit System (PWA)
+// Service worker — LFA CRM System (PWA)
 // Strategia: pliki aplikacji = sieć najpierw (świeży kod po każdym deployu), cache jako fallback offline;
 // biblioteki/fonty/ikony = cache najpierw. Zapytania do SharePoint/Graph/logowania/kafli mapy NIE są przechwytywane.
 const VERSION = "lfa-v1";

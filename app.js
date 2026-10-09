@@ -1306,7 +1306,7 @@ async function createAuditCalendarEvents(audit) {
     `Termin: ${rangeLabel}${days > 1 ? ` (${days} dni)` : ""}`,
     `Adres: ${loc || "—"}`,
     ``,
-    `Zaplanowano przez LF Assurance Audit System`,
+    `Zaplanowano przez LFA CRM System`,
   ].join("\n");
 
   const event = {
@@ -2750,7 +2750,7 @@ async function generatePdfRzeznik() {
       doc.line(14, 283, 196, 283);
       doc.setFontSize(6.5); doc.setFont(F, "normal");
       doc.setTextColor(...S500);
-      doc.text("LF Assurance Audit System  ·  Dokument poufny  ·  " + dateStr, 14, 288.5);
+      doc.text("LFA CRM System  ·  Dokument poufny  ·  " + dateStr, 14, 288.5);
       doc.text(pageNum + " / " + totalPages, 196, 288.5, { align: "right" });
     }
 
@@ -4469,7 +4469,7 @@ const SettleModule = (function () {
       doc.setDrawColor(...LINE); doc.setLineWidth(0.2); doc.line(MX, H - 13, W - MX, H - 13);
       doc.setFont(F, "normal"); doc.setFontSize(6.3); doc.setTextColor(...MUTED);
       doc.text(LF_COMPANY, MX, H - 9);
-      doc.text("Wygenerowano z LF Assurance Audit System · " + issued + " · strona " + p + " / " + pages, W - MX, H - 9, { align: "right" }); }
+      doc.text("Wygenerowano z LFA CRM System · " + issued + " · strona " + p + " / " + pages, W - MX, H - 9, { align: "right" }); }
     return { doc, fee, costs, filename: "Raport_rozliczenia_" + bd.short + "_" + month + (layout === "A" ? "_zestawienie" : "_do_faktury") + ".pdf" };
   }
 
@@ -5217,13 +5217,13 @@ const DelegModule = (function () {
       BODY_KEYS.forEach(bk => { const r = rows.filter(a => bodyKey(a) === bk); if (r.length) line("Dni delegacji — " + BODY_INFO[bk].full, String(r.reduce((s2, a) => s2 + totalDays(a), 0)), false); });
       line("Razem dni delegacji", String(days), true); doc.setDrawColor(...LINE); doc.setLineWidth(0.2); doc.rect(bx, y, bw, yl - y, "S");
       doc.setFont(F, "normal"); doc.setFontSize(7.2); doc.setTextColor(...MUTED);
-      const notes = ["Zasada liczenia: dni delegacji = dni trwania audytu u klienta (data audytu LF + liczba dni, zaokrąglone w górę) + dni dojazdu wpisane w audycie. Źródło: LF Assurance Audit System, lista Audits."]
+      const notes = ["Zasada liczenia: dni delegacji = dni trwania audytu u klienta (data audytu LF + liczba dni, zaokrąglone w górę) + dni dojazdu wpisane w audycie. Źródło: LFA CRM System, lista Audits."]
         .concat(skipped.length ? ["Pominięte (nie są delegacją): " + skipped.map(a => (a.Title || "") + ", " + fmtD(startOf(a)) + ", " + (a.AuditMode === "Online" ? "Online" : a.City || "Warszawa")).join("; ") + "."] : []);
       let ny = y + 4; notes.forEach(t => { const ls = doc.splitTextToSize(t, bx - MX - 10); doc.text(ls, MX, ny); ny += ls.length * 3.4 + 1.5; });
       const sy = Math.max(yl, ny) + 20; doc.setDrawColor(...INK); doc.setLineWidth(0.2); doc.line(MX, sy, MX + 78, sy); doc.setFontSize(6.5); doc.setTextColor(...MUTED); doc.text("SPORZĄDZIŁ · " + auditor.toUpperCase(), MX, sy + 3.6);
       const pages = doc.internal.getNumberOfPages();
       for (let p2 = 1; p2 <= pages; p2++) { doc.setPage(p2); doc.setDrawColor(...LINE); doc.setLineWidth(0.2); doc.line(MX, H - 13, W - MX, H - 13); doc.setFont(F, "normal"); doc.setFontSize(6.3); doc.setTextColor(...MUTED);
-        doc.text("LF Assurance · Gocławska 9B/7, 03-810 Warszawa · NIP 9182077986 · REGON 527791960", MX, H - 9); doc.text("Wygenerowano z LF Assurance Audit System · " + issued + " · strona " + p2 + " / " + pages, W - MX, H - 9, { align: "right" }); }
+        doc.text("LF Assurance · Gocławska 9B/7, 03-810 Warszawa · NIP 9182077986 · REGON 527791960", MX, H - 9); doc.text("Wygenerowano z LFA CRM System · " + issued + " · strona " + p2 + " / " + pages, W - MX, H - 9, { align: "right" }); }
       await saveBlobFile(doc.output("blob"), "Delegacje_" + P.nr.replace("/", "-") + (scope === "done" ? "" : "_" + scope) + ".pdf");
       showToast("⬇ Zestawienie delegacji gotowe (" + rows.length + " wyjazdów, " + days + " dni)", "success");
     } catch (e) { console.error(e); showToast("Nie udało się wygenerować PDF: " + String(e.message || e).substring(0, 90), "error"); }
