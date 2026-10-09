@@ -1157,7 +1157,8 @@ async function saveChanges() {
     await cancelIfRejected(currentAudit, statusBefore);
     // Zmiana daty audytu → pytanie o przeniesienie wydarzenia w Outlooku (stare odwołujemy, nowe tworzymy, chyba że kliknięto „Zaplanuj audyt”)
     const dateAfter = currentAudit.AuditDateStart ? String(currentAudit.AuditDateStart).substring(0, 10) : "";
-    if (editMode && dateBefore && dateBefore !== dateAfter && statusBefore !== "REJECTED" && currentAudit.AuditStatus !== "REJECTED") {
+    const wasEditMode = document.getElementById("modal-overlay").classList.contains("edit-mode");
+    if (wasEditMode && dateBefore && dateBefore !== dateAfter && statusBefore !== "REJECTED" && currentAudit.AuditStatus !== "REJECTED") {
       const q = dateAfter
         ? `Data audytu zmieniona z ${formatDate(dateBefore)} na ${formatDate(dateAfter)}.\n\nPrzenieść też wydarzenie w Outlooku? (stare zostanie odwołane${planAuditRequested ? "" : ", nowe zaproszenie wysłane"})`
         : `Data audytu usunięta (było ${formatDate(dateBefore)}).\n\nOdwołać wydarzenie w Outlooku?`;
