@@ -5251,10 +5251,10 @@ const DelegModule = (function () {
     const parse = v => { const m = String(v || "").match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/); return m ? [m[1], m[2]] : null; };
     return { depart: parse(a.DelegDepart) || dep, ret: parse(a.DelegReturn) || ret, place: "Warszawa", dest, purpose, transport: settleNum(a.SettleKm) > 0 || !a.SettleTickets ? "samochód osobowy" : "pociąg" };
   }
-  function nextNo(k) { // OD/RRRR/MM/nnn — kolejny numer w miesiącu wyjazdu
-    const pre = "OD/" + k.substring(0, 4) + "/" + k.substring(5, 7) + "/";
-    const used = (allAudits || []).map(a => String(a.DelegNo || "")).filter(n => n.startsWith(pre)).map(n => parseInt(n.substring(pre.length)) || 0);
-    return pre + pad(Math.max(0, ...used) + 1).padStart(3, "0");
+  function nextNo(k) { // DEL/nnn/MM/RRRR (format księgowości, Michał 2026-10-09) — kolejny numer w miesiącu wyjazdu
+    const suf = "/" + k.substring(5, 7) + "/" + k.substring(0, 4);
+    const used = (allAudits || []).map(a => String(a.DelegNo || "")).filter(n => n.startsWith("DEL/") && n.endsWith(suf)).map(n => parseInt(n.split("/")[1]) || 0);
+    return "DEL/" + String(Math.max(0, ...used) + 1).padStart(3, "0") + suf;
   }
   let stmtAudit = null;
   function openStatement(a) {
