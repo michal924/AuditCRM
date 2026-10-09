@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300" font-family="Archivo, Arial, sans-serif">
+  <!-- Pieczęć imienna — Michał Rzeźnik, LF Assurance; kolor tuszu bordo -->
+  <text x="600" y="110" text-anchor="middle" fill="#6E1F2C" font-size="92" font-weight="700" letter-spacing="4">MICHAŁ RZEŹNIK</text>
+  <line x1="120" y1="160" x2="1080" y2="160" stroke="#6E1F2C" stroke-width="5"/>
+  <text x="600" y="240" text-anchor="middle" fill="#6E1F2C" font-size="58" font-weight="600" letter-spacing="6">LF ASSURANCE</text>
+</svg>
