@@ -1150,9 +1150,11 @@ async function saveChanges() {
       }
     }
 
+    const statusBefore = currentAudit.AuditStatus;
     await updateAudit(currentAudit.Id, fields);
     Object.assign(currentAudit, fields);
     renderTable();
+    await cancelIfRejected(currentAudit, statusBefore);
 
     // ── Integracja kalendarza: gdy użytkownik kliknął "Zaplanuj audyt" (niezależnie od statusu końcowego) ──
     if (planAuditRequested && currentAudit.AuditDateStart) {
@@ -1182,6 +1184,33 @@ async function saveChanges() {
 // ============================================================
 // INTEGRACJA MICROSOFT CALENDAR (Graph API)
 // ============================================================
+// Odwołanie wydarzeń audytu w Outlooku (po zmianie statusu na REJECTED): szukamy w dniach audytu wydarzeń
+// z tytułem zawierającym „Audyt” i nazwę klienta, usuwamy je — jako organizator wysyłamy odwołanie do office@.
+async function cancelAuditCalendarEvents(audit) {
+  if (!audit || !audit.AuditDateStart) return 0;
+  const token = await getGraphToken();
+  const dateStr = String(audit.AuditDateStart).substring(0, 10);
+  const days = Math.max(1, Math.ceil(parseFloat(audit.AuditDays) || 1));
+  const s = new Date(dateStr + "T00:00:00"), e = new Date(dateStr + "T00:00:00"); e.setDate(e.getDate() + days + 1);
+  const url = `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${s.toISOString()}&endDateTime=${e.toISOString()}&$select=id,subject,isOrganizer&$top=100`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Prefer: 'outlook.timezone="Europe/Warsaw"' } });
+  if (!r.ok) throw new Error(`Graph ${r.status}`);
+  const title = String(audit.Title || "").trim().toLowerCase();
+  const hits = ((await r.json()).value || []).filter(ev => { const sub = String(ev.subject || "").toLowerCase(); return title && sub.includes(title) && /audyt/.test(sub); });
+  let n = 0;
+  for (const ev of hits) {
+    const d = await fetch(`https://graph.microsoft.com/v1.0/me/events/${ev.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    if (d.ok || d.status === 404) n++; else console.warn("[Calendar] nie usunięto", ev.subject, d.status);
+  }
+  try { SideCalModule.refresh(); } catch {}
+  return n;
+}
+async function cancelIfRejected(audit, prevStatus) {
+  if (audit.AuditStatus !== "REJECTED" || prevStatus === "REJECTED") return;
+  try { const n = await cancelAuditCalendarEvents(audit); if (n) showToast(`📅 Odwołano ${n} ${n === 1 ? "wydarzenie" : "wydarzenia"} w Outlooku (${audit.Title || ""})`, "success"); }
+  catch (e) { showToast("⚠️ Audyt odwołany, ale nie udało się usunąć wydarzenia z Outlooka: " + String(e.message || e).substring(0, 80), "warn"); }
+}
+
 async function createCalendarEvent(audit) {
   const token = await getGraphToken();
   const dateStr  = audit.AuditDateStart.substring(0, 10);
@@ -3653,7 +3682,7 @@ const AuditCalModule = (function () {
     const map = {};
     const list = (typeof allAudits !== "undefined" && Array.isArray(allAudits)) ? allAudits : [];
     list.forEach(a => {
-      if (a.AuditorName !== MY_AUDITOR || !a.AuditDateStart) return;
+      if (a.AuditorName !== MY_AUDITOR || !a.AuditDateStart || a.AuditStatus === "REJECTED") return;   // odwołany audyt zwalnia dzień
       const start = new Date(String(a.AuditDateStart).substring(0,10) + "T12:00:00");
       const n = ceilDays(a);
       for (let i = 0; i < n; i++) (map[keyOf(addDays(start, i))] ||= []).push({ a, cont: i > 0 });
@@ -3954,7 +3983,7 @@ const SideCalModule = (function () {
 
   function dayMap(){
     const map = {}; const list = (typeof allAudits!=="undefined" && Array.isArray(allAudits)) ? allAudits : [];
-    list.forEach(a => { if (a.AuditorName!==MY_AUDITOR || !a.AuditDateStart) return;
+    list.forEach(a => { if (a.AuditorName!==MY_AUDITOR || !a.AuditDateStart || a.AuditStatus==="REJECTED") return;
       const start = new Date(String(a.AuditDateStart).substring(0,10)+"T12:00:00"); const n = ceilDays(a);
       for (let i=0;i<n;i++) (map[keyOf(addDays(start,i))] ||= []).push(a); });
     return map;
@@ -4923,7 +4952,7 @@ const FinanceModule = (function () {
         <span class="fin-late-actions"><button class="btn-ghost sm" data-act="DONE" data-id="${a.Id}">✓ DONE</button><button class="btn-ghost sm danger" data-act="REJECTED" data-id="${a.Id}">REJECTED</button></span></div>`).join("");
     box.querySelectorAll(".fin-list-row .t, .fin-list-row .d").forEach(el => el.onclick = () => openModal(parseInt(el.parentElement.dataset.id)));
     box.querySelectorAll("button[data-act]").forEach(b => b.onclick = async e => { e.stopPropagation(); const id = parseInt(b.dataset.id), a = (allAudits || []).find(x => x.Id === id); if (!a) return;
-      b.disabled = true; try { await updateAudit(id, { AuditStatus: b.dataset.act }); a.AuditStatus = b.dataset.act; showToast((a.Title || "") + " → " + b.dataset.act, "success"); render(); if (typeof renderTable === "function") renderTable(); }
+      b.disabled = true; try { const prev = a.AuditStatus; await updateAudit(id, { AuditStatus: b.dataset.act }); a.AuditStatus = b.dataset.act; showToast((a.Title || "") + " → " + b.dataset.act, "success"); render(); if (typeof renderTable === "function") renderTable(); await cancelIfRejected(a, prev); }
       catch (err) { b.disabled = false; showToast("Nie udało się zmienić statusu: " + (err.message || err), "error"); } });
   }
   function renderMonthList(all) {
