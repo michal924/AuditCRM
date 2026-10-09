@@ -4920,10 +4920,13 @@ const FinanceModule = (function () {
   function renderKpis(all) {
     const box = $("fin-kpis"); if (!box) return;
     const by = {}; CATS.forEach(c => by[c] = agg(all.filter(a => catOf(a) === c)));
-    const kpi = (c, label, sub) => { const o = by[c]; return `<div class="fin-kpi ${c}"><span class="k-label">${label}</span><span class="k-val">${money(o.fee)}</span><span class="k-sub">${o.n} audytów · ${dni(o.days)} · koszty ${money(o.costs)}${sub ? " · " + sub : ""}</span></div>`; };
-    const yearAll = agg(all);
+    // Podział wg zleceniodawcy w podtytule (gdy widok „Wszyscy”): „CU 4 172 · SGS 1 840” — żeby suma nie myliła (Michał 2026-10-09)
+    const split = (list, key) => body !== "all" ? "" : BODY_KEYS.map(k => { const o = agg(list.filter(a => bodyKey(a) === k)); return o.n ? BODY_INFO[k].short + " " + money(o[key]).replace(" zł", "") : ""; }).filter(Boolean).join(" · ");
+    const kpi = (c, label) => { const o = by[c]; const its = all.filter(a => catOf(a) === c); const sf = split(its, "fee"), sc = split(its, "costs");
+      return `<div class="fin-kpi ${c}"><span class="k-label">${label}</span><span class="k-val">${money(o.fee)}</span><span class="k-sub">${sf ? sf + " · " : ""}${o.n} audytów · ${dni(o.days)}<br>koszty ${money(o.costs)}${sc ? " (" + sc + ")" : ""}</span></div>`; };
+    const yearAll = agg(all); const sfA = split(all, "fee"), scA = split(all, "costs");
     box.innerHTML = kpi("plan", "Prognoza (SCHEDULED)") + kpi("tent", "Wstępnie (PLANNED)") + kpi("open", "Do rozliczenia") + kpi("sent", "Wysłane do zleceniodawcy") + kpi("done", "Rozliczone") + (by.late.n ? kpi("late", "Zaległe — brak statusu DONE") : "") +
-      `<div class="fin-kpi"><span class="k-label">Razem (${escHtml(yearLabel())})</span><span class="k-val">${money(yearAll.fee)}</span><span class="k-sub">${yearAll.n} pozycji · ${dni(yearAll.days)} · koszty ${money(yearAll.costs)} · z kosztami ${money(yearAll.total)}</span></div>`;
+      `<div class="fin-kpi"><span class="k-label">Razem (${escHtml(yearLabel())})</span><span class="k-val">${money(yearAll.fee)}</span><span class="k-sub">${sfA ? sfA + " · " : ""}${yearAll.n} pozycji · ${dni(yearAll.days)}<br>koszty ${money(yearAll.costs)}${scA ? " (" + scA + ")" : ""} · z kosztami ${money(yearAll.total)}</span></div>`;
   }
   function monthData(all) {
     return Array.from({ length: 12 }, (_, m) => { const inM = all.filter(a => parseInt(String(dateOf(a)).substring(5, 7)) - 1 === m);
