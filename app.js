@@ -1150,11 +1150,25 @@ async function saveChanges() {
       }
     }
 
-    const statusBefore = currentAudit.AuditStatus;
+    const statusBefore = currentAudit.AuditStatus, dateBefore = originalAuditDate || "";
     await updateAudit(currentAudit.Id, fields);
     Object.assign(currentAudit, fields);
     renderTable();
     await cancelIfRejected(currentAudit, statusBefore);
+    // Zmiana daty audytu → pytanie o przeniesienie wydarzenia w Outlooku (stare odwołujemy, nowe tworzymy, chyba że kliknięto „Zaplanuj audyt”)
+    const dateAfter = currentAudit.AuditDateStart ? String(currentAudit.AuditDateStart).substring(0, 10) : "";
+    if (editMode && dateBefore && dateBefore !== dateAfter && statusBefore !== "REJECTED" && currentAudit.AuditStatus !== "REJECTED") {
+      const q = dateAfter
+        ? `Data audytu zmieniona z ${formatDate(dateBefore)} na ${formatDate(dateAfter)}.\n\nPrzenieść też wydarzenie w Outlooku? (stare zostanie odwołane${planAuditRequested ? "" : ", nowe zaproszenie wysłane"})`
+        : `Data audytu usunięta (było ${formatDate(dateBefore)}).\n\nOdwołać wydarzenie w Outlooku?`;
+      if (confirm(q)) {
+        try {
+          const n = await cancelAuditCalendarEvents(Object.assign({}, currentAudit, { AuditDateStart: dateBefore }));
+          if (dateAfter && !planAuditRequested) { await createAuditCalendarEvents(currentAudit); showToast(`📅 Przeniesiono: odwołano ${n}, wysłano nowe zaproszenie na ${formatDate(dateAfter)}`, "success"); }
+          else showToast(`📅 Odwołano ${n} ${n === 1 ? "wydarzenie" : "wydarzenia"} z ${formatDate(dateBefore)}`, "success");
+        } catch (e) { showToast("⚠️ Zapisano, ale Outlook: " + String(e.message || e).substring(0, 80), "warn"); }
+      }
+    }
 
     // ── Integracja kalendarza: gdy użytkownik kliknął "Zaplanuj audyt" (niezależnie od statusu końcowego) ──
     if (planAuditRequested && currentAudit.AuditDateStart) {
