@@ -151,6 +151,7 @@ async function init() {
   FinanceModule.setup();
   DashboardModule.setup();
   DelegModule.setup();
+  ClientsModule.setup();
 
   await loadAudits();
   try { DashboardModule.render(); } catch (e) { console.warn("Pulpit:", e); }
@@ -175,6 +176,7 @@ function setupNav() {
       if (view === "kalendarz")  AuditCalModule.render();
       if (view === "finanse")    { FinanceModule.render(); DelegModule.render(); }
       if (view === "pulpit")     DashboardModule.render();
+      if (view === "klienci")    ClientsModule.render();
     };
   });
 }
@@ -200,6 +202,7 @@ async function loadAudits() {
     renderTable();
     try { SideCalModule.render(); } catch {}
     migrateInvoiceStatus();
+    try { ClientsModule.load(); } catch {}
     try { if (!document.getElementById("view-pulpit").classList.contains("hidden")) DashboardModule.render(); } catch {}
   } catch (e) {
     document.getElementById("audits-tbody").innerHTML =
@@ -5145,6 +5148,261 @@ const TestEnvModule = (function () {
   return { init };
 })();
 window.TestEnvModule = TestEnvModule;
+
+// ============================================================
+// MODUŁ: KLIENCI — karta klienta (LFA Hub, etap 1). Lista Clients + ClientId w audytach.
+// Klient = rekord z danymi stałymi; audyty z obu jednostek (CU, SGS, LF) w jednej liście, certyfikaty i terminy wyliczane z audytów.
+// Dopasowanie audytu: ClientId (trwałe) albo, gdy brak, znormalizowana nazwa (nazwa lub „inne zapisy”).
+// ============================================================
+const ClientsModule = (function () {
+  const $ = id => document.getElementById(id);
+  let clients = [], sel = null, q = "", proposal = null, loaded = false;
+  const DAY = 864e5;
+
+  // Klucz porównawczy nazwy: bez wielkości liter, polskich znaków, interpunkcji i form prawnych
+  function norm(s) {
+    let t = " " + String(s || "").toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim() + " ";
+    const forms = [" sp z o o ", " sp z oo ", " spolka z ograniczona odpowiedzialnoscia ", " spolka akcyjna ", " spolka komandytowa ", " spolka jawna ",
+                   " sp k ", " sp j ", " s a ", " sa ", " gmbh ", " ltd ", " bv ", " sp zoo "];
+    let prev; do { prev = t; forms.forEach(f => { t = t.split(f).join(" "); }); } while (t !== prev);
+    return t.replace(/\s+/g, " ").trim();
+  }
+  function keysOf(c) {
+    const ks = new Set([norm(c.Title)]);
+    String(c.Aliases || "").split(/[\n;]+/).forEach(x => { const k = norm(x); if (k) ks.add(k); });
+    ks.delete(""); return ks;
+  }
+  function keyIndex() { const m = new Map(); clients.forEach(c => keysOf(c).forEach(k => { if (!m.has(k)) m.set(k, c.Id); })); return m; }
+  function clientIdOf(a, idx) {
+    if (a.ClientId != null && clients.some(c => c.Id === a.ClientId)) return a.ClientId;
+    const k = norm(a.Title); return k && idx.has(k) ? idx.get(k) : null;
+  }
+  function groupAudits() {
+    const idx = keyIndex(), by = new Map();
+    (allAudits || []).forEach(a => { const id = clientIdOf(a, idx); if (id == null) return; if (!by.has(id)) by.set(id, []); by.get(id).push(a); });
+    return by;
+  }
+  const dKey = a => String(a.AuditDateStart || "").slice(0, 10);
+  const todayKey = () => new Date().toISOString().slice(0, 10);
+  const BODY_SHORT = { CUC: "CU", SGS: "SGS", LF: "LF" };
+
+  // ── ładowanie ──
+  async function load() {
+    if (!window.CLIENTS_ENABLED) return;
+    clients = await fetchClients();
+    const map = await fetchAuditClientIds();
+    (allAudits || []).forEach(a => { if (map[a.Id] != null) a.ClientId = map[a.Id]; });
+    loaded = true;
+    if (!$("view-klienci").classList.contains("hidden")) render();
+    try { DashboardModule.render(); } catch {}
+  }
+
+  // ── lista ──
+  function renderList(by) {
+    const box = $("cl-list"); if (!box) return;
+    const nq = norm(q), raw = q.trim().toLowerCase();
+    let rows = clients.filter(c => !raw || norm(c.Title).includes(nq) || (c.City || "").toLowerCase().includes(raw) || (c.NIP || "").includes(raw) ||
+      Array.from(keysOf(c)).some(k => k.includes(nq)));
+    rows.sort((a, b) => String(a.Title || "").localeCompare(String(b.Title || ""), "pl"));
+    $("cl-count").textContent = rows.length + (rows.length === clients.length ? "" : " / " + clients.length);
+    box.innerHTML = rows.map(c => {
+      const au = by.get(c.Id) || [];
+      const bodies = Array.from(new Set(au.map(a => BODY_SHORT[bodyKey(a)]))).join(" · ");
+      const exp = certRows(au).some(r => r.left != null && r.left < 90);
+      return `<button class="cl-item${c.Id === sel ? " active" : ""}" data-id="${c.Id}">
+        <span class="cl-name">${escHtml(c.Title || "—")}${exp ? ' <i class="cl-warn" title="Certyfikat wygasa w ciągu 90 dni">!</i>' : ""}</span>
+        <span class="cl-sub">${escHtml(c.City || "")}${c.City && au.length ? " · " : ""}${au.length ? au.length + " audyt" + (au.length === 1 ? "" : au.length < 5 ? "y" : "ów") : "bez audytów"}${bodies ? " · " + bodies : ""}</span></button>`;
+    }).join("") || '<div class="cl-empty">Brak klientów. Użyj „Wyodrębnij klientów z audytów”.</div>';
+    box.querySelectorAll(".cl-item").forEach(b => b.onclick = () => { sel = parseInt(b.dataset.id); proposal = null; render(); });
+  }
+
+  // certyfikaty z audytów klienta: dla każdego programu najpóźniejszy CertValidTo
+  function certRows(au) {
+    const m = new Map();
+    au.forEach(a => {
+      if (!a.CertValidTo) return;
+      const progs = programsOf ? programsOf(a) : [a.Program];
+      (progs && progs.length ? progs : [a.Program || "—"]).forEach(p => {
+        const cur = m.get(p), v = String(a.CertValidTo).slice(0, 10);
+        if (!cur || v > cur.valid) m.set(p, { prog: p, valid: v });
+      });
+    });
+    const t = new Date(todayKey() + "T12:00:00");
+    return Array.from(m.values()).map(r => ({ ...r, left: Math.ceil((new Date(r.valid + "T12:00:00") - t) / DAY) }))
+      .sort((a, b) => a.valid.localeCompare(b.valid));
+  }
+
+  // ── karta ──
+  function renderCard(by) {
+    const box = $("cl-card"); if (!box) return;
+    const c = clients.find(x => x.Id === sel);
+    if (!c) { box.innerHTML = '<div class="cl-empty">Wybierz klienta z listy.</div>'; return; }
+    const au = (by.get(c.Id) || []).slice().sort((a, b) => dKey(b).localeCompare(dKey(a)));
+    const t = todayKey();
+    const done = au.filter(a => a.AuditStatus === "DONE");
+    const next = au.filter(a => dKey(a) >= t && a.AuditStatus !== "DONE" && a.AuditStatus !== "REJECTED").sort((a, b) => dKey(a).localeCompare(dKey(b)))[0];
+    const last = done[0];
+    const certs = certRows(au);
+    const days = au.reduce((s, a) => s + (parseFloat(a.AuditDays) || 0), 0);
+    const kpi = (l, v, s) => `<div class="fin-kpi"><span class="k-label">${l}</span><span class="k-val">${v}</span><span class="k-sub">${s || "&nbsp;"}</span></div>`;
+    const inp = (n, l, wide) => `<label class="cl-f${wide ? " wide" : ""}"><span>${l}</span><input id="cl-f-${n}" value="${escHtml(c[n] || "")}"></label>`;
+    const area = (n, l) => `<label class="cl-f wide"><span>${l}</span><textarea id="cl-f-${n}" rows="2">${escHtml(c[n] || "")}</textarea></label>`;
+    box.innerHTML = `
+      <div class="cl-head"><h3>${escHtml(c.Title || "—")}</h3>
+        <span class="cl-head-sub">${Array.from(new Set(au.map(a => bodyLabel(a)))).join(" · ") || "brak audytów"}</span></div>
+      <div class="fin-kpis cl-kpis">
+        ${kpi("Audyty", au.length, days ? (Math.round(days * 100) / 100) + " dni łącznie" : "")}
+        ${kpi("Ostatni audyt", last ? formatDate(last.AuditDateStart) : "—", last ? escHtml(bodyLabel(last) + " · " + (last.Program || "")) : "")}
+        ${kpi("Następny", next ? formatDate(next.AuditDateStart) : "—", next ? escHtml(bodyLabel(next) + " · " + statusLabel(next.AuditStatus)) : "brak zaplanowanego")}
+        ${kpi("Najbliższy certyfikat", certs[0] ? formatDate(certs[0].valid) : "—", certs[0] ? escHtml(certs[0].prog) + (certs[0].left < 0 ? " · wygasł" : " · za " + certs[0].left + " dni") : "")}
+      </div>
+      <div class="cl-section"><h4>Dane klienta</h4>
+        <div class="cl-form">
+          ${inp("Title", "Nazwa", true)}${inp("NIP", "NIP")}${inp("CertCodes", "Kody certyfikatów (FSC/PEFC)")}
+          ${inp("Address", "Adres siedziby", true)}${inp("PostalCode", "Kod pocztowy")}${inp("City", "Miasto")}
+          ${area("SiteAddress", "Adres zakładu / miejsca audytu (jeśli inny niż siedziba)")}
+          ${inp("ContactPerson", "Osoba kontaktowa")}${inp("ClientEmail", "E-mail")}${inp("Phone", "Telefon")}
+          ${area("Aliases", "Inne zapisy nazwy w audytach (po jednym w wierszu) — służą do dopasowania audytów")}
+          ${area("Notes", "Notatki")}
+        </div>
+        <div class="cl-actions"><button id="cl-save" class="btn-action">Zapisz dane klienta</button><span id="cl-save-msg" class="fin-hint"></span></div>
+      </div>
+      <div class="cl-section"><h4>Certyfikaty i terminy</h4>
+        ${certs.length ? `<table class="cl-table"><thead><tr><th>Program</th><th>Ważny do</th><th class="num">Pozostało</th></tr></thead><tbody>` +
+          certs.map(r => `<tr><td>${escHtml(r.prog)}</td><td>${formatDate(r.valid)}</td><td class="num ${r.left < 0 ? "cl-bad" : r.left < 90 ? "cl-soon" : ""}">${r.left < 0 ? "wygasł " + (-r.left) + " dni temu" : r.left + " dni"}</td></tr>`).join("") + `</tbody></table>`
+          : '<div class="cl-empty">Brak dat ważności certyfikatów w audytach tego klienta (pole „Cert valid to”).</div>'}
+      </div>
+      <div class="cl-section"><h4>Audyty (wszystkie jednostki)</h4>
+        ${au.length ? `<table class="cl-table cl-audits"><thead><tr><th>Data</th><th>Jednostka</th><th>Program</th><th>Typ</th><th>Status</th><th>Audytor</th><th class="num">Dni</th></tr></thead><tbody>` +
+          au.map(a => `<tr class="m row-body-${bodyCls(a)}" data-id="${a.Id}"><td>${formatDate(a.AuditDateStart)}</td><td>${escHtml(bodyLabel(a))}</td><td>${escHtml(a.Program || "")}</td>
+            <td>${escHtml(isMeeting(a) ? kindOf(a) : shortType(a.AuditType))}</td><td>${escHtml(statusLabel(a.AuditStatus))}</td><td>${escHtml(a.AuditorName || "")}</td><td class="num">${escHtml(a.AuditDays != null ? String(a.AuditDays) : "")}</td></tr>`).join("") + `</tbody></table>`
+          : '<div class="cl-empty">Brak audytów przypisanych do tego klienta.</div>'}
+      </div>
+      <div class="cl-section cl-docs"><h4>Dokumenty</h4>
+        <div class="cl-empty">Foldery audytów z SharePoint (witryny jednostek) pojawią się tutaj po etapie migracji dokumentów.</div>
+      </div>`;
+    box.querySelectorAll("tr.m").forEach(tr => tr.onclick = () => openModal(parseInt(tr.dataset.id)));
+    $("cl-save").onclick = save;
+  }
+
+  async function save() {
+    const c = clients.find(x => x.Id === sel); if (!c) return;
+    const f = {}; CLIENT_FIELDS.map(x => x.name).concat(["Title"]).forEach(n => { const el = $("cl-f-" + n); if (el) f[n] = el.value.trim(); });
+    if (!f.Title) { showToast("Nazwa klienta nie może być pusta", "error"); return; }
+    const btn = $("cl-save"), msg = $("cl-save-msg"); btn.disabled = true;
+    try { await updateClient(c.Id, f); Object.assign(c, f); msg.textContent = "Zapisano"; showToast("Zapisano: " + f.Title, "success"); render(); }
+    catch (e) { btn.disabled = false; msg.textContent = "Błąd: " + (e.message || e); showToast("Nie zapisano: " + (e.message || e), "error"); }
+  }
+
+  // ── wyodrębnianie klientów z audytów (do akceptacji) ──
+  function buildProposal() {
+    const idx = keyIndex(), groups = new Map();
+    (allAudits || []).forEach(a => {
+      const k = norm(a.Title); if (!k) return;
+      if (!groups.has(k)) groups.set(k, { key: k, audits: [], names: new Map() });
+      const g = groups.get(k); g.audits.push(a); g.names.set(a.Title.trim(), (g.names.get(a.Title.trim()) || 0) + 1);
+    });
+    const out = [];
+    groups.forEach(g => {
+      const names = Array.from(g.names.entries()).sort((x, y) => y[1] - x[1] || y[0].length - x[0].length).map(e => e[0]);
+      const ordered = g.audits.slice().sort((a, b) => dKey(b).localeCompare(dKey(a)));
+      const pick = n => { const a = ordered.find(x => x[n]); return a ? String(a[n]).trim() : ""; };
+      const existingId = idx.has(g.key) ? idx.get(g.key) : null;
+      const toLink = g.audits.filter(a => existingId == null ? true : a.ClientId !== existingId);
+      if (existingId != null && !toLink.length) return;                      // nic do zrobienia
+      const onlyMeetings = g.audits.every(a => isMeeting(a));
+      out.push({ key: g.key, name: names[0], variants: names.slice(1), existingId, audits: g.audits, toLink,
+        bodies: Array.from(new Set(g.audits.map(a => BODY_SHORT[bodyKey(a)]))),
+        fields: { Title: names[0], Address: pick("Address"), PostalCode: pick("PostalCode"), City: pick("City"), ClientEmail: pick("ClientEmail"), Phone: pick("Phone") || pick("Mobile") },
+        include: !onlyMeetings, onlyMeetings });
+    });
+    out.sort((a, b) => (b.existingId == null) - (a.existingId == null) || b.audits.length - a.audits.length || a.name.localeCompare(b.name, "pl"));
+    return out;
+  }
+  function renderProposal() {
+    const box = $("cl-card");
+    const nNew = proposal.filter(p => p.include && p.existingId == null).length, nLink = proposal.filter(p => p.include).reduce((s, p) => s + p.toLink.length, 0);
+    box.innerHTML = `<div class="cl-head"><h3>Wyodrębnianie klientów z audytów</h3><span class="cl-head-sub">Propozycja do akceptacji — nic nie zostało zapisane</span></div>
+      <p class="cl-note">Audyty są grupowane po nazwie (bez wielkości liter, polskich znaków i form „sp. z o.o.”, „S.A.”). Odznacz grupy, które nie są klientami albo które trzeba połączyć ręcznie. Dane adresowe pochodzą z najnowszego audytu grupy.</p>
+      <div class="cl-actions"><button id="cl-apply" class="btn-action">Utwórz ${nNew} klientów i podepnij ${nLink} audytów</button>
+        <button id="cl-cancel" class="btn-ghost">Anuluj</button><span id="cl-prog" class="fin-hint"></span></div>
+      <table class="cl-table cl-prop"><thead><tr><th></th><th>Klient</th><th>Miasto</th><th class="num">Audyty</th><th>Jednostki</th><th>Inne zapisy nazwy</th><th>Akcja</th></tr></thead><tbody>` +
+      proposal.map((p, i) => `<tr><td><input type="checkbox" data-i="${i}" ${p.include ? "checked" : ""}></td><td><b>${escHtml(p.name)}</b>${p.onlyMeetings ? ' <small class="cl-sub">(tylko spotkania/szkolenia)</small>' : ""}</td>
+        <td>${escHtml(p.fields.City)}</td><td class="num">${p.audits.length}</td><td>${p.bodies.join(" · ")}</td><td class="cl-sub">${p.variants.map(escHtml).join("; ")}</td>
+        <td>${p.existingId == null ? "nowy klient" : "dopnij do istniejącego (" + p.toLink.length + ")"}</td></tr>`).join("") + `</tbody></table>`;
+    box.querySelectorAll("input[type=checkbox][data-i]").forEach(cb => cb.onchange = () => { proposal[parseInt(cb.dataset.i)].include = cb.checked; renderProposal(); });
+    $("cl-cancel").onclick = () => { proposal = null; render(); };
+    $("cl-apply").onclick = applyProposal;
+  }
+  async function applyProposal() {
+    const todo = proposal.filter(p => p.include); if (!todo.length) { showToast("Nic nie zaznaczono", "warn"); return; }
+    const prog = $("cl-prog"), btn = $("cl-apply"); btn.disabled = true; $("cl-cancel").disabled = true;
+    let made = 0, linked = 0; const errs = [];
+    try {
+      for (const p of todo) {
+        let id = p.existingId;
+        if (id == null) {
+          const f = {}; Object.keys(p.fields).forEach(k => { if (p.fields[k]) f[k] = p.fields[k]; });
+          if (p.variants.length) f.Aliases = p.variants.join("\n");
+          const r = await addClient(f); id = r.Id; made++;
+          clients.push(Object.assign({ Id: id }, f));
+        } else if (p.variants.length) {                       // istniejący klient: dopisz nowe warianty nazwy
+          const c = clients.find(x => x.Id === id), have = new Set(String(c.Aliases || "").split(/[\n;]+/).map(s => s.trim()).filter(Boolean));
+          const add = p.variants.filter(v => !have.has(v));
+          if (add.length) { const al = Array.from(have).concat(add).join("\n"); await updateClient(id, { Aliases: al }); c.Aliases = al; }
+        }
+        for (let i = 0; i < p.toLink.length; i += 4) {
+          await Promise.all(p.toLink.slice(i, i + 4).map(async a => {
+            try { await updateAudit(a.Id, { ClientId: id }); a.ClientId = id; linked++; }
+            catch (e) { errs.push((a.Title || a.Id) + ": " + e.message); }
+          }));
+          prog.textContent = `Klienci: ${made} · podpięte audyty: ${linked}…`;
+        }
+      }
+    } catch (e) { errs.push(e.message || String(e)); }
+    proposal = null;
+    showToast(`Utworzono ${made} klientów, podpięto ${linked} audytów` + (errs.length ? ` · błędy: ${errs.length}` : ""), errs.length ? "warn" : "success");
+    if (errs.length) console.warn("[Klienci]", errs);
+    render();
+  }
+
+  // ── konfiguracja listy ──
+  async function setupSchema() {
+    const b = $("cl-setup-btn"); b.disabled = true; $("cl-setup-msg").textContent = "Tworzę listę i kolumny…";
+    try {
+      const r = await ensureClientsSchema();
+      $("cl-setup-msg").textContent = "Gotowe: " + (r.created.length ? r.created.join(", ") : "nic do dodania") + (r.errors.length ? " · błędy: " + r.errors.join("; ") : "");
+      await load(); render();
+    } catch (e) { b.disabled = false; $("cl-setup-msg").textContent = "Błąd: " + (e.message || e); }
+  }
+
+  function render() {
+    if (!$("view-klienci")) return;
+    const missing = window.clientsListMissing || window.auditClientFieldMissing;
+    $("cl-setup").classList.toggle("hidden", !missing);
+    const by = groupAudits();
+    const unlinked = (allAudits || []).filter(a => clientIdOf(a, keyIndex()) == null).length;
+    $("cl-unlinked").textContent = unlinked ? unlinked + " audytów bez klienta" : "";
+    renderList(by);
+    if (proposal) renderProposal(); else renderCard(by);
+  }
+
+  function setup() {
+    if (!window.CLIENTS_ENABLED) return;
+    const nb = $("nav-klienci"); if (nb) nb.classList.remove("hidden");
+    $("cl-search").oninput = e => { q = e.target.value; render(); };
+    $("cl-extract").onclick = () => { proposal = buildProposal(); sel = null; if (!proposal.length) { proposal = null; showToast("Wszystkie audyty są już przypisane do klientów", "success"); render(); return; } render(); };
+    $("cl-add").onclick = async () => {
+      const name = (prompt("Nazwa nowego klienta:") || "").trim(); if (!name) return;
+      try { const r = await addClient({ Title: name }); clients.push({ Id: r.Id, Title: name }); sel = r.Id; proposal = null; render(); }
+      catch (e) { showToast("Nie utworzono: " + (e.message || e), "error"); }
+    };
+    $("cl-setup-btn").onclick = setupSchema;
+  }
+  function clientOfAudit(a) { if (!loaded) return null; const id = clientIdOf(a, keyIndex()); return id == null ? null : clients.find(c => c.Id === id); }
+  return { setup, load, render, norm, clientOfAudit };
+})();
+window.ClientsModule = ClientsModule;
 
 // ============================================================
 // MODUŁ: DELEGACJE — dni poza Warszawą do oświadczeń o delegacji (Michał, nagranie 2026-10-09)

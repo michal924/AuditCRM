@@ -8,6 +8,8 @@ const SITE_URL = "https://logisticfit.sharepoint.com/sites/AuditCRM";
 const IS_TEST = /-(staging|\d+)\.|^localhost$|^127\.0\.0\.1$/.test(window.location.hostname);   // …-staging.* lub podgląd PR …-<nr>.*
 const AUDITS_LIST = IS_TEST ? "Audits_TEST" : "Audits";
 const DEV_LIST    = IS_TEST ? "DevRequests_TEST" : "DevRequests";
+const CLIENTS_LIST = IS_TEST ? "Clients_TEST" : "Clients";            // LFA Hub, etap 1: karta klienta (tylko środowisko testowe do akceptacji)
+window.CLIENTS_ENABLED = IS_TEST;                                       // na produkcji zakładka Klienci niewidoczna, dopóki Michał nie zaakceptuje
 window.IS_TEST = IS_TEST; window.AUDITS_LIST = AUDITS_LIST;
 
 async function spGet(path) {
@@ -353,4 +355,83 @@ async function setupTestList(prodTitle, testTitle, copyData, onProgress) {
     log(`Skopiowano ${copied}/${items.length} rekordów do ${testTitle}`);
   }
   return { created, copied, errors };
+}
+
+
+// ============================================================
+// LFA HUB · ETAP 1 — lista Clients + powiązanie ClientId w Audits
+// Klient dotąd istniał tylko jako nazwa w audycie (Title). Teraz: osobny rekord + liczbowy ClientId w audycie.
+// Pola tworzone z apki (jak kolumny rozliczeń); brak listy/pola nie psuje reszty aplikacji.
+// ============================================================
+const CLIENT_FIELDS = [
+  { name: "NIP",           label: "NIP",                         type: "Text" },
+  { name: "Address",       label: "Adres siedziby",              type: "Text" },
+  { name: "PostalCode",    label: "Kod pocztowy",                type: "Text" },
+  { name: "City",          label: "Miasto",                      type: "Text" },
+  { name: "SiteAddress",   label: "Adres zakładu / audytu",      type: "Note" },
+  { name: "ContactPerson", label: "Osoba kontaktowa",            type: "Text" },
+  { name: "ClientEmail",   label: "E-mail",                      type: "Text" },
+  { name: "Phone",         label: "Telefon",                     type: "Text" },
+  { name: "CertCodes",     label: "Kody certyfikatów (FSC/PEFC)", type: "Text" },
+  { name: "Aliases",       label: "Inne zapisy nazwy (z audytów)", type: "Note" },
+  { name: "Notes",         label: "Notatki",                     type: "Note" },
+];
+const CLIENT_SELECT = ["Id", "Title"].concat(CLIENT_FIELDS.map(f => f.name));
+window.clientsListMissing = false;
+window.auditClientFieldMissing = false;
+
+async function createListField(listTitle, f) {
+  const token = await getToken(); const digest = await getDigest(token);
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${listTitle}')/fields/createfieldasxml`, { method: "POST",
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=verbose", "Content-Type": "application/json;odata=verbose", "X-RequestDigest": digest },
+    body: JSON.stringify({ parameters: { __metadata: { type: "SP.XmlSchemaFieldCreationInformation" }, SchemaXml: settleFieldSchemaXml(f), Options: 12 } }) });
+  if (!r.ok) throw new Error(`${f.name}: ${r.status} ${(await r.text().catch(() => "")).substring(0, 120)}`);
+}
+
+// Tworzy listę Clients (jeśli brak), jej kolumny oraz kolumnę ClientId w Audits. Zwraca {created, errors}.
+async function ensureClientsSchema() {
+  const errors = []; const created = [];
+  if (!(await spListExists(CLIENTS_LIST))) {
+    const token = await getToken(); const digest = await getDigest(token);
+    const r = await fetch(`${SITE_URL}/_api/web/lists`, { method: "POST",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=verbose", "Content-Type": "application/json;odata=verbose", "X-RequestDigest": digest },
+      body: JSON.stringify({ __metadata: { type: "SP.List" }, BaseTemplate: 100, Title: CLIENTS_LIST, Description: "Klienci — LFA CRM System (LFA Hub, etap 1)" }) });
+    if (!r.ok) throw new Error(`Lista ${CLIENTS_LIST}: ${r.status} ${(await r.text().catch(() => "")).substring(0, 160)}`);
+    created.push("lista " + CLIENTS_LIST);
+  }
+  const have = new Set((await spCustomFields(CLIENTS_LIST)).map(f => f.name));
+  for (const f of CLIENT_FIELDS) { if (have.has(f.name)) continue; try { await createListField(CLIENTS_LIST, f); created.push(f.name); } catch (e) { errors.push(e.message); } }
+  const auditHave = await fetchAuditFieldNames();
+  if (!auditHave.has("ClientId")) {
+    try { await createListField(AUDITS_LIST, { name: "ClientId", label: "ID klienta (lista Clients)", type: "Number" }); created.push("Audits.ClientId"); }
+    catch (e) { errors.push(e.message); }
+  }
+  return { created, errors };
+}
+
+// Lista klientów; gdy listy brak (404) → [] i flaga clientsListMissing
+async function fetchClients() {
+  try {
+    const items = await spAllItems(CLIENTS_LIST, CLIENT_SELECT.join(","));
+    window.clientsListMissing = false; return items;
+  } catch (e) { window.clientsListMissing = true; return []; }
+}
+// Mapa Id audytu → ClientId (osobny odczyt, żeby brak kolumny nie psuł głównego $select)
+async function fetchAuditClientIds() {
+  try {
+    const items = await fetchAuditsWithSelect(["Id", "ClientId"]);
+    window.auditClientFieldMissing = false;
+    const m = {}; items.forEach(i => { if (i.ClientId != null) m[i.Id] = i.ClientId; }); return m;
+  } catch (e) { window.auditClientFieldMissing = true; return {}; }
+}
+async function addClient(fields) {
+  const token = await getToken(); const digest = await getDigest(token);
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${CLIENTS_LIST}')/items`, { method: "POST",
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=nometadata", "Content-Type": "application/json;odata=nometadata", "X-RequestDigest": digest },
+    body: JSON.stringify(fields) });
+  if (!r.ok) throw new Error(`Klient: ${r.status} ${(await r.text().catch(() => "")).substring(0, 120)}`);
+  return r.json();
+}
+async function updateClient(id, fields) {
+  await spPatch(`/_api/lists/getbytitle('${CLIENTS_LIST}')/items(${id})`, fields);
 }

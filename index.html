@@ -86,6 +86,7 @@
       <button class="nav-btn" data-view="opieka"><span class="nav-ico">👨‍👦</span><span class="nav-lbl">Opieka — Szymon</span></button>
       <button class="nav-btn" data-view="mapa"><span class="nav-ico">🗺</span><span class="nav-lbl">Mapa audytów</span></button>
       <button class="nav-btn" data-view="finanse"><span class="nav-ico">💰</span><span class="nav-lbl">Finanse</span></button>
+      <button class="nav-btn hidden" id="nav-klienci" data-view="klienci"><span class="nav-ico">🏢</span><span class="nav-lbl">Klienci</span></button>
     </div>
     <div class="nav-right">
       <button id="btn-import" class="btn-action" title="Importuj kwartalny plan z CUC">⬆ Import CUC</button>
@@ -535,6 +536,30 @@
         <span><i class="op-sw today"></i> Dziś</span>
         <span><i class="op-sw conflict"></i> Kolizja audyt + opieka</span>
       </div>
+    </div>
+  </div>
+
+  <!-- WIDOK: KLIENCI — karta klienta (LFA Hub, etap 1; tylko środowisko testowe) -->
+  <div id="view-klienci" class="view hidden">
+    <div class="view-header">
+      <h2>Klienci</h2>
+      <div class="header-filters">
+        <input id="cl-search" class="cl-search" type="search" placeholder="Szukaj: nazwa, miasto, NIP…" autocomplete="off">
+        <button id="cl-extract" class="btn-action" title="Grupuje audyty po nazwie i proponuje listę klientów do akceptacji">🧩 Wyodrębnij klientów z audytów</button>
+        <button id="cl-add" class="btn-ghost">+ Nowy klient</button>
+      </div>
+    </div>
+    <div id="cl-setup" class="fin-late hidden">
+      <div class="fin-late-head"><b>Lista klientów nie jest jeszcze utworzona</b>
+        <span>Utworzę listę Clients (osobna lista SharePoint) i kolumnę ClientId w audytach. Istniejące dane nie są zmieniane.</span></div>
+      <div class="cl-actions"><button id="cl-setup-btn" class="btn-action">Utwórz listę Clients i pole ClientId</button><span id="cl-setup-msg" class="fin-hint"></span></div>
+    </div>
+    <div class="cl-layout">
+      <aside class="cl-side">
+        <div class="cl-side-head"><span id="cl-count"></span><span id="cl-unlinked" class="fin-hint"></span></div>
+        <div id="cl-list" class="cl-list"></div>
+      </aside>
+      <section id="cl-card" class="cl-card"></section>
     </div>
   </div>
 
