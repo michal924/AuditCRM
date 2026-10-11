@@ -134,6 +134,7 @@ async function init() {
   document.getElementById("nav-user").textContent = account.name || account.username;
   document.getElementById("btn-logout").onclick = logout;
   LfaTheme.init();
+  TestEnvModule.init();
 
   show("page-app");
   hide("page-login");
@@ -5114,6 +5115,36 @@ const DashboardModule = (function () {
   return { setup, render };
 })();
 window.DashboardModule = DashboardModule;
+
+// ============================================================
+// ŚRODOWISKO TESTOWE — pasek + konfiguracja list *_TEST (tylko gdy IS_TEST; produkcja wyłącznie do odczytu)
+// ============================================================
+const TestEnvModule = (function () {
+  const $ = id => document.getElementById(id);
+  async function run(copy) {
+    if (copy && !confirm("Nadpisać dane w Audits_TEST kopią produkcji?\n\nRekordy testowe zostaną usunięte i zastąpione aktualnymi danymi z listy Audits. Produkcja nie jest modyfikowana.")) return;
+    const log = $("test-log"); const btns = [$("test-setup"), $("test-copy")]; btns.forEach(b => b.disabled = true);
+    try {
+      const r1 = await setupTestList("Audits", "Audits_TEST", copy, m => { log.textContent = m; });
+      const r2 = await setupTestList("DevRequests", "DevRequests_TEST", false, m => { log.textContent = m; }).catch(e => ({ errors: ["DevRequests: " + e.message] }));
+      const errs = (r1.errors || []).concat(r2.errors || []);
+      log.textContent = `Gotowe: kolumny +${r1.created}` + (copy ? `, rekordy ${r1.copied}` : "") + (errs.length ? ` · błędy: ${errs.length} (konsola)` : "");
+      if (errs.length) console.warn("[TEST]", errs);
+      showToast(copy ? "Dane testowe odświeżone z produkcji — przeładowuję" : "Listy TEST gotowe — przeładowuję", "success");
+      allAudits = await fetchAllAudits(); renderTable(); try { DashboardModule.render(); } catch {}
+    } catch (e) { log.textContent = "Błąd: " + (e.message || e); showToast("Konfiguracja TEST: " + (e.message || e), "error"); }
+    finally { btns.forEach(b => b.disabled = false); }
+  }
+  function init() {
+    if (!window.IS_TEST) return;
+    document.title = "[TEST] " + document.title;
+    const b = $("test-banner"); if (b) b.classList.remove("hidden");
+    const s1 = $("test-setup"); if (s1) s1.onclick = () => run(false);
+    const s2 = $("test-copy"); if (s2) s2.onclick = () => run(true);
+  }
+  return { init };
+})();
+window.TestEnvModule = TestEnvModule;
 
 // ============================================================
 // MODUŁ: DELEGACJE — dni poza Warszawą do oświadczeń o delegacji (Michał, nagranie 2026-10-09)

@@ -3,6 +3,12 @@
 // ============================================================
 
 const SITE_URL = "https://logisticfit.sharepoint.com/sites/AuditCRM";
+// Środowisko TESTOWE (gałąź staging → podgląd PR w Azure SWA „…-<nr PR>.7.azurestaticapps.net”, a także localhost): ta sama witryna i logowanie,
+// ale OSOBNE listy Audits_TEST / DevRequests_TEST. Produkcja (auditcrm.logisticfit.com) zawsze na Audits / DevRequests.
+const IS_TEST = /-(staging|\d+)\.|^localhost$|^127\.0\.0\.1$/.test(window.location.hostname);   // …-staging.* lub podgląd PR …-<nr>.*
+const AUDITS_LIST = IS_TEST ? "Audits_TEST" : "Audits";
+const DEV_LIST    = IS_TEST ? "DevRequests_TEST" : "DevRequests";
+window.IS_TEST = IS_TEST; window.AUDITS_LIST = AUDITS_LIST;
 
 async function spGet(path) {
   const token = await getToken();
@@ -86,7 +92,7 @@ const BASE_AUDIT_SELECT = [
 async function fetchAuditsWithSelect(selectArr) {
   const select = selectArr.join(",");
   let items = [];
-  let url = `/_api/lists/getbytitle('Audits')/items?$select=${select}&$top=500&$orderby=AuditDateStart`;
+  let url = `/_api/lists/getbytitle('${AUDITS_LIST}')/items?$select=${select}&$top=500&$orderby=AuditDateStart`;
   while (url) {
     const data = await spGet(url);
     items = items.concat(data.value || []);
@@ -119,7 +125,7 @@ async function fetchAllAudits() {
 
 // Nazwy wewnętrzne kolumn istniejących na liście Audits
 async function fetchAuditFieldNames() {
-  const data = await spGet("/_api/lists/getbytitle('Audits')/fields?$select=InternalName&$top=1000");
+  const data = await spGet(`/_api/lists/getbytitle('${AUDITS_LIST}')/fields?$select=InternalName&$top=1000`);
   return new Set((data.value || []).map(f => f.InternalName));
 }
 
@@ -140,7 +146,7 @@ function settleFieldSchemaXml(f) {
 async function createAuditField(f) {
   const token = await getToken();
   const digest = await getDigest(token);
-  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('Audits')/fields/createfieldasxml`, {
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${AUDITS_LIST}')/fields/createfieldasxml`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -179,14 +185,14 @@ async function fetchAuditors() {
 
 // Zaktualizuj rekord
 async function updateAudit(id, fields) {
-  await spPatch(`/_api/lists/getbytitle('Audits')/items(${id})`, fields);
+  await spPatch(`/_api/lists/getbytitle('${AUDITS_LIST}')/items(${id})`, fields);
 }
 
 // Dodaj nowy rekord
 async function addAudit(fields) {
   const token = await getToken();
   const digest = await getDigest(token);
-  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('Audits')/items`, {
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${AUDITS_LIST}')/items`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -206,13 +212,13 @@ async function addAudit(fields) {
 // ── Zgłoszenia rozwoju aplikacji (lista DevRequests) ──
 async function fetchDevRequests() {
   // Bez $select pól niestandardowych — dzięki temu ew. inna nazwa kolumny nie wywala odczytu (400)
-  const data = await spGet("/_api/lists/getbytitle('DevRequests')/items?$top=200&$orderby=Created desc");
+  const data = await spGet(`/_api/lists/getbytitle('${DEV_LIST}')/items?$top=200&$orderby=Created desc`);
   return data.value || [];
 }
 async function addDevRequest(fields) {
   const token = await getToken();
   const digest = await getDigest(token);
-  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('DevRequests')/items`, {
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${DEV_LIST}')/items`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -226,14 +232,14 @@ async function addDevRequest(fields) {
   return r.json();
 }
 async function updateDevRequest(id, fields) {
-  await spPatch(`/_api/lists/getbytitle('DevRequests')/items(${id})`, fields);
+  await spPatch(`/_api/lists/getbytitle('${DEV_LIST}')/items(${id})`, fields);
 }
 
 // Pobierz istniejące klucze ProjectID+Year+Program (do wykrycia duplikatów przy imporcie)
 // Klucz: "ProjectID_Year_Program" np. "12345_2025_FSC"
 async function fetchExistingProjectIds() {
   const ids = new Set();
-  let url = `/_api/lists/getbytitle('Audits')/items?$select=ProjectID,Year,Program&$top=500`;
+  let url = `/_api/lists/getbytitle('${AUDITS_LIST}')/items?$select=ProjectID,Year,Program&$top=500`;
   while (url) {
     const data = await spGet(url);
     (data.value || []).forEach(item => {
@@ -256,7 +262,7 @@ async function fetchImportedForQuarter(quarter, year) {
   );
   const select = "Id,ProjectID,Year,Program,Title,AuditStatus,AuditDateStart,ImportFile";
   let items = [];
-  let url = `/_api/lists/getbytitle('Audits')/items?$select=${select}&$filter=${filter}&$top=500`;
+  let url = `/_api/lists/getbytitle('${AUDITS_LIST}')/items?$select=${select}&$filter=${filter}&$top=500`;
   while (url) {
     const data = await spGet(url);
     items = items.concat(data.value || []);
@@ -271,7 +277,7 @@ async function fetchImportedForQuarter(quarter, year) {
 async function deleteAudit(id) {
   const token = await getToken();
   const digest = await getDigest(token);
-  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('Audits')/items(${id})`, {
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${AUDITS_LIST}')/items(${id})`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -281,4 +287,70 @@ async function deleteAudit(id) {
     },
   });
   if (!r.ok) throw new Error(`Delete error ${r.status}`);
+}
+
+
+// ============================================================
+// ŚRODOWISKO TESTOWE — listy *_TEST jako kopia schematu produkcji i (opcjonalnie) kopia danych. Produkcja tylko do odczytu.
+// ============================================================
+async function spListExists(title) {
+  const token = await getToken();
+  const r = await fetch(`${SITE_URL}/_api/web/lists/getbytitle('${title}')?$select=Id`, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=nometadata" } });
+  return r.ok;
+}
+async function spCreateList(title) {
+  const token = await getToken(); const digest = await getDigest(token);
+  const r = await fetch(`${SITE_URL}/_api/web/lists`, { method: "POST",
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=verbose", "Content-Type": "application/json;odata=verbose", "X-RequestDigest": digest },
+    body: JSON.stringify({ __metadata: { type: "SP.List" }, BaseTemplate: 100, Title: title, Description: "Kopia testowa — LFA CRM System (staging)" }) });
+  if (!r.ok) throw new Error(`Lista ${title}: ${r.status} ${(await r.text().catch(() => "")).substring(0, 160)}`);
+}
+// Kolumny niestandardowe listy (bez systemowych); SchemaXml bez identyfikatorów, żeby odtworzyć je na innej liście
+async function spCustomFields(title) {
+  const data = await spGet(`/_api/lists/getbytitle('${title}')/fields?$select=InternalName,SchemaXml,Hidden,ReadOnlyField,FromBaseType,CanBeDeleted,Sealed&$top=1000`);
+  return (data.value || []).filter(f => !f.Hidden && !f.ReadOnlyField && !f.FromBaseType && f.CanBeDeleted && !f.Sealed)
+    .map(f => ({ name: f.InternalName, xml: f.SchemaXml.replace(/\s(ID|SourceID|Version|ColName|RowOrdinal|List|WebId)="[^"]*"/g, "") }));
+}
+async function spCreateFieldXml(title, xml) {
+  const token = await getToken(); const digest = await getDigest(token);
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${title}')/fields/createfieldasxml`, { method: "POST",
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=verbose", "Content-Type": "application/json;odata=verbose", "X-RequestDigest": digest },
+    body: JSON.stringify({ parameters: { __metadata: { type: "SP.XmlSchemaFieldCreationInformation" }, SchemaXml: xml, Options: 12 } }) });
+  if (!r.ok) throw new Error(`${r.status} ${(await r.text().catch(() => "")).substring(0, 120)}`);
+}
+async function spAllItems(title, select) {
+  const token = await getToken(); let url = `${SITE_URL}/_api/lists/getbytitle('${title}')/items?$select=${select}&$top=500`; const out = [];
+  while (url) { const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=nometadata" } }); if (!r.ok) throw new Error(`Odczyt ${title}: ${r.status}`); const d = await r.json(); out.push(...(d.value || [])); url = d["odata.nextLink"] || null; }
+  return out;
+}
+async function spAddItem(title, fields) {
+  const token = await getToken(); const digest = await getDigest(token);
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${title}')/items`, { method: "POST",
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=nometadata", "Content-Type": "application/json;odata=nometadata", "X-RequestDigest": digest }, body: JSON.stringify(fields) });
+  if (!r.ok) throw new Error(`${r.status} ${(await r.text().catch(() => "")).substring(0, 120)}`);
+}
+async function spDeleteAllItems(title) {
+  if (!/_TEST$/.test(title)) throw new Error("Czyszczenie dozwolone tylko dla list *_TEST");   // bezpiecznik: nigdy produkcja
+  const items = await spAllItems(title, "Id"); const token = await getToken(); const digest = await getDigest(token); let n = 0;
+  for (const it of items) { const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${title}')/items(${it.Id})`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "X-RequestDigest": digest, "X-HTTP-Method": "DELETE", "IF-MATCH": "*" } }); if (r.ok) n++; }
+  return n;
+}
+// Tworzy/uzupełnia listę TEST wg schematu produkcyjnej. copyData → kasuje dane TEST i kopiuje wszystkie rekordy z produkcji.
+async function setupTestList(prodTitle, testTitle, copyData, onProgress) {
+  if (!/_TEST$/.test(testTitle)) throw new Error("Cel musi być listą *_TEST");
+  const log = m => { if (onProgress) onProgress(m); };
+  if (!(await spListExists(testTitle))) { await spCreateList(testTitle); log(`Utworzono listę ${testTitle}`); }
+  const prodFields = await spCustomFields(prodTitle);
+  const have = new Set((await spCustomFields(testTitle)).map(f => f.name)); let created = 0; const errors = [];
+  for (const f of prodFields) { if (have.has(f.name) || f.name === "Title") continue; try { await spCreateFieldXml(testTitle, f.xml); created++; } catch (e) { errors.push(f.name + ": " + e.message); } }
+  log(`Kolumny: ${prodFields.length} na produkcji, utworzono ${created}` + (errors.length ? `, błędy ${errors.length}` : ""));
+  let copied = 0;
+  if (copyData) {
+    const names = ["Title"].concat(prodFields.map(f => f.name).filter(n => n !== "Title"));
+    const removed = await spDeleteAllItems(testTitle); log(`Wyczyszczono ${testTitle}: ${removed} rekordów`);
+    const items = await spAllItems(prodTitle, names.join(","));
+    for (const it of items) { const f = {}; names.forEach(n => { if (it[n] !== undefined && it[n] !== null) f[n] = it[n]; }); try { await spAddItem(testTitle, f); copied++; } catch (e) { errors.push("rekord " + (it.Title || "") + ": " + e.message); } if (copied % 25 === 0) log(`Skopiowano ${copied}/${items.length}…`); }
+    log(`Skopiowano ${copied}/${items.length} rekordów do ${testTitle}`);
+  }
+  return { created, copied, errors };
 }
