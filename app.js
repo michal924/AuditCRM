@@ -152,6 +152,7 @@ async function init() {
   DashboardModule.setup();
   DelegModule.setup();
   ClientsModule.setup();
+  LauraModule.setup();
 
   await loadAudits();
   try { DashboardModule.render(); } catch (e) { console.warn("Pulpit:", e); }
@@ -174,7 +175,7 @@ function setupNav() {
       if (view === "opieka")     OpiekaModule.render();
       if (view === "mapa")       MapModule.render();
       if (view === "kalendarz")  AuditCalModule.render();
-      if (view === "finanse")    { FinanceModule.render(); DelegModule.render(); }
+      if (view === "finanse")    { FinanceModule.render(); DelegModule.render(); try { LauraModule.render(); } catch {} }
       if (view === "pulpit")     DashboardModule.render();
       if (view === "klienci")    ClientsModule.render();
     };
@@ -203,6 +204,7 @@ async function loadAudits() {
     try { SideCalModule.render(); } catch {}
     migrateInvoiceStatus();
     try { ClientsModule.load(); } catch {}
+    try { LauraModule.load(); } catch {}
     try { if (!document.getElementById("view-pulpit").classList.contains("hidden")) DashboardModule.render(); } catch {}
   } catch (e) {
     document.getElementById("audits-tbody").innerHTML =
@@ -5405,6 +5407,160 @@ const ClientsModule = (function () {
 window.ClientsModule = ClientsModule;
 
 // ============================================================
+// MODUŁ: ROZLICZENIE Z LAURY — CSV z Škoda Connect → przejazdy → dopasowanie do okien delegacji (wyjazd–powrót) → plan vs rzeczywistość.
+// Zasady: jazda należy do audytu, gdy mieści się w oknie [wyjazd − 90 min, powrót + 3 h]; km z Laury NIE nadpisują rozliczenia same —
+// „Przyjmij km” to świadoma akcja per audyt. Jazdy poza oknami (≥ 10 km) pokazane osobno (prywatne/niepowiązane).
+// ============================================================
+const LauraModule = (function () {
+  const $ = id => document.getElementById(id);
+  let trips = [], month = "all";
+  const THRESH = 10;     // km poniżej progu nie trafiają na listę „niepowiązane”
+  const pad = n => String(n).padStart(2, "0");
+  const MIES = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
+  const ms = s => new Date(String(s).replace(" ", "T") + ":00").getTime();
+  const fmt = s => String(s).substring(8, 10) + "." + String(s).substring(5, 7) + " " + String(s).substring(11, 16);
+  const num = v => { const n = parseFloat(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
+
+  // ── parser CSV (cudzysłowy, przecinki, BOM) ──
+  function parseCsv(text) {
+    text = String(text).replace(/^﻿/, "");
+    const rows = []; let row = [], cur = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true;
+      else if (c === ",") { row.push(cur); cur = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cur); if (row.some(x => x !== "")) rows.push(row); row = []; cur = ""; }
+      else cur += c;
+    }
+    if (cur !== "" || row.length) { row.push(cur); if (row.some(x => x !== "")) rows.push(row); }
+    return rows;
+  }
+  function parseTrips(text, fileName) {
+    const rows = parseCsv(text); if (!rows.length) return [];
+    const head = rows[0].map(h => h.trim().toLowerCase());
+    const col = n => head.findIndex(h => h === n);
+    const iEnd = col("end of trip"), iS = col("start mileage in km"), iE = col("end mileage in km"), iKm = col("mileage in km"), iMin = col("travel time in minutes"),
+          iCost = col("total cost"), iPrice = col("fuel price per litre");
+    if (iEnd < 0 || iKm < 0) throw new Error("To nie wygląda na plik przejazdów z Laury (brak kolumn „End of trip” / „Mileage in km”).");
+    const out = [];
+    rows.slice(1).forEach(r => {
+      const m = String(r[iEnd] || "").match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{1,2}):(\d{2})/); if (!m) return;
+      const end = `${m[3]}-${m[2]}-${m[1]} ${pad(+m[4])}:${m[5]}`;
+      const endKm = num(r[iE]);
+      out.push({ key: end.replace(/[- :]/g, "") + "_" + endKm, end, startKm: num(r[iS]), endKm, km: num(r[iKm]), min: num(r[iMin]), cost: num(r[iCost]), price: num(r[iPrice]), file: fileName });
+    });
+    return out;
+  }
+
+  // ── dopasowanie ──
+  function windows() {
+    return (allAudits || []).filter(a => a.AuditorName === MY_AUDITOR && a.AuditStatus !== "REJECTED" && a.AuditDateStart && DelegModule.eligible(a)).map(a => {
+      const d = DelegModule.defaults(a);
+      return { a, w0: ms(d.depart[0] + " " + d.depart[1]) - 90 * 60000, w1: ms(d.ret[0] + " " + d.ret[1]) + 3 * 3600000, depart: d.depart, ret: d.ret };
+    });
+  }
+  function assign(list) {
+    const W = windows(), by = new Map(); const free = [];
+    list.forEach(t => {
+      const e = ms(t.end), s = e - t.min * 60000, mid = (s + e) / 2;
+      const hits = W.filter(w => s >= w.w0 && e <= w.w1);
+      if (!hits.length) { free.push(t); return; }
+      hits.sort((x, y) => Math.abs((x.w0 + x.w1) / 2 - mid) - Math.abs((y.w0 + y.w1) / 2 - mid));
+      const id = hits[0].a.Id; if (!by.has(id)) by.set(id, []); by.get(id).push(t);
+    });
+    return { W, by, free };
+  }
+
+  function months() { return Array.from(new Set(trips.map(t => t.Title ? t.EndTime.substring(0, 7) : "").filter(Boolean))).sort().reverse(); }
+  function norm() { return trips.map(t => ({ end: t.EndTime, km: num(t.Km), min: num(t.Minutes), cost: num(t.Cost), key: t.Title })); }
+
+  function render() {
+    const box = $("laura-body"); if (!box) return;
+    const missing = window.tripsListMissing;
+    $("laura-setup").classList.toggle("hidden", !missing);
+    if (missing) { box.innerHTML = ""; $("laura-kpis").innerHTML = ""; return; }
+    const ms_ = months();
+    $("laura-month").innerHTML = '<option value="all">Wszystkie okresy</option>' + ms_.map(m => `<option value="${m}">${MIES[+m.substring(5) - 1]} ${m.substring(0, 4)}</option>`).join("");
+    $("laura-month").value = ms_.includes(month) ? month : "all"; month = $("laura-month").value;
+    const all = norm().sort((a, b) => a.end.localeCompare(b.end));
+    if (!all.length) { $("laura-kpis").innerHTML = ""; box.innerHTML = '<div class="settle-empty">Brak przejazdów. Wgraj plik CSV z aplikacji Škoda Connect (Statystyki przejazdów → Eksport).</div>'; return; }
+    const inMonth = t => month === "all" || t.end.startsWith(month);
+    const { W, by, free } = assign(all);
+    const tripsM = all.filter(inMonth), freeM = free.filter(inMonth).filter(t => t.km >= THRESH);
+    const kmAll = tripsM.reduce((s, t) => s + t.km, 0), kmFree = freeM.reduce((s, t) => s + t.km, 0), cost = tripsM.reduce((s, t) => s + t.cost, 0);
+    $("laura-kpis").innerHTML = [["przejazdów", tripsM.length], ["km łącznie", Math.round(kmAll).toLocaleString("pl-PL")], ["km przypisane do audytów", Math.round(kmAll - free.filter(inMonth).reduce((s, t) => s + t.km, 0)).toLocaleString("pl-PL")],
+      ["km niepowiązane (≥ " + THRESH + ")", Math.round(kmFree).toLocaleString("pl-PL")], ["paliwo wg Laury", fmtPLN(cost)]]
+      .map(([l, v]) => `<div class="fin-kpi"><span class="k-label">${l}</span><span class="k-val">${v}</span></div>`).join("");
+    const rows = W.filter(w => month === "all" ? by.has(w.a.Id) : (w.depart[0].startsWith(month) || w.ret[0].startsWith(month) || (by.get(w.a.Id) || []).some(t => t.end.startsWith(month))))
+      .sort((x, y) => x.depart[0].localeCompare(y.depart[0]));
+    const head = `<thead><tr><th>Wyjazd – powrót</th><th>Klient</th><th>Miejscowość</th><th class="num">Jazd</th><th class="num">Km (Laura)</th><th class="num">Km (rozliczenie)</th><th class="num">Różnica</th><th></th></tr></thead>`;
+    const body = rows.map(w => {
+      const a = w.a, ts = by.get(a.Id) || [], k = Math.round(ts.reduce((s, t) => s + t.km, 0)), plan = Math.round(settleNum(a.SettleKm));
+      const diff = ts.length ? k - plan : null, cls = diff == null ? "" : Math.abs(diff) > Math.max(15, plan * 0.1) ? "cl-bad" : "";
+      return `<tr class="m" data-id="${a.Id}"><td>${fmt(w.depart[0] + " " + w.depart[1])} – ${fmt(w.ret[0] + " " + w.ret[1])}</td><td class="wrap">${escHtml(a.Title || "—")}</td><td>${escHtml(a.City || "—")}</td>
+        <td class="num">${ts.length || "—"}</td><td class="num"><strong>${ts.length ? k : "brak"}</strong></td><td class="num">${plan || "—"}</td><td class="num ${cls}">${diff == null ? "—" : (diff > 0 ? "+" : "") + diff}</td>
+        <td class="num">${ts.length && diff !== 0 ? `<button class="btn-ghost sm laura-take" data-id="${a.Id}" data-km="${k}">Przyjmij ${k} km</button>` : ""}</td></tr>`;
+    }).join("");
+    const freeHtml = freeM.length ? `<div class="laura-free"><b>Jazdy poza oknami delegacji (≥ ${THRESH} km)</b> — prywatne albo audyt bez wpisanej delegacji:<ul>` +
+      freeM.slice(-60).map(t => { const e = ms(t.end), nx = W.find(w => w.w0 - e > 0 && w.w0 - e < 36 * 3600000);
+        return `<li>${fmt(t.end)} · ${t.km} km · ${t.min} min${nx ? ` <em>← przed wyjazdem: ${escHtml((nx.a.Title || "").substring(0, 28))} (${nx.depart[0].substring(8)}.${nx.depart[0].substring(5, 7)})</em>` : ""}</li>`; }).join("") + `</ul>${freeM.length > 60 ? "<small>pokazano ostatnie 60</small>" : ""}</div>` : "";
+    box.innerHTML = `<div class="table-wrapper settle-table-wrap"><table class="settle-table fin-table" id="laura-table">${head}<tbody>${body || '<tr><td colspan="8" class="settle-empty">Brak delegacji w tym okresie.</td></tr>'}</tbody></table></div>${freeHtml}`;
+    box.querySelectorAll("tr.m").forEach(tr => tr.onclick = () => openModal(parseInt(tr.dataset.id)));
+    box.querySelectorAll(".laura-take").forEach(b => b.onclick = async e => {
+      e.stopPropagation(); const a = (allAudits || []).find(x => x.Id === parseInt(b.dataset.id)); if (!a) return;
+      const km = parseInt(b.dataset.km);
+      if (!confirm(`${a.Title}\nKm w rozliczeniu: ${Math.round(settleNum(a.SettleKm)) || "brak"} → km z Laury: ${km}\n\nZapisać km z Laury w rozliczeniu tego audytu?`)) return;
+      b.disabled = true;
+      try { await updateAudit(a.Id, { SettleKm: km }); a.SettleKm = km; showToast("Zapisano " + km + " km: " + (a.Title || ""), "success"); render(); try { DelegModule.render(); FinanceModule.render(); } catch {} }
+      catch (err) { b.disabled = false; showToast("Nie zapisano: " + (err.message || err), "error"); }
+    });
+  }
+
+  async function load() { if (!window.LAURA_ENABLED) return; trips = await fetchTrips(); render(); }
+
+  async function importFiles(files) {
+    const st = $("laura-status"); const have = new Set(trips.map(t => t.Title)); let all = [];
+    try {
+      for (const f of files) { all = all.concat(parseTrips(await f.text(), f.name)); }
+    } catch (e) { st.textContent = e.message; showToast(e.message, "error"); return; }
+    const seen = new Set(); const fresh = all.filter(t => { if (have.has(t.key) || seen.has(t.key)) return false; seen.add(t.key); return true; });
+    const dup = all.length - fresh.length;
+    if (!all.length) { st.textContent = "Nie znaleziono przejazdów w pliku."; return; }
+    const dates = all.map(t => t.end).sort();
+    st.textContent = `Plik: ${all.length} przejazdów (${dates[0].substring(0, 10)} – ${dates[dates.length - 1].substring(0, 10)}), nowych ${fresh.length}, już w bazie ${dup}.`;
+    if (!fresh.length) { showToast("Wszystkie przejazdy z pliku już są w bazie", "success"); return; }
+    if (!confirm(`Zapisać ${fresh.length} nowych przejazdów (pomijam ${dup} już istniejących)?`)) return;
+    const rows = fresh.map(t => ({ Title: t.key, EndTime: t.end, StartKm: t.startKm, EndKm: t.endKm, Km: t.km, Minutes: t.min, Cost: t.cost, FuelPrice: t.price, ImportFile: t.file }));
+    $("laura-pick").disabled = true;
+    try {
+      const r = await addTripsBatch(rows, (d, n) => { st.textContent = `Zapisuję przejazdy: ${d}/${n}…`; });
+      st.textContent = `Zapisano ${r.done} przejazdów` + (r.errs.length ? `, błędy: ${r.errs.length}` : "") + (dup ? ` · pominięto ${dup} istniejących` : "");
+      if (r.errs.length) console.warn("[Laura]", r.errs);
+      showToast(`Laura: zapisano ${r.done} przejazdów`, r.errs.length ? "warn" : "success");
+    } catch (e) { st.textContent = "Błąd: " + (e.message || e); showToast("Import Laury: " + (e.message || e), "error"); }
+    finally { $("laura-pick").disabled = false; await load(); }
+  }
+
+  async function setupSchema() {
+    const b = $("laura-setup-btn"); b.disabled = true;
+    try { const r = await ensureTripsSchema(); $("laura-status").textContent = "Gotowe: " + (r.created.join(", ") || "nic do dodania") + (r.errors.length ? " · błędy: " + r.errors.join("; ") : ""); await load(); }
+    catch (e) { b.disabled = false; $("laura-status").textContent = "Błąd: " + (e.message || e); }
+  }
+
+  function setup() {
+    const card = $("laura-card"); if (!card) return;
+    if (!window.LAURA_ENABLED) { card.classList.add("hidden"); return; }
+    $("laura-pick").onclick = () => $("laura-file").click();
+    $("laura-file").onchange = e => { const fs = Array.from(e.target.files || []); e.target.value = ""; if (fs.length) importFiles(fs); };
+    $("laura-month").onchange = e => { month = e.target.value; render(); };
+    $("laura-setup-btn").onclick = setupSchema;
+  }
+  return { setup, load, render, parseTrips, assign };
+})();
+window.LauraModule = LauraModule;
+
+// ============================================================
 // MODUŁ: DELEGACJE — dni poza Warszawą do oświadczeń o delegacji (Michał, nagranie 2026-10-09)
 // Zasady: 1 wiersz = 1 wyjazd; dni = ceil(dni audytu) + dni dojazdu; tylko On-site poza Warszawą; spotkania/szkolenia też (przełącznik).
 // Zakres „Zrealizowane” = DONE / wysłane / rozliczone; zaległe (po terminie bez DONE) NIE wchodzą — osobne ostrzeżenie.
@@ -5692,7 +5848,7 @@ const DelegModule = (function () {
     fillPeriodValues();
   }
   function renderAll() { if ($("deleg-pval")) { fillPeriodValues($("deleg-pval").value); render(); } }
-  return { setup, render: renderAll, exportPdf, openStatement, eligible };
+  return { setup, render: renderAll, exportPdf, openStatement, eligible, defaults };
 })();
 window.DelegModule = DelegModule;
 

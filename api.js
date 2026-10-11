@@ -435,3 +435,52 @@ async function addClient(fields) {
 async function updateClient(id, fields) {
   await spPatch(`/_api/lists/getbytitle('${CLIENTS_LIST}')/items(${id})`, fields);
 }
+
+
+// ============================================================
+// LAURA (Škoda Connect) — przejazdy z CSV: lista Trips. Klucz = koniec jazdy + przebieg końcowy → import idempotentny.
+// ============================================================
+const TRIPS_LIST = IS_TEST ? "Trips_TEST" : "Trips";
+window.LAURA_ENABLED = IS_TEST;
+const TRIP_FIELDS = [
+  { name: "EndTime",   label: "Koniec jazdy (RRRR-MM-DD GG:MM)", type: "Text" },
+  { name: "StartKm",   label: "Przebieg start", type: "Number" },
+  { name: "EndKm",     label: "Przebieg koniec", type: "Number" },
+  { name: "Km",        label: "Km", type: "Number" },
+  { name: "Minutes",   label: "Czas (min)", type: "Number" },
+  { name: "Cost",      label: "Koszt paliwa (PLN)", type: "Number" },
+  { name: "FuelPrice", label: "Cena paliwa za litr", type: "Number" },
+  { name: "ImportFile", label: "Plik źródłowy", type: "Text" },
+];
+window.tripsListMissing = false;
+async function ensureTripsSchema() {
+  const created = [], errors = [];
+  if (!(await spListExists(TRIPS_LIST))) {
+    const token = await getToken(); const digest = await getDigest(token);
+    const r = await fetch(`${SITE_URL}/_api/web/lists`, { method: "POST",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=verbose", "Content-Type": "application/json;odata=verbose", "X-RequestDigest": digest },
+      body: JSON.stringify({ __metadata: { type: "SP.List" }, BaseTemplate: 100, Title: TRIPS_LIST, Description: "Przejazdy z Laury (CSV) — LFA CRM System" }) });
+    if (!r.ok) throw new Error(`Lista ${TRIPS_LIST}: ${r.status} ${(await r.text().catch(() => "")).substring(0, 160)}`);
+    created.push("lista " + TRIPS_LIST);
+  }
+  const have = new Set((await spCustomFields(TRIPS_LIST)).map(f => f.name));
+  for (const f of TRIP_FIELDS) { if (have.has(f.name)) continue; try { await createListField(TRIPS_LIST, f); created.push(f.name); } catch (e) { errors.push(e.message); } }
+  return { created, errors };
+}
+async function fetchTrips() {
+  try { const it = await spAllItems(TRIPS_LIST, ["Id", "Title"].concat(TRIP_FIELDS.map(f => f.name)).join(",")); window.tripsListMissing = false; return it; }
+  catch (e) { window.tripsListMissing = true; return []; }
+}
+// Dodaje przejazdy równolegle (po 5), jeden digest na całą partię
+async function addTripsBatch(rows, onProgress) {
+  const token = await getToken(); const digest = await getDigest(token); let done = 0; const errs = [];
+  for (let i = 0; i < rows.length; i += 5) {
+    await Promise.all(rows.slice(i, i + 5).map(async f => {
+      const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${TRIPS_LIST}')/items`, { method: "POST",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=nometadata", "Content-Type": "application/json;odata=nometadata", "X-RequestDigest": digest }, body: JSON.stringify(f) });
+      if (r.ok) done++; else errs.push(f.Title + ": " + r.status);
+    }));
+    if (onProgress) onProgress(done, rows.length);
+  }
+  return { done, errs };
+}

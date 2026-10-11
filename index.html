@@ -624,6 +624,21 @@
       <div id="deleg-skipped" class="fin-hint" style="margin-top:8px"></div>
     </div>
 
+    <div class="fin-card" id="laura-card">
+      <div class="fin-card-head"><h3>🚗 Rozliczenie z Laury — plan vs rzeczywistość</h3><span class="fin-hint">CSV ze Škoda Connect · dopasowanie jazd do okien wyjazd–powrót · tylko środowisko testowe</span></div>
+      <div id="laura-setup" class="fin-late hidden">
+        <div class="fin-late-head"><b>Lista przejazdów (Trips) nie jest jeszcze utworzona</b><span>Powstaje osobna lista SharePoint. Istniejące dane nie są zmieniane.</span></div>
+        <div class="cl-actions"><button id="laura-setup-btn" class="btn-action">Utwórz listę Trips</button></div>
+      </div>
+      <div class="settle-toolbar deleg-toolbar">
+        <div class="form-row"><label for="laura-month">Okres</label><select id="laura-month" class="form-input"></select></div>
+        <div class="settle-toolbar-actions"><button id="laura-pick" class="btn-action">⬆ Wgraj CSV z Laury</button><input type="file" id="laura-file" accept=".csv,text/csv" multiple hidden></div>
+      </div>
+      <div id="laura-status" class="fin-hint"></div>
+      <div id="laura-kpis" class="fin-kpis"></div>
+      <div id="laura-body"></div>
+    </div>
+
     <div class="fin-card" id="fin-month-card">
       <div class="fin-card-head"><h3 id="fin-month-title">Audyty w miesiącu</h3><span class="fin-hint">kliknij wiersz, aby otworzyć audyt</span></div>
       <div id="fin-month-list" class="settle-empty">Wybierz miesiąc na wykresie lub w tabeli.</div>
