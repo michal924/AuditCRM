@@ -78,6 +78,11 @@ function runPlanningTests(P) {
   eq("opieka we wtorek", wk.days[1].custody, true);
   eq("zajętość w środę", wk.days[2].busy.length, 1);
 
+  // bezstronność
+  has("klient doradczy: blokada", P.checkAudit({ date: "2026-12-02", body: "CU", advisory: true }, R), "bezstronnosc");
+  has("klient doradczy: spotkanie bez blokady", P.checkAudit({ date: "2026-12-02", body: "CU", advisory: true, meeting: true }, R), "bezstronnosc", false);
+  has("blokada wyłączona w regułach", P.checkAudit({ date: "2026-12-02", body: "CU", advisory: true }, P.parseRules([{ Title: "bezstronnosc_blokada", Value: "nie" }])), "bezstronnosc", false);
+
   // wolne okna i bloki na raporty
   eq("wolne okna dnia", P.freeWindows([{ start: "10:00", end: "12:00" }], R), [[510, 600], [720, 990]]);
   eq("krótkie okno pominięte", P.freeWindows([{ start: "08:40", end: "16:30" }], R), []);

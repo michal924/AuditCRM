@@ -114,6 +114,8 @@ const PlanningModule = (function () {
     }
   }
 
+  // Bezstronność: klient z kartoteki (lista Clients) oznaczony jako doradczy LogisticFit
+  function isAdvisory(a) { try { const c = window.ClientsModule && ClientsModule.clientOfAudit(a); return !!c && c.DoradczyLF === "tak"; } catch { return false; } }
   // ── audyty w zakresie dni ──
   function weekItems() { return itemsBetween(monday, P.addDays(monday, 6)); }
   function itemsBetween(fromDate, toDate) {
@@ -126,7 +128,7 @@ const PlanningModule = (function () {
         const text = siteText(a), city = a.SiteCity || a.City;
         const meeting = /spotkan|szkoleni/i.test((a.AuditType || "") + " " + (a.Program || ""));
         out.push({ id: a.Id, audit: a, date: k, start: a.StartTime || "", end: a.EndTime || (a.StartTime ? addHours(a.StartTime, DEFAULT_AUDIT_HOURS) : ""),
-          body: certBodyOf(a) === "SGS" ? "SGS" : "CU", scheme: a.Program || "", meeting, planSent: a.PlanSentDate || "", done: a.AuditStatus === "DONE", title: a.Title || "", place: text, point: text ? pointOf(text, city) : null });
+          body: certBodyOf(a) === "SGS" ? "SGS" : "CU", scheme: a.Program || "", meeting, planSent: a.PlanSentDate || "", done: a.AuditStatus === "DONE", advisory: isAdvisory(a), title: a.Title || "", place: text, point: text ? pointOf(text, city) : null });
       });
     }
     return out;
@@ -228,13 +230,13 @@ const PlanningModule = (function () {
     });
   }
   function openVariants(x) {
-    const vs = P.variants({ date: x.date, start: x.start, end: x.end, body: x.body, scheme: x.scheme, travel: travelOf(x), point: x.point, planSent: x.planSent }, dayCtx(x), rules, todayISO(), 3);
+    const vs = P.variants({ date: x.date, start: x.start, end: x.end, body: x.body, scheme: x.scheme, travel: travelOf(x), point: x.point, planSent: x.planSent, advisory: x.advisory }, dayCtx(x), rules, todayISO(), 3);
     $("plan-var-h").textContent = "Inne terminy: " + (x.title || "audyt");
     $("plan-var-body").innerHTML = `<p class="lfa-muted">Obecny termin <span class="lfa-data">${DAYS[P.weekday(x.date)]} ${dmy(x.date)}</span>. Propozycje w promieniu ${rules.wariant_okno_dni} dni, z regułami, opieką i kalendarzami. Nic się nie zmienia, dopóki nie przełożysz audytu w jego karcie.</p>` +
       (vs.length ? vs.map((v, i) => `<section class="lfa-card plan-var">
           <div class="lfa-card-header"><span>Wariant ${i + 1}: <span class="lfa-data">${DAYS[P.weekday(v.date)]} ${dmy(v.date)}.${v.date.slice(0, 4)}</span></span></div>
           <div class="lfa-card-body"><ul class="plan-infos">${v.reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>
-        </section>`).join("") : `<div class="lfa-alert" data-kind="warning">Brak dnia bez blokady w tym zakresie. Zmień reguły albo zakres w ustawieniach.</div>`);
+        </section>`).join("") : `<div class="lfa-alert" data-kind="warning">${x.advisory ? "Klient doradczy LogisticFit: bez wariantów, najpierw decyzja o bezstronności." : "Brak dnia bez blokady w tym zakresie. Zmień reguły albo zakres w ustawieniach."}</div>`);
     $("plan-var-overlay").classList.remove("hidden");
     $("plan-var-close").focus();
   }

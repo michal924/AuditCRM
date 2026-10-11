@@ -31,6 +31,7 @@ var PlanningCore = (function () {
     { key: "raport_godziny_SGS",         type: "number", value: 4,                desc: "Czas na raport SGS (godziny pracy)" },
     { key: "dzien_pracy_od",             type: "time",   value: "08:30",          desc: "Początek dnia pracy (bloki na raporty)" },
     { key: "dzien_pracy_do",             type: "time",   value: "16:30",          desc: "Koniec dnia pracy (bloki na raporty)" },
+    { key: "bezstronnosc_blokada",       type: "bool",   value: true,             desc: "Klient doradczy LogisticFit blokuje audyt (bezstronność)" },
     { key: "wariant_okno_dni",           type: "number", value: 21,               desc: "Szukanie innego terminu: ile dni przed i po obecnej dacie" },
   ];
 
@@ -113,10 +114,12 @@ var PlanningCore = (function () {
   }
 
   // ── ocena jednego audytu w dniu ──
-  // ctx: { date, start, end, body, scheme, travel {km,min,base}, custody (bool), busy [{start,end,label}], sameDay [{point}], point, today }
+  // ctx: { date, start, end, body, scheme, advisory (klient doradczy LF), travel {km,min,base}, custody (bool), busy [{start,end,label}], sameDay [{point}], point, today }
   // wynik: [{level: "block"|"warn"|"info", code, text}]
   function checkAudit(ctx, rules) {
     var f = [], add = function (level, code, text) { f.push({ level: level, code: code, text: text }); };
+    if (ctx.advisory && rules.bezstronnosc_blokada && !ctx.meeting)
+      add("block", "bezstronnosc", "Bezstronność: klient doradczy LogisticFit. Audytu LF Assurance nie planujemy bez osobnej decyzji");
     var wd = weekday(ctx.date);
     if (wd === 6) add("block", "niedziela", "Niedziela. Audyt w niedzielę nie jest planowany");
     else if (wd === 5 && !rules.sobota_dozwolona) add("warn", "sobota", "Sobota. Tylko jako wyjątek");
@@ -191,7 +194,7 @@ var PlanningCore = (function () {
           var travel = travelOf ? travelOf(x) : null;
           var others = dayItems.filter(function (o) { return o !== x; });
           return { item: x, travel: travel, findings: checkAudit({
-            date: date, start: x.start, end: x.end, body: x.body, scheme: x.scheme, travel: travel, meeting: x.meeting, planSent: x.planSent, done: x.done,
+            date: date, start: x.start, end: x.end, body: x.body, scheme: x.scheme, travel: travel, meeting: x.meeting, planSent: x.planSent, done: x.done, advisory: x.advisory,
             custody: custody, busy: busy, sameDay: others, point: x.point, today: today,
           }, rules) };
         }),
@@ -251,7 +254,7 @@ var PlanningCore = (function () {
       if (i === 0 || date < earliest) continue;
       var c = (dayCtx && dayCtx(date)) || {};
       var fs = checkAudit({ date: date, start: a.start, end: a.end, body: a.body, scheme: a.scheme, travel: a.travel, point: a.point,
-        custody: c.custody, busy: c.busy, sameDay: c.sameDay, today: today, planSent: a.planSent }, rules);
+        custody: c.custody, busy: c.busy, sameDay: c.sameDay, today: today, planSent: a.planSent, advisory: a.advisory }, rules);
       if (fs.some(function (f) { return f.level === "block"; })) continue;
       var warns = fs.filter(function (f) { return f.level === "warn" && f.code !== "dojazd" && f.code !== "dojazd_czas"; });
       var score = 100 - warns.length * 30 - Math.abs(i) - ((c.busy || []).length ? 3 : 0);
