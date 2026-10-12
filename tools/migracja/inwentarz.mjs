@@ -28,15 +28,18 @@ const byHash = new Map(); files.forEach(f => { if (f.hash) { if (!byHash.has(f.h
 
 // 3. klasyfikacja
 function sectionOf(rel) {
-  const parts = rel.split(/[\\/]/), name = parts[parts.length - 1], n = norm(name), full = norm(rel);
+  const parts = rel.split(/[\\/]/), name = parts[parts.length - 1], n = norm(name);
   const m = parts.map(p => p.match(/^(0[1-9])_/)).find(Boolean); if (m) return { sec: m[1], why: "folder " + m[0] };
   if (MAIL.test(name)) return { sec: "09", why: "wiadomość e-mail" };
-  if (IMG.test(name)) return { sec: "05", why: "zdjęcie" };
-  if (/certyfikat|certificate/.test(n)) return { sec: "07", why: "certyfikat (wynik audytu)" };
-  if (/podpisan|signed|lista[_ ]obecnosci/.test(n)) return { sec: "07", why: "w nazwie: podpisany/lista obecności" };
-  if (/raport|report|cucrpt|analiza[_ ]ryzyka|lista[_ ]kontrolna|checklist/.test(n)) return { sec: "06", why: "raport / lista kontrolna / analiza ryzyka" };
-  if (/dostaw|supplier|deklaracja|rejestr[_ ]kwalif/.test(n)) return { sec: "03", why: "dostawcy / deklaracje" };
+  const clientDoc = /internal[_ ]audit|management|managment|review|ethical|manual|policy|declaration|license|agreement|training|ohas|vsc|mass[_ ]balance|product[_ ]groups|material[_ ]identification|bilans|procedur|wewnetrzn|kwartaln|harmonogram|rejestr/.test(n);
+  const auditorOut = /cucrpt|pqpc-23-11|raport[_ ]z[_ ]auditu|lista[_ ]kontrolna|checklist|analiz[a-z]*[_ ]ryzyk/.test(n);
+  if (/certyfikat|certificate/.test(n) && !clientDoc) return { sec: "07", why: "certyfikat (wynik audytu)" };
+  if (/lista[_ ]obecnosci|attendance/.test(n) || (/podpisan|signed/.test(n) && auditorOut)) return { sec: "07", why: "podpisany dokument audytora / lista obecności" };
+  if (auditorOut) return { sec: "06", why: "raport audytora / lista kontrolna / analiza ryzyka" };
+  if (/dostaw|supplier|deklaracja[_ ]dostaw|rejestr[_ ]kwalif/.test(n)) return { sec: "03", why: "dostawcy" };
   if (/plan[_ ]aud|audplan|zlecenie|kalkulator|notification/.test(n)) return { sec: "01", why: "plan / zlecenie / kalkulator" };
+  if (clientDoc) return { sec: "02", why: "dokument klienta" + (IMG.test(name) ? " (skan w formacie obrazu)" : "") };
+  if (IMG.test(name)) return { sec: "05", why: "zdjęcie / obraz bez cechy dokumentu" };
   return { sec: "02", why: "domyślnie: dokument klienta" };
 }
 const PREV = /(_archiwum|poprzednia[_ ]wersja|przed[_ ]korekta|stara|old)/i;
