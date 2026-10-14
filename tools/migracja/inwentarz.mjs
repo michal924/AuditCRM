@@ -36,7 +36,7 @@ function sectionOf(rel) {
   if (/certyfikat|certificate/.test(n) && !clientDoc) return { sec: "07", why: "certyfikat (wynik audytu)" };
   if (/lista[_ ]obecnosci|attendance/.test(n) || (/podpisan|signed/.test(n) && auditorOut)) return { sec: "07", why: "podpisany dokument audytora / lista obecności" };
   if (auditorOut) return { sec: "06", why: "raport audytora / lista kontrolna / analiza ryzyka" };
-  if (/dostaw|supplier|deklaracja[_ ]dostaw|rejestr[_ ]kwalif/.test(n)) return { sec: "03", why: "dostawcy" };
+  if (/timestamped|fsc-c\d{5,}|dostaw|supplier|deklaracja[_ ]dostaw|rejestr[_ ]kwalif/.test(n)) return { sec: "03", why: "dostawcy" };
   if (/plan[_ ]aud|audplan|zlecenie|kalkulator|notification/.test(n)) return { sec: "01", why: "plan / zlecenie / kalkulator" };
   if (clientDoc) return { sec: "02", why: "dokument klienta" + (IMG.test(name) ? " (skan w formacie obrazu)" : "") };
   if (IMG.test(name)) return { sec: "05", why: "zdjęcie / obraz bez cechy dokumentu" };
@@ -64,7 +64,7 @@ for (const f of files) {
   if (dups && dups.length > 1 && dups[0] !== f) { action = "pomiń-duplikat"; why = "identyczny bajt w bajt z: " + dups[0].rel; }
   if (/^(pefc|fsc)[\\/]/i.test(rel) && dups && dups.length > 1) why += " · folder programu; audyt łączony = jedna kopia";
   if (!/^0[1-9]_/.test(rel.split(/[\\/]/).slice(-2)[0] || "") && rel.split(/[\\/]/).length <= 2 && s.sec === "06" && /lista[_ ]kontrolna/i.test(name)) why += " · luzem w katalogu głównym";
-  const proposed = unit === "CU" ? name.replace(/^FL_\d{14}_/, "") : name;       // CU: system dokleja FL_… przy eksporcie — nasza nazwa bez prefiksu
+  const proposed = unit === "CU" ? name.replace(/^FL_\d{12,14}_/, "") : name;       // CU: system dokleja FL_… przy eksporcie — nasza nazwa bez prefiksu
   rows.push({ audyt: auditOf(rel), zrodlo: rel, sekcja: target, akcja: action, nazwa_docelowa: proposed, metadane: JSON.stringify(mt), powod: why, rozmiar: f.size ?? "" });
 }
 const q = v => `"${String(v).replace(/"/g, '""')}"`;
