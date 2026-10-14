@@ -152,6 +152,7 @@ async function init() {
   DashboardModule.setup();
   DelegModule.setup();
   ClientsModule.setup();
+  DocsModule.setup();
   LauraModule.setup();
 
   await loadAudits();
@@ -5152,6 +5153,123 @@ const TestEnvModule = (function () {
 window.TestEnvModule = TestEnvModule;
 
 // ============================================================
+// MODUŁ: DOKUMENTY — biblioteki „Audyty” na witrynach jednostek + wgrywanie folderu klienta według planu migracji (CSV z inwentarza).
+// Domyślnie tryb TESTU (nic nie jest wgrywane). Wgrywanie jest idempotentne (nadpisuje ten sam plik w tym samym miejscu).
+// ============================================================
+const DocsModule = (function () {
+  const $ = id => document.getElementById(id);
+  let plan = [], files = new Map();
+  const log = m => { const el = $("docs-log"); el.textContent += m + "\n"; el.scrollTop = el.scrollHeight; };
+  const nfc = s => String(s).normalize("NFC");
+
+  function parsePlan(text) {
+    text = String(text).replace(/^﻿/, ""); const rows = []; let row = [], cur = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true; else if (c === ";") { row.push(cur); cur = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cur); if (row.some(x => x !== "")) rows.push(row); row = []; cur = ""; }
+      else cur += c;
+    }
+    if (cur !== "" || row.length) { row.push(cur); if (row.some(x => x !== "")) rows.push(row); }
+    const h = rows[0] || []; const ix = n => h.indexOf(n);
+    if (ix("zrodlo") < 0 || ix("sekcja") < 0 || ix("akcja") < 0) throw new Error("To nie jest plik planu migracji (brak kolumn zrodlo / sekcja / akcja).");
+    return rows.slice(1).map(r => ({ audyt: r[ix("audyt")] || "(do przypisania)", zrodlo: nfc(r[ix("zrodlo")] || ""), sekcja: r[ix("sekcja")] || "", akcja: r[ix("akcja")] || "",
+      nazwa: r[ix("nazwa_docelowa")] || "", meta: (() => { try { return JSON.parse(r[ix("metadane")] || "{}"); } catch { return {}; } })() }));
+  }
+
+  async function renderSites() {
+    const box = $("docs-sites"); box.innerHTML = '<div class="cl-empty">Sprawdzam witryny…</div>';
+    const cards = [];
+    for (const k of Object.keys(DOC_SITES)) {
+      const site = DOC_SITES[k], st = await docLibraryState(site);
+      const txt = st.error ? "⚠ " + escHtml(st.error) : st.exists ? `Biblioteka „${DOC_LIB}” istnieje · plików: ${st.items ?? "?"} · wersjonowanie ${st.versioning ? "włączone" : "wyłączone"}` : `Biblioteki „${DOC_LIB}” jeszcze nie ma`;
+      cards.push(`<div class="docs-site"><div class="k">${escHtml(site.label)}</div><div class="v">${txt}</div>
+        <button class="btn-action docs-create" data-k="${k}"${st.error ? " disabled" : ""}>${st.exists ? "Uzupełnij kolumny" : "Utwórz bibliotekę"}</button></div>`);
+    }
+    box.innerHTML = cards.join("");
+    box.querySelectorAll(".docs-create").forEach(b => b.onclick = async () => {
+      const site = DOC_SITES[b.dataset.k]; b.disabled = true;
+      try { const r = await ensureDocLibrary(site); showToast(`${site.label}: ${r.created.length ? r.created.join(", ") : "bez zmian"}` + (r.errors.length ? ` · błędy: ${r.errors.length}` : ""), r.errors.length ? "warn" : "success"); if (r.errors.length) console.warn(r.errors); }
+      catch (e) { showToast(String(e.message || e), "error"); }
+      renderSites();
+    });
+  }
+
+  function fillClients() {
+    const sel = $("docs-client"); const cs = (window.ClientsModule && ClientsModule.list) ? ClientsModule.list() : [];
+    sel.innerHTML = cs.map(c => `<option value="${c.Id}">${escHtml(c.Title || "")}</option>`).join("") || '<option value="">(brak klientów — najpierw wyodrębnij)</option>';
+    renderMap();
+  }
+  function auditsOfClient(id) { return (window.ClientsModule && ClientsModule.auditsOf) ? ClientsModule.auditsOf(parseInt(id)) : []; }
+  function renderMap() {
+    const box = $("docs-map"); const names = Array.from(new Set(plan.map(r => r.audyt)));
+    const au = auditsOfClient($("docs-client").value).slice().sort((a, b) => String(b.AuditDateStart).localeCompare(String(a.AuditDateStart)));
+    box.innerHTML = names.map((n, i) => {
+      const cnt = plan.filter(r => r.audyt === n).length;
+      return `<label class="cl-f"><span>Audyt z planu „${escHtml(n)}” (${cnt} plików) →</span><select class="form-input docs-map-sel" data-name="${escHtml(n)}"><option value="">(nie przypisuj — folder „do przypisania”)</option>` +
+        au.map(a => `<option value="${a.Id}">${escHtml(formatDate(a.AuditDateStart))} · ${escHtml(bodyLabel(a))} · ${escHtml(a.Program || "")}${a.ProjectID ? " · " + escHtml(a.ProjectID) : ""}</option>`).join("") + `</select></label>`;
+    }).join("");
+  }
+
+  async function run() {
+    const dry = $("docs-dry").checked, st = $("docs-status"); $("docs-log").textContent = "";
+    if (!plan.length) { showToast("Wskaż plik planu migracji", "warn"); return; }
+    if (!files.size) { showToast("Wskaż folder źródłowy", "warn"); return; }
+    const cid = parseInt($("docs-client").value); const client = (ClientsModule.list() || []).find(c => c.Id === cid);
+    if (!client) { showToast("Wybierz klienta", "warn"); return; }
+    const site = DOC_SITES[$("docs-unit").value];
+    const map = {}; document.querySelectorAll(".docs-map-sel").forEach(s => { map[s.dataset.name] = s.value ? parseInt(s.value) : null; });
+    const todo = plan.filter(r => r.akcja === "kopiuj" || r.akcja === "wersja-poprzednia");
+    const skipped = plan.length - todo.length;
+    if (!dry && !confirm(`Wgrać ${todo.length} plików klienta „${client.Title}” do witryny ${site.label}?\n(pominięto wg planu: ${skipped})`)) return;
+    $("docs-run").disabled = true; let ok = 0, miss = 0, err = 0;
+    try {
+      if (!dry) { const s0 = await docLibraryState(site); if (!s0.exists) throw new Error("Biblioteka „" + DOC_LIB + "” nie istnieje w " + site.label + " — utwórz ją powyżej."); }
+      for (let i = 0; i < todo.length; i++) {
+        const r = todo[i], f = files.get(r.zrodlo);
+        if (!f) { miss++; log("BRAK PLIKU: " + r.zrodlo); continue; }
+        const a = map[r.audyt] != null ? (allAudits || []).find(x => x.Id === map[r.audyt]) : null;
+        const audFolder = a ? `${String(a.AuditDateStart || "").slice(0, 10)}_${safeSeg(a.Program)}${a.ProjectID ? "_" + safeSeg(a.ProjectID) : ""}` : "(do przypisania)_" + safeSeg(r.audyt);
+        const folder = `${safeSeg(client.Title)}/${audFolder}/${r.sekcja}` + (r.akcja === "wersja-poprzednia" ? "/_poprzednie_wersje" : "");
+        const name = r.nazwa || f.name, secNo = (r.sekcja.match(/^(0[1-9])/) || [])[1];
+        const meta = { ClientId: client.Id, ClientName: client.Title, DocSection: r.sekcja, DocType: DOC_TYPE_OF[secNo] || "", SourceName: f.name,
+          SourceDate: r.meta.wgranoDoCU || "", FormCode: r.meta.formularzSGS || "" };
+        if (a) { meta.AuditId = a.Id; meta.AuditLabel = audFolder; }
+        Object.keys(meta).forEach(k => { if (meta[k] === "" || meta[k] == null) delete meta[k]; });
+        st.textContent = `${dry ? "Test" : "Wgrywam"}: ${i + 1}/${todo.length}`;
+        if (dry) { log(`[test] ${folder}/${name}`); ok++; continue; }
+        try { await docUpload(site, folder, name, f, meta); ok++; log(`OK  ${folder}/${name}`); }
+        catch (e) { err++; log(`BŁĄD ${name}: ${e.message || e}`); }
+      }
+      st.textContent = `${dry ? "Test zakończony" : "Zakończono"}: ${ok} plików${miss ? `, brak na dysku: ${miss}` : ""}${err ? `, błędy: ${err}` : ""}${skipped ? ` · pominięte wg planu: ${skipped}` : ""}`;
+      showToast(st.textContent, err || miss ? "warn" : "success");
+    } catch (e) { st.textContent = "Błąd: " + (e.message || e); showToast(String(e.message || e), "error"); }
+    finally { $("docs-run").disabled = false; if (!dry) renderSites(); }
+  }
+
+  function setup() {
+    const card = $("docs-card"); if (!card) return;
+    if (!window.CLIENTS_ENABLED) return;
+    card.classList.remove("hidden");
+    card.addEventListener("toggle", () => { if (card.open) { renderSites(); fillClients(); } });
+    $("docs-client").onchange = renderMap;
+    $("docs-plan").onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      try { plan = parsePlan(await f.text()); $("docs-status").textContent = `Plan: ${plan.length} wierszy`; fillClients(); } catch (err) { plan = []; $("docs-status").textContent = err.message; }
+    };
+    $("docs-folder").onchange = e => {
+      files = new Map(); const arr = Array.from(e.target.files || []);
+      arr.forEach(f => { const p = nfc(f.webkitRelativePath || f.name).split("/"); files.set(p.slice(1).join("/"), f); });
+      $("docs-status").textContent = `Folder: ${arr.length} plików`;
+    };
+    $("docs-run").onclick = run;
+  }
+  return { setup, fillClients };
+})();
+window.DocsModule = DocsModule;
+
+// ============================================================
 // MODUŁ: KLIENCI — karta klienta (LFA Hub, etap 1). Lista Clients + ClientId w audytach.
 // Klient = rekord z danymi stałymi; audyty z obu jednostek (CU, SGS, LF) w jednej liście, certyfikaty i terminy wyliczane z audytów.
 // Dopasowanie audytu: ClientId (trwałe) albo, gdy brak, znormalizowana nazwa (nazwa lub „inne zapisy”).
@@ -5402,7 +5520,8 @@ const ClientsModule = (function () {
     $("cl-setup-btn").onclick = setupSchema;
   }
   function clientOfAudit(a) { if (!loaded) return null; const id = clientIdOf(a, keyIndex()); return id == null ? null : clients.find(c => c.Id === id); }
-  return { setup, load, render, norm, clientOfAudit };
+  function auditsOf(id) { return groupAudits().get(id) || []; }
+  return { setup, load, render, norm, clientOfAudit, list: () => clients.slice().sort((a, b) => String(a.Title || "").localeCompare(String(b.Title || ""), "pl")), auditsOf };
 })();
 window.ClientsModule = ClientsModule;
 

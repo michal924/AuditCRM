@@ -554,6 +554,27 @@
         <span>Utworzę listę Clients (osobna lista SharePoint) i kolumnę ClientId w audytach. Istniejące dane nie są zmieniane.</span></div>
       <div class="cl-actions"><button id="cl-setup-btn" class="btn-action">Utwórz listę Clients i pole ClientId</button><span id="cl-setup-msg" class="fin-hint"></span></div>
     </div>
+    <details id="docs-card" class="fin-card docs-card hidden">
+      <summary><b>📁 Dokumenty</b> — biblioteki jednostek i wgrywanie według planu migracji</summary>
+      <div class="docs-body">
+        <div id="docs-sites" class="docs-sites"></div>
+        <h4 class="docs-h">Wgraj folder klienta według planu</h4>
+        <p class="cl-note">Plan (CSV) powstaje skryptem inwentarza. Wskaż ten plik i ten sam folder źródłowy, przypisz audyty z planu do audytów w CRM, najpierw zrób test bez wgrywania.</p>
+        <div class="settle-toolbar deleg-toolbar">
+          <div class="form-row"><label for="docs-client">Klient</label><select id="docs-client" class="form-input"></select></div>
+          <div class="form-row"><label for="docs-unit">Jednostka (witryna)</label><select id="docs-unit" class="form-input"><option value="CUC">LFA Control Union</option><option value="SGS">LFA SGS</option></select></div>
+          <div class="form-row"><label for="docs-plan">Plan migracji (CSV)</label><input type="file" id="docs-plan" accept=".csv,text/csv" class="form-input"></div>
+          <div class="form-row"><label for="docs-folder">Folder źródłowy</label><input type="file" id="docs-folder" webkitdirectory class="form-input"></div>
+        </div>
+        <div id="docs-map" class="docs-map"></div>
+        <div class="cl-actions">
+          <button id="docs-run" class="btn-action">Uruchom</button>
+          <label class="settle-import-opt"><input type="checkbox" id="docs-dry" checked> tylko test (nic nie wgrywaj)</label>
+          <span id="docs-status" class="fin-hint"></span>
+        </div>
+        <pre id="docs-log" class="docs-log"></pre>
+      </div>
+    </details>
     <div class="cl-layout">
       <aside class="cl-side">
         <div class="cl-side-head"><span id="cl-count"></span><span id="cl-unlinked" class="fin-hint"></span></div>

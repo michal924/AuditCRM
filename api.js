@@ -484,3 +484,107 @@ async function addTripsBatch(rows, onProgress) {
   }
   return { done, errs };
 }
+
+
+// ============================================================
+// LFA HUB · DOKUMENTY — biblioteka „Audyty” na witrynach jednostek (LFA-CU, LFA-SGS)
+// Struktura: Klient / RRRR-MM-DD_Program_PRJ / 01_… 09_… / plik. Metadane na pliku: klient, audyt CRM, sekcja, typ, źródło.
+// ============================================================
+const DOC_SITES = {
+  CUC: { url: "https://logisticfit.sharepoint.com/sites/LFA-CU",  path: "/sites/LFA-CU",  label: "LFA Control Union" },
+  SGS: { url: "https://logisticfit.sharepoint.com/sites/LFA-SGS", path: "/sites/LFA-SGS", label: "LFA SGS" },
+};
+const DOC_LIB = "Audyty";
+const DOC_SECTIONS = ["01_Przygotowanie", "02_Dokumenty_klienta", "03_Dostawcy", "04_GHG", "05_Zdjecia", "06_Raport_roboczy", "07_Podpisane", "08_Paczka", "09_Korespondencja"];
+const DOC_TYPE_OF = { "01": "Plan / przygotowanie", "02": "Dokument klienta", "03": "Dostawcy", "04": "GHG", "05": "Zdjęcie", "06": "Raport roboczy", "07": "Podpisany", "08": "Paczka dla jednostki", "09": "Korespondencja" };
+const DOC_FIELDS = [
+  { name: "ClientId",    label: "ID klienta (CRM)",       type: "Number" },
+  { name: "ClientName",  label: "Klient",                 type: "Text" },
+  { name: "AuditId",     label: "ID audytu (CRM)",        type: "Number" },
+  { name: "AuditLabel",  label: "Audyt",                  type: "Text" },
+  { name: "DocSection",  label: "Sekcja",                 type: "Choice", choices: DOC_SECTIONS, defaultValue: "02_Dokumenty_klienta" },
+  { name: "DocType",     label: "Typ dokumentu",          type: "Text" },
+  { name: "SourceName",  label: "Nazwa źródłowa",         type: "Text" },
+  { name: "SourceDate",  label: "Data wgrania do jednostki", type: "Text" },
+  { name: "FormCode",    label: "Kod formularza",         type: "Text" },
+];
+
+const _docDigest = {};
+async function docSite(site, path, opts) {
+  opts = opts || {};
+  const token = await getToken();
+  const h = Object.assign({ Authorization: `Bearer ${token}`, Accept: "application/json;odata=nometadata" }, opts.headers || {});
+  if (opts.write) {
+    if (!_docDigest[site.url] || Date.now() - _docDigest[site.url].t > 20 * 60000) {
+      const r = await fetch(`${site.url}/_api/contextinfo`, { method: "POST", headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=nometadata", "Content-Length": "0" } });
+      if (!r.ok) throw new Error(`contextinfo ${site.label}: ${r.status}`);
+      _docDigest[site.url] = { v: (await r.json()).FormDigestValue, t: Date.now() };
+    }
+    h["X-RequestDigest"] = _docDigest[site.url].v;
+  }
+  const r = await fetch(`${site.url}${path}`, { method: opts.method || "GET", headers: h, body: opts.body });
+  return r;
+}
+const _q = s => String(s).replace(/'/g, "''");
+
+// Stan biblioteki: {exists, items?} albo {error}
+async function docLibraryState(site) {
+  try {
+    const r = await docSite(site, `/_api/web/lists/getbytitle('${DOC_LIB}')?$select=Id,ItemCount,EnableVersioning`);
+    if (r.status === 404) return { exists: false };
+    if (!r.ok) return { error: `HTTP ${r.status}` + (r.status === 403 ? " (brak uprawnień do witryny)" : "") };
+    const d = await r.json(); return { exists: true, items: d.ItemCount, versioning: d.EnableVersioning };
+  } catch (e) { return { error: e.message || String(e) }; }
+}
+// Tworzy bibliotekę Audyty, włącza wersjonowanie, dodaje kolumny metadanych. Zwraca {created, errors}.
+async function ensureDocLibrary(site) {
+  const created = [], errors = [];
+  const st = await docLibraryState(site);
+  if (st.error) throw new Error(`${site.label}: ${st.error}`);
+  if (!st.exists) {
+    const r = await docSite(site, `/_api/web/lists`, { method: "POST", write: true,
+      headers: { "Content-Type": "application/json;odata=nometadata" },
+      body: JSON.stringify({ __metadata: { type: "SP.List" }, BaseTemplate: 101, Title: DOC_LIB, Description: "Audyty klientów — LFA Hub", EnableVersioning: true }) });
+    if (!r.ok) throw new Error(`Biblioteka ${DOC_LIB}: ${r.status} ${(await r.text().catch(() => "")).substring(0, 160)}`);
+    created.push("biblioteka " + DOC_LIB);
+  } else if (!st.versioning) {
+    const r = await docSite(site, `/_api/web/lists/getbytitle('${DOC_LIB}')`, { method: "POST", write: true,
+      headers: { "Content-Type": "application/json;odata=nometadata", "X-HTTP-Method": "MERGE", "IF-MATCH": "*" }, body: JSON.stringify({ EnableVersioning: true }) });
+    if (r.ok) created.push("wersjonowanie");
+  }
+  const fr = await docSite(site, `/_api/web/lists/getbytitle('${DOC_LIB}')/fields?$select=InternalName&$top=1000`);
+  const have = new Set(fr.ok ? ((await fr.json()).value || []).map(f => f.InternalName) : []);
+  for (const f of DOC_FIELDS) {
+    if (have.has(f.name)) continue;
+    const r = await docSite(site, `/_api/web/lists/getbytitle('${DOC_LIB}')/fields/createfieldasxml`, { method: "POST", write: true,
+      headers: { Accept: "application/json;odata=verbose", "Content-Type": "application/json;odata=verbose" },
+      body: JSON.stringify({ parameters: { __metadata: { type: "SP.XmlSchemaFieldCreationInformation" }, SchemaXml: settleFieldSchemaXml(f), Options: 12 } }) });
+    if (r.ok) created.push(f.name); else errors.push(f.name + ": " + r.status);
+  }
+  return { created, errors };
+}
+const safeSeg = s => String(s || "").replace(/[~"#%&*:<>?\/{|}\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().replace(/[. ]+$/, "").substring(0, 80) || "bez_nazwy";
+async function docEnsureFolder(site, relPath) {          // relPath względem biblioteki, np. "KORA/2025-10-19_FSC/01_Przygotowanie"
+  const parts = relPath.split("/").filter(Boolean); let cur = `${site.path}/${DOC_LIB}`;
+  for (const seg of parts) {
+    cur += "/" + seg;
+    const r = await docSite(site, `/_api/web/folders`, { method: "POST", write: true, headers: { "Content-Type": "application/json;odata=nometadata" },
+      body: JSON.stringify({ __metadata: { type: "SP.Folder" }, ServerRelativeUrl: cur }) });
+    if (!r.ok && r.status !== 409) throw new Error(`Folder ${cur}: ${r.status}`);   // add jest idempotentne; 409 = już jest
+  }
+  return cur;
+}
+// Wgrywa plik (Blob) i ustawia metadane; zwraca ServerRelativeUrl
+async function docUpload(site, folderRel, fileName, blob, meta) {
+  const folder = await docEnsureFolder(site, folderRel);
+  fileName = String(fileName).replace(/[~"#%&*:<>?\\/{|}]/g, " ").replace(/\s+/g, " ").trim();   // znaki niedozwolone w SharePoint
+  const r = await docSite(site, `/_api/web/GetFolderByServerRelativeUrl('${_q(folder)}')/Files/add(url='${_q(fileName)}',overwrite=true)`, { method: "POST", write: true, body: blob });
+  if (!r.ok) throw new Error(`Plik ${fileName}: ${r.status} ${(await r.text().catch(() => "")).substring(0, 100)}`);
+  const f = await r.json(); const url = f.ServerRelativeUrl || (folder + "/" + fileName);
+  if (meta && Object.keys(meta).length) {
+    const m = await docSite(site, `/_api/web/GetFileByServerRelativeUrl('${_q(url)}')/ListItemAllFields`, { method: "POST", write: true,
+      headers: { "Content-Type": "application/json;odata=nometadata", "X-HTTP-Method": "MERGE", "IF-MATCH": "*" }, body: JSON.stringify(meta) });
+    if (!m.ok) throw new Error(`Metadane ${fileName}: ${m.status}`);
+  }
+  return url;
+}
