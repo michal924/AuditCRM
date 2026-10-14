@@ -544,7 +544,7 @@ async function ensureDocLibrary(site) {
   if (!st.exists) {
     const r = await docSite(site, `/_api/web/lists`, { method: "POST", write: true,
       headers: { "Content-Type": "application/json;odata=nometadata" },
-      body: JSON.stringify({ __metadata: { type: "SP.List" }, BaseTemplate: 101, Title: DOC_LIB, Description: "Audyty klientów — LFA Hub", EnableVersioning: true }) });
+      body: JSON.stringify({ BaseTemplate: 101, Title: DOC_LIB, Description: "Audyty klientów — LFA Hub", EnableVersioning: true }) });
     if (!r.ok) throw new Error(`Biblioteka ${DOC_LIB}: ${r.status} ${(await r.text().catch(() => "")).substring(0, 160)}`);
     created.push("biblioteka " + DOC_LIB);
   } else if (!st.versioning) {
@@ -569,7 +569,7 @@ async function docEnsureFolder(site, relPath) {          // relPath względem bi
   for (const seg of parts) {
     cur += "/" + seg;
     const r = await docSite(site, `/_api/web/folders`, { method: "POST", write: true, headers: { "Content-Type": "application/json;odata=nometadata" },
-      body: JSON.stringify({ __metadata: { type: "SP.Folder" }, ServerRelativeUrl: cur }) });
+      body: JSON.stringify({ ServerRelativeUrl: cur }) });
     if (!r.ok && r.status !== 409) throw new Error(`Folder ${cur}: ${r.status}`);   // add jest idempotentne; 409 = już jest
   }
   return cur;
