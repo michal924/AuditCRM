@@ -313,7 +313,7 @@ function updateSettleCalcFromInputs() {
   const g = id => { const el = document.getElementById(id); return el ? el.value : ""; };
   const tmp = { SettleKm: g("e-s-km"), SettleKmRate: g("e-s-rate"), SettleHotel: g("e-s-hotel"),
     SettleHighway: g("e-s-highway"), SettleOther: g("e-s-other"), SettleTickets: g("e-s-tickets"), SettleFee: g("e-s-fee"),
-    SettleDayRate: g("e-s-dayrate"), AuditDays: g("e-days"), CertBody: g("e-certbody") || (currentAudit && currentAudit.CertBody), Program: currentAudit && currentAudit.Program, AuditType: g("e-type") || (currentAudit && currentAudit.AuditType) };
+    SettleDayRate: g("e-s-dayrate"), AuditDays: g("e-days"), CertBody: g("e-certbody") || (currentAudit && currentAudit.CertBody), Program: g("e-program") || (currentAudit && currentAudit.Program), AuditType: g("e-type") || (currentAudit && currentAudit.AuditType) };
   const c = settleCalc(tmp);
   settleSetText("m-s-kmcost", c.km ? fmtPLN(c.kmCost) : "—");
   settleSetText("m-s-costs",  fmtPLN(c.costs));
@@ -1004,6 +1004,7 @@ function enterEditMode() {
     syncKindType("e-kind", "e-type-row"); }
   document.getElementById("e-mode").value    = a.AuditMode || "On-site";
   document.getElementById("e-certbody").value = certBodyOf(a);
+  { const ep = document.getElementById("e-program"); if (ep) ep.value = a.Program || ""; }
   document.getElementById("e-cu").value      = a.PlannedCUDate ? a.PlannedCUDate.substring(0, 10) : "";
   document.getElementById("e-notes").value   = a.Notes || "";
   // Rozliczenie — pola edycji
@@ -1136,6 +1137,7 @@ async function saveChanges() {
         if (ek && et) fields.AuditType = ek.value === "Audyt" ? (et.value || null) : ek.value; }
       fields.AuditMode     = document.getElementById("e-mode").value || null;
       fields.CertBody      = document.getElementById("e-certbody").value || "CUC";
+      { const ep = document.getElementById("e-program"); if (ep && ep.value.trim()) fields.Program = ep.value.trim().replace(/\s*\+\s*/g, " + "); }
       fields.PlannedCUDate = cuVal ? safeDate(cuVal) : null;
       fields.Notes         = document.getElementById("e-notes").value.trim()   || null;
       // Rozliczenie — tylko gdy kolumny istnieją (inaczej PATCH by się wysypał)
@@ -1164,6 +1166,7 @@ async function saveChanges() {
     const statusBefore = currentAudit.AuditStatus, dateBefore = originalAuditDate || "";
     await updateAudit(currentAudit.Id, fields);
     Object.assign(currentAudit, fields);
+    { const mp = document.getElementById("m-program"); if (mp) mp.textContent = currentAudit.Program || "—"; }
     renderTable();
     await cancelIfRejected(currentAudit, statusBefore);
     // Zmiana daty audytu → pytanie o przeniesienie wydarzenia w Outlooku (stare odwołujemy, nowe tworzymy, chyba że kliknięto „Zaplanuj audyt”)
