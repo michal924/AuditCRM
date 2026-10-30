@@ -876,6 +876,7 @@
             <input type="date" id="plan-sent-date" class="field-input field-input-sm plan-date hidden" title="Data wysłania planu">
           </div>
         </div>
+        <button id="btn-cancel-audit" class="btn-ghost btn-cancel-audit hidden" title="Audyt się nie odbędzie: status REJECTED, zwalnia dzień w kalendarzu i odwołuje zaproszenia w Outlooku">🚫 Odwołaj audyt</button>
         <button id="btn-delete-audit" class="btn-ghost btn-delete-audit" title="Usuń ten wpis z listy Audits (np. duplikat)">🗑 Usuń wpis</button>
         <button id="btn-merge-audit" class="btn-ghost btn-merge-audit hidden" title="Scal z drugim wpisem tego samego dnia w audyt łączony">🔗 Scal w audyt łączony</button>
         <button id="btn-deleg-audit" class="btn-ghost btn-deleg-audit hidden" title="Oświadczenie o podróży służbowej (PDF z pieczęciami i podpisem)">📄 Oświadczenie o delegacji</button>
@@ -1164,6 +1165,9 @@
             <option value="SGS">SGS</option>
             <option value="LF">LogisticFit</option>
           </select>
+        </div>
+        <div class="form-row">
+          <label class="settle-import-opt"><input type="checkbox" id="settle-incl-rejected"> uwzględnij odwołane (REJECTED)</label>
         </div>
         <div class="form-row">
           <label for="settle-rate-CUC">Stawka dzienna CU</label>

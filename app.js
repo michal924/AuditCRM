@@ -863,6 +863,7 @@ function setupModal() {
   });
   document.getElementById("btn-save").onclick = saveChanges;
   document.getElementById("btn-delete-audit").onclick = deleteCurrentAudit;
+  { const bc = document.getElementById("btn-cancel-audit"); if (bc) bc.onclick = cancelCurrentAudit; }
   document.getElementById("btn-merge-audit").onclick = mergeCurrentAudit;
   document.getElementById("btn-deleg-audit").onclick = () => { if (currentAudit) DelegModule.openStatement(currentAudit); };
 
@@ -915,6 +916,7 @@ function openModal(id) {
   if (!a) return;
   currentAudit = a;
   refreshMergeButton(a);
+  { const bc = document.getElementById("btn-cancel-audit"); if (bc) bc.classList.toggle("hidden", a.AuditStatus === "REJECTED"); }
   { const b = document.getElementById("btn-deleg-audit"); if (b) { const ok = DelegModule.eligible(a); b.classList.toggle("hidden", !ok); if (ok) b.textContent = a.DelegNo ? "📄 Oświadczenie " + a.DelegNo : "📄 Oświadczenie o delegacji"; } }
   currentStatus = a.AuditStatus;
   currentProforma = a.Proforma;
@@ -1076,6 +1078,25 @@ async function mergeCurrentAudit() {
 }
 
 // Usunięcie wpisu (np. duplikat po imporcie). Potwierdzenie z nazwą i datą — bez cofania.
+// Odwołanie audytu: status REJECTED → zwalnia dzień w kalendarzu/planowaniu i odwołuje zaproszenia w Outlooku; odwołany nie wchodzi do rozliczenia
+async function cancelCurrentAudit() {
+  const a = currentAudit; if (!a || a.AuditStatus === "REJECTED") return;
+  const label = (a.Title || "—") + " · " + (formatDate(a.AuditDateStart) || "bez daty");
+  if (!confirm("Odwołać audyt?\n\n" + label + "\n\nStatus zmieni się na REJECTED, dzień zostanie zwolniony w kalendarzu, a zaproszenia w Outlooku odwołane. Audyt nie wejdzie do rozliczenia.")) return;
+  const btn = document.getElementById("btn-cancel-audit"); btn.disabled = true;
+  const prev = a.AuditStatus;
+  try {
+    await updateAudit(a.Id, { AuditStatus: "REJECTED" });
+    a.AuditStatus = "REJECTED"; currentStatus = "REJECTED";
+    document.querySelectorAll(".status-btn").forEach(b => b.classList.toggle("active", b.dataset.val === "REJECTED"));
+    btn.classList.add("hidden");
+    renderTable(); try { FinanceModule.render(); DashboardModule.render(); } catch {}
+    showToast("🚫 Odwołano: " + (a.Title || ""), "success");
+    await cancelIfRejected(a, prev);
+  } catch (e) { showToast("Nie udało się odwołać: " + (e.message || e), "error"); }
+  finally { btn.disabled = false; }
+}
+
 async function deleteCurrentAudit() {
   const a = currentAudit; if (!a) return;
   const label = (a.Title || "—") + (a.ProjectID ? " · PRJ " + a.ProjectID : "") + " · " + (formatDate(a.AuditDateStart) || "bez daty");
@@ -4246,8 +4267,14 @@ const SettleModule = (function () {
   }
   function bodyFilter() { const el = $("settle-body-select"); return el ? el.value : "all"; }   // UWAGA: #settle-body to sekcja w oknie audytu
   function rowsByBody() {
-    const b = bodyFilter();
-    return myRows().filter(a => b === "all" || certBodyOf(a) === b);
+    const b = bodyFilter(), inc = $("settle-incl-rejected"), withRej = !!(inc && inc.checked);
+    // Rozliczenie ujmuje audyty zaplanowane (PLANNED/SCHEDULED) i wykonane, ale NIE odwołane (REJECTED) — chyba że zaznaczono „uwzględnij odwołane”
+    return myRows().filter(a => (b === "all" || certBodyOf(a) === b) && (withRej || a.AuditStatus !== "REJECTED"));
+  }
+  function rejectedInMonth() {
+    const m = $("settle-month") ? $("settle-month").value : "", b = bodyFilter(), inc = $("settle-incl-rejected");
+    if (!m || (inc && inc.checked)) return [];
+    return myRows().filter(a => a.AuditStatus === "REJECTED" && monthKeyOf(a) === m && (b === "all" || certBodyOf(a) === b));
   }
   function monthKeyOf(a) { return a.AuditDateStart ? String(a.AuditDateStart).substring(0, 7) : null; }
   function monthRows() {
@@ -4511,7 +4538,9 @@ const SettleModule = (function () {
     if (!rows.length) { box.innerHTML = '<div class="settle-empty">Brak audytów w wybranym miesiącu.</div>'; return; }
     let costs = 0, fee = 0, total = 0; const byStatus = {};
     rows.forEach(a => { const c = settleCalc(a); costs += c.costs; fee += c.fee; total += c.total; const s = settleStatusOf(a); byStatus[s] = (byStatus[s] || 0) + 1; });
+    const rej = rejectedInMonth();
     box.innerHTML =
+      (rej.length ? '<div class="settle-import-hint">Pominięto odwołane (REJECTED): <b>' + rej.length + '</b> — ' + rej.map(a => escHtml(a.Title || "—") + " (" + formatDate(a.AuditDateStart) + ")").join("; ") + '. Zaznacz „uwzględnij odwołane”, jeśli mają być w rozliczeniu.</div>' : '') +
       '<div class="settle-kpis">' +
         kpi("Audyty", rows.length) + kpi("Koszty", fmtPLN(costs)) + kpi("Wynagrodzenie", fmtPLN(fee)) + kpi("Razem", fmtPLN(total)) +
       '</div>' +
@@ -4706,6 +4735,7 @@ const SettleModule = (function () {
       inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + (bk === "CUC_COMBO" ? "CU łączony FSC+PEFC" : bk === "CUC_EUDR" ? "EUDR (CU)" : BODY_INFO[bk].label) + " zapisana (na tym urządzeniu)", "success"); }; });
     const mo = $("settle-month"); if (mo) mo.onchange = renderMonthSummary;
     const bd = $("settle-body-select"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
+    const ir = $("settle-incl-rejected"); if (ir) ir.onchange = () => { renderMonthSummary(); renderReports(); };
     const yr = $("settle-year"); if (yr) yr.onchange = renderReports;
     const imf = $("settle-import-file"); if (imf) imf.onchange = onImportFile;
     const ims = $("settle-import-save"); if (ims) ims.onclick = saveImport;
