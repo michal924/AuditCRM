@@ -858,6 +858,9 @@ function setupModal() {
   document.getElementById("btn-save").onclick = saveChanges;
   document.getElementById("btn-delete-audit").onclick = deleteCurrentAudit;
   { const bc = document.getElementById("btn-cancel-audit"); if (bc) bc.onclick = cancelCurrentAudit; }
+  { const br = document.getElementById("btn-reschedule-audit"); if (br) br.onclick = () => {
+      const eb = document.getElementById("btn-edit-audit"); if (eb && !isEditMode) eb.click();
+      setTimeout(() => { const d = document.getElementById("e-date"); if (d) { d.scrollIntoView({ block: "center" }); d.focus(); } }, 60); }; }
   document.getElementById("btn-merge-audit").onclick = mergeCurrentAudit;
   document.getElementById("btn-deleg-audit").onclick = () => { if (currentAudit) DelegModule.openStatement(currentAudit); };
 
@@ -911,6 +914,7 @@ function openModal(id) {
   currentAudit = a;
   refreshMergeButton(a);
   { const bc = document.getElementById("btn-cancel-audit"); if (bc) bc.classList.toggle("hidden", a.AuditStatus === "REJECTED"); }
+  { const br = document.getElementById("btn-reschedule-audit"); if (br) br.classList.toggle("hidden", a.AuditStatus === "REJECTED" || a.AuditStatus === "DONE"); }
   { const b = document.getElementById("btn-deleg-audit"); if (b) { const ok = DelegModule.eligible(a); b.classList.toggle("hidden", !ok); if (ok) b.textContent = a.DelegNo ? "📄 Oświadczenie " + a.DelegNo : "📄 Oświadczenie o delegacji"; } }
   currentStatus = a.AuditStatus;
   currentProforma = a.Proforma;
