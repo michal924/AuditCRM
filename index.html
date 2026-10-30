@@ -86,6 +86,7 @@
       <button class="nav-btn" data-view="opieka"><span class="nav-ico">👨‍👦</span><span class="nav-lbl">Opieka — Szymon</span></button>
       <button class="nav-btn" data-view="mapa"><span class="nav-ico">🗺</span><span class="nav-lbl">Mapa audytów</span></button>
       <button class="nav-btn" data-view="finanse"><span class="nav-ico">💰</span><span class="nav-lbl">Finanse</span></button>
+      <button class="nav-btn hidden" id="nav-klienci" data-view="klienci"><span class="nav-ico">🏢</span><span class="nav-lbl">Klienci</span></button>
     </div>
     <div class="nav-right">
       <button id="btn-import" class="btn-action" title="Importuj kwartalny plan z CUC">⬆ Import CUC</button>
@@ -538,6 +539,51 @@
     </div>
   </div>
 
+  <!-- WIDOK: KLIENCI — karta klienta (LFA Hub, etap 1; tylko środowisko testowe) -->
+  <div id="view-klienci" class="view hidden">
+    <div class="view-header">
+      <h2>Klienci</h2>
+      <div class="header-filters">
+        <input id="cl-search" class="cl-search" type="search" placeholder="Szukaj: nazwa, miasto, NIP…" autocomplete="off">
+        <button id="cl-extract" class="btn-action" title="Grupuje audyty po nazwie i proponuje listę klientów do akceptacji">🧩 Wyodrębnij klientów z audytów</button>
+        <button id="cl-add" class="btn-ghost">+ Nowy klient</button>
+      </div>
+    </div>
+    <div id="cl-setup" class="fin-late hidden">
+      <div class="fin-late-head"><b>Lista klientów nie jest jeszcze utworzona</b>
+        <span>Utworzę listę Clients (osobna lista SharePoint) i kolumnę ClientId w audytach. Istniejące dane nie są zmieniane.</span></div>
+      <div class="cl-actions"><button id="cl-setup-btn" class="btn-action">Utwórz listę Clients i pole ClientId</button><span id="cl-setup-msg" class="fin-hint"></span></div>
+    </div>
+    <details id="docs-card" class="fin-card docs-card hidden">
+      <summary><b>📁 Dokumenty</b> — biblioteki jednostek i wgrywanie według planu migracji</summary>
+      <div class="docs-body">
+        <div id="docs-sites" class="docs-sites"></div>
+        <h4 class="docs-h">Wgraj folder klienta według planu</h4>
+        <p class="cl-note">Plan (CSV) powstaje skryptem inwentarza. Wskaż ten plik i ten sam folder źródłowy, przypisz audyty z planu do audytów w CRM, najpierw zrób test bez wgrywania.</p>
+        <div class="settle-toolbar deleg-toolbar">
+          <div class="form-row"><label for="docs-client">Klient</label><select id="docs-client" class="form-input"></select></div>
+          <div class="form-row"><label for="docs-unit">Jednostka (witryna)</label><select id="docs-unit" class="form-input"><option value="CUC">LFA Control Union</option><option value="SGS">LFA SGS</option></select></div>
+          <div class="form-row"><label for="docs-plan">Plan migracji (CSV)</label><input type="file" id="docs-plan" accept=".csv,text/csv" class="form-input"></div>
+          <div class="form-row"><label for="docs-folder">Folder źródłowy</label><input type="file" id="docs-folder" webkitdirectory class="form-input"></div>
+        </div>
+        <div id="docs-map" class="docs-map"></div>
+        <div class="cl-actions">
+          <button id="docs-run" class="btn-action">Uruchom</button>
+          <label class="settle-import-opt"><input type="checkbox" id="docs-dry" checked> tylko test (nic nie wgrywaj)</label>
+          <span id="docs-status" class="fin-hint"></span>
+        </div>
+        <pre id="docs-log" class="docs-log"></pre>
+      </div>
+    </details>
+    <div class="cl-layout">
+      <aside class="cl-side">
+        <div class="cl-side-head"><span id="cl-count"></span><span id="cl-unlinked" class="fin-hint"></span></div>
+        <div id="cl-list" class="cl-list"></div>
+      </aside>
+      <section id="cl-card" class="cl-card"></section>
+    </div>
+  </div>
+
   <!-- WIDOK: FINANSE — plan finansowy i rozliczenia (prognoza vs wykonanie) -->
   <div id="view-finanse" class="view hidden">
     <div class="view-header">
@@ -599,6 +645,21 @@
       <div id="deleg-skipped" class="fin-hint" style="margin-top:8px"></div>
     </div>
 
+    <div class="fin-card" id="laura-card">
+      <div class="fin-card-head"><h3>🚗 Rozliczenie z Laury — plan vs rzeczywistość</h3><span class="fin-hint">CSV ze Škoda Connect · dopasowanie jazd do okien wyjazd–powrót · tylko środowisko testowe</span></div>
+      <div id="laura-setup" class="fin-late hidden">
+        <div class="fin-late-head"><b>Lista przejazdów (Trips) nie jest jeszcze utworzona</b><span>Powstaje osobna lista SharePoint. Istniejące dane nie są zmieniane.</span></div>
+        <div class="cl-actions"><button id="laura-setup-btn" class="btn-action">Utwórz listę Trips</button></div>
+      </div>
+      <div class="settle-toolbar deleg-toolbar">
+        <div class="form-row"><label for="laura-month">Okres</label><select id="laura-month" class="form-input"></select></div>
+        <div class="settle-toolbar-actions"><button id="laura-pick" class="btn-action">⬆ Wgraj CSV z Laury</button><input type="file" id="laura-file" accept=".csv,text/csv" multiple hidden></div>
+      </div>
+      <div id="laura-status" class="fin-hint"></div>
+      <div id="laura-kpis" class="fin-kpis"></div>
+      <div id="laura-body"></div>
+    </div>
+
     <div class="fin-card" id="fin-month-card">
       <div class="fin-card-head"><h3 id="fin-month-title">Audyty w miesiącu</h3><span class="fin-hint">kliknij wiersz, aby otworzyć audyt</span></div>
       <div id="fin-month-list" class="settle-empty">Wybierz miesiąc na wykresie lub w tabeli.</div>
@@ -626,7 +687,9 @@
         <div class="modal-section">
           <h3>Dane firmy</h3>
           <div class="field-row"><label>PRJ</label><span id="m-prj">—</span></div>
-          <div class="field-row"><label>Program</label><span id="m-program">—</span></div>
+          <div class="field-row"><label>Program</label><span id="m-program" class="view-val">—</span>
+            <input id="e-program" class="edit-val field-input" list="e-program-list" placeholder="np. FSC CoC + PEFC CoC" autocomplete="off">
+            <datalist id="e-program-list"><option value="FSC CoC"><option value="PEFC CoC"><option value="FSC CoC + PEFC CoC"><option value="EUDR"><option value="KZR INiG"></datalist></div>
           <div class="field-row">
             <label>Jednostka</label>
             <span id="m-certbody" class="view-val">—</span>
@@ -813,6 +876,8 @@
             <input type="date" id="plan-sent-date" class="field-input field-input-sm plan-date hidden" title="Data wysłania planu">
           </div>
         </div>
+        <button id="btn-reschedule-audit" class="btn-ghost btn-reschedule-audit hidden" title="Zmień datę audytu: dzień dotychczasowy się zwalnia, audyt trafia do rozliczenia miesiąca nowej daty">📅 Przełóż termin</button>
+        <button id="btn-cancel-audit" class="btn-ghost btn-cancel-audit hidden" title="Audyt się nie odbędzie: status REJECTED, zwalnia dzień w kalendarzu i odwołuje zaproszenia w Outlooku">🚫 Odwołaj audyt</button>
         <button id="btn-delete-audit" class="btn-ghost btn-delete-audit" title="Usuń ten wpis z listy Audits (np. duplikat)">🗑 Usuń wpis</button>
         <button id="btn-merge-audit" class="btn-ghost btn-merge-audit hidden" title="Scal z drugim wpisem tego samego dnia w audyt łączony">🔗 Scal w audyt łączony</button>
         <button id="btn-deleg-audit" class="btn-ghost btn-deleg-audit hidden" title="Oświadczenie o podróży służbowej (PDF z pieczęciami i podpisem)">📄 Oświadczenie o delegacji</button>
@@ -1101,6 +1166,9 @@
             <option value="SGS">SGS</option>
             <option value="LF">LogisticFit</option>
           </select>
+        </div>
+        <div class="form-row">
+          <label class="settle-import-opt"><input type="checkbox" id="settle-incl-rejected"> uwzględnij odwołane (REJECTED)</label>
         </div>
         <div class="form-row">
           <label for="settle-rate-CUC">Stawka dzienna CU</label>

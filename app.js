@@ -151,6 +151,9 @@ async function init() {
   FinanceModule.setup();
   DashboardModule.setup();
   DelegModule.setup();
+  ClientsModule.setup();
+  DocsModule.setup();
+  LauraModule.setup();
 
   await loadAudits();
   try { DashboardModule.render(); } catch (e) { console.warn("Pulpit:", e); }
@@ -173,8 +176,9 @@ function setupNav() {
       if (view === "opieka")     OpiekaModule.render();
       if (view === "mapa")       MapModule.render();
       if (view === "kalendarz")  AuditCalModule.render();
-      if (view === "finanse")    { FinanceModule.render(); DelegModule.render(); }
+      if (view === "finanse")    { FinanceModule.render(); DelegModule.render(); try { LauraModule.render(); } catch {} }
       if (view === "pulpit")     DashboardModule.render();
+      if (view === "klienci")    ClientsModule.render();
     };
   });
 }
@@ -200,6 +204,8 @@ async function loadAudits() {
     renderTable();
     try { SideCalModule.render(); } catch {}
     migrateInvoiceStatus();
+    try { ClientsModule.load(); } catch {}
+    try { LauraModule.load(); } catch {}
     try { if (!document.getElementById("view-pulpit").classList.contains("hidden")) DashboardModule.render(); } catch {}
   } catch (e) {
     document.getElementById("audits-tbody").innerHTML =
@@ -307,7 +313,7 @@ function updateSettleCalcFromInputs() {
   const g = id => { const el = document.getElementById(id); return el ? el.value : ""; };
   const tmp = { SettleKm: g("e-s-km"), SettleKmRate: g("e-s-rate"), SettleHotel: g("e-s-hotel"),
     SettleHighway: g("e-s-highway"), SettleOther: g("e-s-other"), SettleTickets: g("e-s-tickets"), SettleFee: g("e-s-fee"),
-    SettleDayRate: g("e-s-dayrate"), AuditDays: g("e-days"), CertBody: g("e-certbody") || (currentAudit && currentAudit.CertBody), Program: currentAudit && currentAudit.Program, AuditType: g("e-type") || (currentAudit && currentAudit.AuditType) };
+    SettleDayRate: g("e-s-dayrate"), AuditDays: g("e-days"), CertBody: g("e-certbody") || (currentAudit && currentAudit.CertBody), Program: g("e-program") || (currentAudit && currentAudit.Program), AuditType: g("e-type") || (currentAudit && currentAudit.AuditType) };
   const c = settleCalc(tmp);
   settleSetText("m-s-kmcost", c.km ? fmtPLN(c.kmCost) : "—");
   settleSetText("m-s-costs",  fmtPLN(c.costs));
@@ -857,6 +863,10 @@ function setupModal() {
   });
   document.getElementById("btn-save").onclick = saveChanges;
   document.getElementById("btn-delete-audit").onclick = deleteCurrentAudit;
+  { const bc = document.getElementById("btn-cancel-audit"); if (bc) bc.onclick = cancelCurrentAudit; }
+  { const br = document.getElementById("btn-reschedule-audit"); if (br) br.onclick = () => {
+      const eb = document.getElementById("btn-edit-audit"); if (eb && !isEditMode) eb.click();
+      setTimeout(() => { const d = document.getElementById("e-date"); if (d) { d.scrollIntoView({ block: "center" }); d.focus(); } }, 60); }; }
   document.getElementById("btn-merge-audit").onclick = mergeCurrentAudit;
   document.getElementById("btn-deleg-audit").onclick = () => { if (currentAudit) DelegModule.openStatement(currentAudit); };
 
@@ -909,6 +919,8 @@ function openModal(id) {
   if (!a) return;
   currentAudit = a;
   refreshMergeButton(a);
+  { const bc = document.getElementById("btn-cancel-audit"); if (bc) bc.classList.toggle("hidden", a.AuditStatus === "REJECTED"); }
+  { const br = document.getElementById("btn-reschedule-audit"); if (br) br.classList.toggle("hidden", a.AuditStatus === "REJECTED" || a.AuditStatus === "DONE"); }
   { const b = document.getElementById("btn-deleg-audit"); if (b) { const ok = DelegModule.eligible(a); b.classList.toggle("hidden", !ok); if (ok) b.textContent = a.DelegNo ? "📄 Oświadczenie " + a.DelegNo : "📄 Oświadczenie o delegacji"; } }
   currentStatus = a.AuditStatus;
   currentProforma = a.Proforma;
@@ -998,6 +1010,7 @@ function enterEditMode() {
     syncKindType("e-kind", "e-type-row"); }
   document.getElementById("e-mode").value    = a.AuditMode || "On-site";
   document.getElementById("e-certbody").value = certBodyOf(a);
+  { const ep = document.getElementById("e-program"); if (ep) ep.value = a.Program || ""; }
   document.getElementById("e-cu").value      = a.PlannedCUDate ? a.PlannedCUDate.substring(0, 10) : "";
   document.getElementById("e-notes").value   = a.Notes || "";
   // Rozliczenie — pola edycji
@@ -1069,6 +1082,25 @@ async function mergeCurrentAudit() {
 }
 
 // Usunięcie wpisu (np. duplikat po imporcie). Potwierdzenie z nazwą i datą — bez cofania.
+// Odwołanie audytu: status REJECTED → zwalnia dzień w kalendarzu/planowaniu i odwołuje zaproszenia w Outlooku; odwołany nie wchodzi do rozliczenia
+async function cancelCurrentAudit() {
+  const a = currentAudit; if (!a || a.AuditStatus === "REJECTED") return;
+  const label = (a.Title || "—") + " · " + (formatDate(a.AuditDateStart) || "bez daty");
+  if (!confirm("Odwołać audyt?\n\n" + label + "\n\nStatus zmieni się na REJECTED, dzień zostanie zwolniony w kalendarzu, a zaproszenia w Outlooku odwołane. Audyt nie wejdzie do rozliczenia.")) return;
+  const btn = document.getElementById("btn-cancel-audit"); btn.disabled = true;
+  const prev = a.AuditStatus;
+  try {
+    await updateAudit(a.Id, { AuditStatus: "REJECTED" });
+    a.AuditStatus = "REJECTED"; currentStatus = "REJECTED";
+    document.querySelectorAll(".status-btn").forEach(b => b.classList.toggle("active", b.dataset.val === "REJECTED"));
+    btn.classList.add("hidden");
+    renderTable(); try { FinanceModule.render(); DashboardModule.render(); } catch {}
+    showToast("🚫 Odwołano: " + (a.Title || ""), "success");
+    await cancelIfRejected(a, prev);
+  } catch (e) { showToast("Nie udało się odwołać: " + (e.message || e), "error"); }
+  finally { btn.disabled = false; }
+}
+
 async function deleteCurrentAudit() {
   const a = currentAudit; if (!a) return;
   const label = (a.Title || "—") + (a.ProjectID ? " · PRJ " + a.ProjectID : "") + " · " + (formatDate(a.AuditDateStart) || "bez daty");
@@ -1130,6 +1162,7 @@ async function saveChanges() {
         if (ek && et) fields.AuditType = ek.value === "Audyt" ? (et.value || null) : ek.value; }
       fields.AuditMode     = document.getElementById("e-mode").value || null;
       fields.CertBody      = document.getElementById("e-certbody").value || "CUC";
+      { const ep = document.getElementById("e-program"); if (ep && ep.value.trim()) fields.Program = ep.value.trim().replace(/\s*\+\s*/g, " + "); }
       fields.PlannedCUDate = cuVal ? safeDate(cuVal) : null;
       fields.Notes         = document.getElementById("e-notes").value.trim()   || null;
       // Rozliczenie — tylko gdy kolumny istnieją (inaczej PATCH by się wysypał)
@@ -1158,6 +1191,7 @@ async function saveChanges() {
     const statusBefore = currentAudit.AuditStatus, dateBefore = originalAuditDate || "";
     await updateAudit(currentAudit.Id, fields);
     Object.assign(currentAudit, fields);
+    { const mp = document.getElementById("m-program"); if (mp) mp.textContent = currentAudit.Program || "—"; }
     renderTable();
     await cancelIfRejected(currentAudit, statusBefore);
     // Zmiana daty audytu → pytanie o przeniesienie wydarzenia w Outlooku (stare odwołujemy, nowe tworzymy, chyba że kliknięto „Zaplanuj audyt”)
@@ -4237,8 +4271,14 @@ const SettleModule = (function () {
   }
   function bodyFilter() { const el = $("settle-body-select"); return el ? el.value : "all"; }   // UWAGA: #settle-body to sekcja w oknie audytu
   function rowsByBody() {
-    const b = bodyFilter();
-    return myRows().filter(a => b === "all" || certBodyOf(a) === b);
+    const b = bodyFilter(), inc = $("settle-incl-rejected"), withRej = !!(inc && inc.checked);
+    // Rozliczenie ujmuje audyty zaplanowane (PLANNED/SCHEDULED) i wykonane, ale NIE odwołane (REJECTED) — chyba że zaznaczono „uwzględnij odwołane”
+    return myRows().filter(a => (b === "all" || certBodyOf(a) === b) && (withRej || a.AuditStatus !== "REJECTED"));
+  }
+  function rejectedInMonth() {
+    const m = $("settle-month") ? $("settle-month").value : "", b = bodyFilter(), inc = $("settle-incl-rejected");
+    if (!m || (inc && inc.checked)) return [];
+    return myRows().filter(a => a.AuditStatus === "REJECTED" && monthKeyOf(a) === m && (b === "all" || certBodyOf(a) === b));
   }
   function monthKeyOf(a) { return a.AuditDateStart ? String(a.AuditDateStart).substring(0, 7) : null; }
   function monthRows() {
@@ -4502,7 +4542,9 @@ const SettleModule = (function () {
     if (!rows.length) { box.innerHTML = '<div class="settle-empty">Brak audytów w wybranym miesiącu.</div>'; return; }
     let costs = 0, fee = 0, total = 0; const byStatus = {};
     rows.forEach(a => { const c = settleCalc(a); costs += c.costs; fee += c.fee; total += c.total; const s = settleStatusOf(a); byStatus[s] = (byStatus[s] || 0) + 1; });
+    const rej = rejectedInMonth();
     box.innerHTML =
+      (rej.length ? '<div class="settle-import-hint">Pominięto odwołane (REJECTED): <b>' + rej.length + '</b> — ' + rej.map(a => escHtml(a.Title || "—") + " (" + formatDate(a.AuditDateStart) + ")").join("; ") + '. Zaznacz „uwzględnij odwołane”, jeśli mają być w rozliczeniu.</div>' : '') +
       '<div class="settle-kpis">' +
         kpi("Audyty", rows.length) + kpi("Koszty", fmtPLN(costs)) + kpi("Wynagrodzenie", fmtPLN(fee)) + kpi("Razem", fmtPLN(total)) +
       '</div>' +
@@ -4697,6 +4739,7 @@ const SettleModule = (function () {
       inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + (bk === "CUC_COMBO" ? "CU łączony FSC+PEFC" : bk === "CUC_EUDR" ? "EUDR (CU)" : BODY_INFO[bk].label) + " zapisana (na tym urządzeniu)", "success"); }; });
     const mo = $("settle-month"); if (mo) mo.onchange = renderMonthSummary;
     const bd = $("settle-body-select"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
+    const ir = $("settle-incl-rejected"); if (ir) ir.onchange = () => { renderMonthSummary(); renderReports(); };
     const yr = $("settle-year"); if (yr) yr.onchange = renderReports;
     const imf = $("settle-import-file"); if (imf) imf.onchange = onImportFile;
     const ims = $("settle-import-save"); if (ims) ims.onclick = saveImport;
@@ -5147,6 +5190,533 @@ const TestEnvModule = (function () {
 window.TestEnvModule = TestEnvModule;
 
 // ============================================================
+// MODUŁ: DOKUMENTY — biblioteki „Audyty” na witrynach jednostek + wgrywanie folderu klienta według planu migracji (CSV z inwentarza).
+// Domyślnie tryb TESTU (nic nie jest wgrywane). Wgrywanie jest idempotentne (nadpisuje ten sam plik w tym samym miejscu).
+// ============================================================
+const DocsModule = (function () {
+  const $ = id => document.getElementById(id);
+  let plan = [], files = new Map();
+  const log = m => { const el = $("docs-log"); el.textContent += m + "\n"; el.scrollTop = el.scrollHeight; };
+  const nfc = s => String(s).normalize("NFC");
+
+  function parsePlan(text) {
+    text = String(text).replace(/^﻿/, ""); const rows = []; let row = [], cur = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true; else if (c === ";") { row.push(cur); cur = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cur); if (row.some(x => x !== "")) rows.push(row); row = []; cur = ""; }
+      else cur += c;
+    }
+    if (cur !== "" || row.length) { row.push(cur); if (row.some(x => x !== "")) rows.push(row); }
+    const h = rows[0] || []; const ix = n => h.indexOf(n);
+    if (ix("zrodlo") < 0 || ix("sekcja") < 0 || ix("akcja") < 0) throw new Error("To nie jest plik planu migracji (brak kolumn zrodlo / sekcja / akcja).");
+    return rows.slice(1).map(r => ({ audyt: r[ix("audyt")] || "(do przypisania)", zrodlo: nfc(r[ix("zrodlo")] || ""), sekcja: r[ix("sekcja")] || "", akcja: r[ix("akcja")] || "",
+      nazwa: r[ix("nazwa_docelowa")] || "", meta: (() => { try { return JSON.parse(r[ix("metadane")] || "{}"); } catch { return {}; } })() }));
+  }
+
+  async function renderSites() {
+    const box = $("docs-sites"); box.innerHTML = '<div class="cl-empty">Sprawdzam witryny…</div>';
+    const cards = [];
+    for (const k of Object.keys(DOC_SITES)) {
+      const site = DOC_SITES[k], st = await docLibraryState(site);
+      const txt = st.error ? "⚠ " + escHtml(st.error) : st.exists ? `Biblioteka „${DOC_LIB}” istnieje · plików: ${st.items ?? "?"} · wersjonowanie ${st.versioning ? "włączone" : "wyłączone"}` : `Biblioteki „${DOC_LIB}” jeszcze nie ma`;
+      cards.push(`<div class="docs-site"><div class="k">${escHtml(site.label)}</div><div class="v">${txt}</div>
+        <button class="btn-action docs-create" data-k="${k}"${st.error ? " disabled" : ""}>${st.exists ? "Uzupełnij kolumny" : "Utwórz bibliotekę"}</button></div>`);
+    }
+    box.innerHTML = cards.join("");
+    box.querySelectorAll(".docs-create").forEach(b => b.onclick = async () => {
+      const site = DOC_SITES[b.dataset.k]; b.disabled = true;
+      try { const r = await ensureDocLibrary(site); showToast(`${site.label}: ${r.created.length ? r.created.join(", ") : "bez zmian"}` + (r.errors.length ? ` · błędy: ${r.errors.length}` : ""), r.errors.length ? "warn" : "success"); if (r.errors.length) console.warn(r.errors); }
+      catch (e) { showToast(String(e.message || e), "error"); }
+      renderSites();
+    });
+  }
+
+  function fillClients() {
+    const sel = $("docs-client"); const cs = (window.ClientsModule && ClientsModule.list) ? ClientsModule.list() : [];
+    sel.innerHTML = cs.map(c => `<option value="${c.Id}">${escHtml(c.Title || "")}</option>`).join("") || '<option value="">(brak klientów — najpierw wyodrębnij)</option>';
+    renderMap();
+  }
+  function auditsOfClient(id) { return (window.ClientsModule && ClientsModule.auditsOf) ? ClientsModule.auditsOf(parseInt(id)) : []; }
+  function renderMap() {
+    const box = $("docs-map"); const names = Array.from(new Set(plan.map(r => r.audyt)));
+    const au = auditsOfClient($("docs-client").value).slice().sort((a, b) => String(b.AuditDateStart).localeCompare(String(a.AuditDateStart)));
+    box.innerHTML = names.map((n, i) => {
+      const cnt = plan.filter(r => r.audyt === n).length;
+      return `<label class="cl-f"><span>Audyt z planu „${escHtml(n)}” (${cnt} plików) →</span><select class="form-input docs-map-sel" data-name="${escHtml(n)}"><option value="">(nie przypisuj — folder „do przypisania”)</option>` +
+        au.map(a => `<option value="${a.Id}">${escHtml(formatDate(a.AuditDateStart))} · ${escHtml(bodyLabel(a))} · ${escHtml(a.Program || "")}${a.ProjectID ? " · " + escHtml(a.ProjectID) : ""}</option>`).join("") + `</select></label>`;
+    }).join("");
+  }
+
+  async function run() {
+    const dry = $("docs-dry").checked, st = $("docs-status"); $("docs-log").textContent = "";
+    if (!plan.length) { showToast("Wskaż plik planu migracji", "warn"); return; }
+    if (!files.size) { showToast("Wskaż folder źródłowy", "warn"); return; }
+    const cid = parseInt($("docs-client").value); const client = (ClientsModule.list() || []).find(c => c.Id === cid);
+    if (!client) { showToast("Wybierz klienta", "warn"); return; }
+    const site = DOC_SITES[$("docs-unit").value];
+    const map = {}; document.querySelectorAll(".docs-map-sel").forEach(s => { map[s.dataset.name] = s.value ? parseInt(s.value) : null; });
+    const todo = plan.filter(r => r.akcja === "kopiuj" || r.akcja === "wersja-poprzednia");
+    const skipped = plan.length - todo.length;
+    if (!dry && !confirm(`Wgrać ${todo.length} plików klienta „${client.Title}” do witryny ${site.label}?\n(pominięto wg planu: ${skipped})`)) return;
+    $("docs-run").disabled = true; let ok = 0, miss = 0, err = 0;
+    try {
+      if (!dry) { const s0 = await docLibraryState(site); if (!s0.exists) throw new Error("Biblioteka „" + DOC_LIB + "” nie istnieje w " + site.label + " — utwórz ją powyżej."); }
+      for (let i = 0; i < todo.length; i++) {
+        const r = todo[i], f = files.get(r.zrodlo);
+        if (!f) { miss++; log("BRAK PLIKU: " + r.zrodlo); continue; }
+        const a = map[r.audyt] != null ? (allAudits || []).find(x => x.Id === map[r.audyt]) : null;
+        const audFolder = a ? `${String(a.AuditDateStart || "").slice(0, 10)}_${safeSeg(a.Program)}${a.ProjectID ? "_" + safeSeg(a.ProjectID) : ""}` : "(do przypisania)_" + safeSeg(r.audyt);
+        const folder = `${safeSeg(client.Title)}/${audFolder}/${r.sekcja}` + (r.akcja === "wersja-poprzednia" ? "/_poprzednie_wersje" : "");
+        const name = r.nazwa || f.name, secNo = (r.sekcja.match(/^(0[1-9])/) || [])[1];
+        const meta = { ClientId: client.Id, ClientName: client.Title, DocSection: r.sekcja, DocType: DOC_TYPE_OF[secNo] || "", SourceName: f.name,
+          SourceDate: r.meta.wgranoDoCU || "", FormCode: r.meta.formularzSGS || "" };
+        if (a) { meta.AuditId = a.Id; meta.AuditLabel = audFolder; }
+        Object.keys(meta).forEach(k => { if (meta[k] === "" || meta[k] == null) delete meta[k]; });
+        st.textContent = `${dry ? "Test" : "Wgrywam"}: ${i + 1}/${todo.length}`;
+        if (dry) { log(`[test] ${folder}/${name}`); ok++; continue; }
+        try { await docUpload(site, folder, name, f, meta); ok++; log(`OK  ${folder}/${name}`); }
+        catch (e) { err++; log(`BŁĄD ${name}: ${e.message || e}`); }
+      }
+      st.textContent = `${dry ? "Test zakończony" : "Zakończono"}: ${ok} plików${miss ? `, brak na dysku: ${miss}` : ""}${err ? `, błędy: ${err}` : ""}${skipped ? ` · pominięte wg planu: ${skipped}` : ""}`;
+      showToast(st.textContent, err || miss ? "warn" : "success");
+    } catch (e) { st.textContent = "Błąd: " + (e.message || e); showToast(String(e.message || e), "error"); }
+    finally { $("docs-run").disabled = false; if (!dry) renderSites(); }
+  }
+
+  function setup() {
+    const card = $("docs-card"); if (!card) return;
+    if (!window.CLIENTS_ENABLED) return;
+    card.classList.remove("hidden");
+    card.addEventListener("toggle", () => { if (card.open) { renderSites(); fillClients(); } });
+    $("docs-client").onchange = renderMap;
+    $("docs-plan").onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      try { plan = parsePlan(await f.text()); $("docs-status").textContent = `Plan: ${plan.length} wierszy`; fillClients(); } catch (err) { plan = []; $("docs-status").textContent = err.message; }
+    };
+    $("docs-folder").onchange = e => {
+      files = new Map(); const arr = Array.from(e.target.files || []);
+      arr.forEach(f => { const p = nfc(f.webkitRelativePath || f.name).split("/"); files.set(p.slice(1).join("/"), f); });
+      $("docs-status").textContent = `Folder: ${arr.length} plików`;
+    };
+    $("docs-run").onclick = run;
+  }
+  return { setup, fillClients };
+})();
+window.DocsModule = DocsModule;
+
+// ============================================================
+// MODUŁ: KLIENCI — karta klienta (LFA Hub, etap 1). Lista Clients + ClientId w audytach.
+// Klient = rekord z danymi stałymi; audyty z obu jednostek (CU, SGS, LF) w jednej liście, certyfikaty i terminy wyliczane z audytów.
+// Dopasowanie audytu: ClientId (trwałe) albo, gdy brak, znormalizowana nazwa (nazwa lub „inne zapisy”).
+// ============================================================
+const ClientsModule = (function () {
+  const $ = id => document.getElementById(id);
+  let clients = [], sel = null, q = "", proposal = null, loaded = false;
+  const DAY = 864e5;
+
+  // Klucz porównawczy nazwy: bez wielkości liter, polskich znaków, interpunkcji i form prawnych
+  function norm(s) {
+    let t = " " + String(s || "").toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim() + " ";
+    const forms = [" sp z o o ", " sp z oo ", " spolka z ograniczona odpowiedzialnoscia ", " spolka akcyjna ", " spolka komandytowa ", " spolka jawna ",
+                   " sp k ", " sp j ", " s a ", " sa ", " gmbh ", " ltd ", " bv ", " sp zoo "];
+    let prev; do { prev = t; forms.forEach(f => { t = t.split(f).join(" "); }); } while (t !== prev);
+    return t.replace(/\s+/g, " ").trim();
+  }
+  function keysOf(c) {
+    const ks = new Set([norm(c.Title)]);
+    String(c.Aliases || "").split(/[\n;]+/).forEach(x => { const k = norm(x); if (k) ks.add(k); });
+    ks.delete(""); return ks;
+  }
+  function keyIndex() { const m = new Map(); clients.forEach(c => keysOf(c).forEach(k => { if (!m.has(k)) m.set(k, c.Id); })); return m; }
+  function clientIdOf(a, idx) {
+    if (a.ClientId != null && clients.some(c => c.Id === a.ClientId)) return a.ClientId;
+    const k = norm(a.Title); return k && idx.has(k) ? idx.get(k) : null;
+  }
+  function groupAudits() {
+    const idx = keyIndex(), by = new Map();
+    (allAudits || []).forEach(a => { const id = clientIdOf(a, idx); if (id == null) return; if (!by.has(id)) by.set(id, []); by.get(id).push(a); });
+    return by;
+  }
+  const dKey = a => String(a.AuditDateStart || "").slice(0, 10);
+  const todayKey = () => new Date().toISOString().slice(0, 10);
+  const BODY_SHORT = { CUC: "CU", SGS: "SGS", LF: "LF" };
+
+  // ── ładowanie ──
+  async function load() {
+    if (!window.CLIENTS_ENABLED) return;
+    clients = await fetchClients();
+    const map = await fetchAuditClientIds();
+    (allAudits || []).forEach(a => { if (map[a.Id] != null) a.ClientId = map[a.Id]; });
+    loaded = true;
+    if (!$("view-klienci").classList.contains("hidden")) render();
+    try { DashboardModule.render(); } catch {}
+  }
+
+  // ── lista ──
+  function renderList(by) {
+    const box = $("cl-list"); if (!box) return;
+    const nq = norm(q), raw = q.trim().toLowerCase();
+    let rows = clients.filter(c => !raw || norm(c.Title).includes(nq) || (c.City || "").toLowerCase().includes(raw) || (c.NIP || "").includes(raw) ||
+      Array.from(keysOf(c)).some(k => k.includes(nq)));
+    rows.sort((a, b) => String(a.Title || "").localeCompare(String(b.Title || ""), "pl"));
+    $("cl-count").textContent = rows.length + (rows.length === clients.length ? "" : " / " + clients.length);
+    box.innerHTML = rows.map(c => {
+      const au = by.get(c.Id) || [];
+      const bodies = Array.from(new Set(au.map(a => BODY_SHORT[bodyKey(a)]))).join(" · ");
+      const exp = certRows(au).some(r => r.left != null && r.left < 90);
+      return `<button class="cl-item${c.Id === sel ? " active" : ""}" data-id="${c.Id}">
+        <span class="cl-name">${escHtml(c.Title || "—")}${exp ? ' <i class="cl-warn" title="Certyfikat wygasa w ciągu 90 dni">!</i>' : ""}</span>
+        <span class="cl-sub">${escHtml(c.City || "")}${c.City && au.length ? " · " : ""}${au.length ? au.length + " audyt" + (au.length === 1 ? "" : au.length < 5 ? "y" : "ów") : "bez audytów"}${bodies ? " · " + bodies : ""}</span></button>`;
+    }).join("") || '<div class="cl-empty">Brak klientów. Użyj „Wyodrębnij klientów z audytów”.</div>';
+    box.querySelectorAll(".cl-item").forEach(b => b.onclick = () => { sel = parseInt(b.dataset.id); proposal = null; render(); });
+  }
+
+  // certyfikaty z audytów klienta: dla każdego programu najpóźniejszy CertValidTo
+  function certRows(au) {
+    const m = new Map();
+    au.forEach(a => {
+      if (!a.CertValidTo) return;
+      const progs = programsOf ? programsOf(a) : [a.Program];
+      (progs && progs.length ? progs : [a.Program || "—"]).forEach(p => {
+        const cur = m.get(p), v = String(a.CertValidTo).slice(0, 10);
+        if (!cur || v > cur.valid) m.set(p, { prog: p, valid: v });
+      });
+    });
+    const t = new Date(todayKey() + "T12:00:00");
+    return Array.from(m.values()).map(r => ({ ...r, left: Math.ceil((new Date(r.valid + "T12:00:00") - t) / DAY) }))
+      .sort((a, b) => a.valid.localeCompare(b.valid));
+  }
+
+  // ── karta ──
+  function renderCard(by) {
+    const box = $("cl-card"); if (!box) return;
+    const c = clients.find(x => x.Id === sel);
+    if (!c) { box.innerHTML = '<div class="cl-empty">Wybierz klienta z listy.</div>'; return; }
+    const au = (by.get(c.Id) || []).slice().sort((a, b) => dKey(b).localeCompare(dKey(a)));
+    const t = todayKey();
+    const done = au.filter(a => a.AuditStatus === "DONE");
+    const next = au.filter(a => dKey(a) >= t && a.AuditStatus !== "DONE" && a.AuditStatus !== "REJECTED").sort((a, b) => dKey(a).localeCompare(dKey(b)))[0];
+    const last = done[0];
+    const certs = certRows(au);
+    const days = au.reduce((s, a) => s + (parseFloat(a.AuditDays) || 0), 0);
+    const kpi = (l, v, s) => `<div class="fin-kpi"><span class="k-label">${l}</span><span class="k-val">${v}</span><span class="k-sub">${s || "&nbsp;"}</span></div>`;
+    const inp = (n, l, wide) => `<label class="cl-f${wide ? " wide" : ""}"><span>${l}</span><input id="cl-f-${n}" value="${escHtml(c[n] || "")}"></label>`;
+    const area = (n, l) => `<label class="cl-f wide"><span>${l}</span><textarea id="cl-f-${n}" rows="2">${escHtml(c[n] || "")}</textarea></label>`;
+    box.innerHTML = `
+      <div class="cl-head"><h3>${escHtml(c.Title || "—")}</h3>
+        <span class="cl-head-sub">${Array.from(new Set(au.map(a => bodyLabel(a)))).join(" · ") || "brak audytów"}</span></div>
+      <div class="fin-kpis cl-kpis">
+        ${kpi("Audyty", au.length, days ? (Math.round(days * 100) / 100) + " dni łącznie" : "")}
+        ${kpi("Ostatni audyt", last ? formatDate(last.AuditDateStart) : "—", last ? escHtml(bodyLabel(last) + " · " + (last.Program || "")) : "")}
+        ${kpi("Następny", next ? formatDate(next.AuditDateStart) : "—", next ? escHtml(bodyLabel(next) + " · " + statusLabel(next.AuditStatus)) : "brak zaplanowanego")}
+        ${kpi("Najbliższy certyfikat", certs[0] ? formatDate(certs[0].valid) : "—", certs[0] ? escHtml(certs[0].prog) + (certs[0].left < 0 ? " · wygasł" : " · za " + certs[0].left + " dni") : "")}
+      </div>
+      <div class="cl-section"><h4>Dane klienta</h4>
+        <div class="cl-form">
+          ${inp("Title", "Nazwa", true)}${inp("NIP", "NIP")}${inp("CertCodes", "Kody certyfikatów (FSC/PEFC)")}
+          ${inp("Address", "Adres siedziby", true)}${inp("PostalCode", "Kod pocztowy")}${inp("City", "Miasto")}
+          ${area("SiteAddress", "Adres zakładu / miejsca audytu (jeśli inny niż siedziba)")}
+          ${inp("ContactPerson", "Osoba kontaktowa")}${inp("ClientEmail", "E-mail")}${inp("Phone", "Telefon")}
+          ${area("Aliases", "Inne zapisy nazwy w audytach (po jednym w wierszu) — służą do dopasowania audytów")}
+          ${area("Notes", "Notatki")}
+        </div>
+        <div class="cl-actions"><button id="cl-save" class="btn-action">Zapisz dane klienta</button><span id="cl-save-msg" class="fin-hint"></span></div>
+      </div>
+      <div class="cl-section"><h4>Certyfikaty i terminy</h4>
+        ${certs.length ? `<table class="cl-table"><thead><tr><th>Program</th><th>Ważny do</th><th class="num">Pozostało</th></tr></thead><tbody>` +
+          certs.map(r => `<tr><td>${escHtml(r.prog)}</td><td>${formatDate(r.valid)}</td><td class="num ${r.left < 0 ? "cl-bad" : r.left < 90 ? "cl-soon" : ""}">${r.left < 0 ? "wygasł " + (-r.left) + " dni temu" : r.left + " dni"}</td></tr>`).join("") + `</tbody></table>`
+          : '<div class="cl-empty">Brak dat ważności certyfikatów w audytach tego klienta (pole „Cert valid to”).</div>'}
+      </div>
+      <div class="cl-section"><h4>Audyty (wszystkie jednostki)</h4>
+        ${au.length ? `<table class="cl-table cl-audits"><thead><tr><th>Data</th><th>Jednostka</th><th>Program</th><th>Typ</th><th>Status</th><th>Audytor</th><th class="num">Dni</th></tr></thead><tbody>` +
+          au.map(a => `<tr class="m row-body-${bodyCls(a)}" data-id="${a.Id}"><td>${formatDate(a.AuditDateStart)}</td><td>${escHtml(bodyLabel(a))}</td><td>${escHtml(a.Program || "")}</td>
+            <td>${escHtml(isMeeting(a) ? kindOf(a) : shortType(a.AuditType))}</td><td>${escHtml(statusLabel(a.AuditStatus))}</td><td>${escHtml(a.AuditorName || "")}</td><td class="num">${escHtml(a.AuditDays != null ? String(a.AuditDays) : "")}</td></tr>`).join("") + `</tbody></table>`
+          : '<div class="cl-empty">Brak audytów przypisanych do tego klienta.</div>'}
+      </div>
+      <div class="cl-section cl-docs"><h4>Dokumenty</h4>
+        <div class="cl-empty">Foldery audytów z SharePoint (witryny jednostek) pojawią się tutaj po etapie migracji dokumentów.</div>
+      </div>`;
+    box.querySelectorAll("tr.m").forEach(tr => tr.onclick = () => openModal(parseInt(tr.dataset.id)));
+    $("cl-save").onclick = save;
+  }
+
+  async function save() {
+    const c = clients.find(x => x.Id === sel); if (!c) return;
+    const f = {}; CLIENT_FIELDS.map(x => x.name).concat(["Title"]).forEach(n => { const el = $("cl-f-" + n); if (el) f[n] = el.value.trim(); });
+    if (!f.Title) { showToast("Nazwa klienta nie może być pusta", "error"); return; }
+    const btn = $("cl-save"), msg = $("cl-save-msg"); btn.disabled = true;
+    try { await updateClient(c.Id, f); Object.assign(c, f); msg.textContent = "Zapisano"; showToast("Zapisano: " + f.Title, "success"); render(); }
+    catch (e) { btn.disabled = false; msg.textContent = "Błąd: " + (e.message || e); showToast("Nie zapisano: " + (e.message || e), "error"); }
+  }
+
+  // ── wyodrębnianie klientów z audytów (do akceptacji) ──
+  function buildProposal() {
+    const idx = keyIndex(), groups = new Map();
+    (allAudits || []).forEach(a => {
+      const k = norm(a.Title); if (!k) return;
+      if (!groups.has(k)) groups.set(k, { key: k, audits: [], names: new Map() });
+      const g = groups.get(k); g.audits.push(a); g.names.set(a.Title.trim(), (g.names.get(a.Title.trim()) || 0) + 1);
+    });
+    const out = [];
+    groups.forEach(g => {
+      const names = Array.from(g.names.entries()).sort((x, y) => y[1] - x[1] || y[0].length - x[0].length).map(e => e[0]);
+      const ordered = g.audits.slice().sort((a, b) => dKey(b).localeCompare(dKey(a)));
+      const pick = n => { const a = ordered.find(x => x[n]); return a ? String(a[n]).trim() : ""; };
+      const existingId = idx.has(g.key) ? idx.get(g.key) : null;
+      const toLink = g.audits.filter(a => existingId == null ? true : a.ClientId !== existingId);
+      if (existingId != null && !toLink.length) return;                      // nic do zrobienia
+      const onlyMeetings = g.audits.every(a => isMeeting(a));
+      out.push({ key: g.key, name: names[0], variants: names.slice(1), existingId, audits: g.audits, toLink,
+        bodies: Array.from(new Set(g.audits.map(a => BODY_SHORT[bodyKey(a)]))),
+        fields: { Title: names[0], Address: pick("Address"), PostalCode: pick("PostalCode"), City: pick("City"), ClientEmail: pick("ClientEmail"), Phone: pick("Phone") || pick("Mobile") },
+        include: !onlyMeetings, onlyMeetings });
+    });
+    out.sort((a, b) => (b.existingId == null) - (a.existingId == null) || b.audits.length - a.audits.length || a.name.localeCompare(b.name, "pl"));
+    return out;
+  }
+  function renderProposal() {
+    const box = $("cl-card");
+    const nNew = proposal.filter(p => p.include && p.existingId == null).length, nLink = proposal.filter(p => p.include).reduce((s, p) => s + p.toLink.length, 0);
+    box.innerHTML = `<div class="cl-head"><h3>Wyodrębnianie klientów z audytów</h3><span class="cl-head-sub">Propozycja do akceptacji — nic nie zostało zapisane</span></div>
+      <p class="cl-note">Audyty są grupowane po nazwie (bez wielkości liter, polskich znaków i form „sp. z o.o.”, „S.A.”). Odznacz grupy, które nie są klientami albo które trzeba połączyć ręcznie. Dane adresowe pochodzą z najnowszego audytu grupy.</p>
+      <div class="cl-actions"><button id="cl-apply" class="btn-action">Utwórz ${nNew} klientów i podepnij ${nLink} audytów</button>
+        <button id="cl-cancel" class="btn-ghost">Anuluj</button><span id="cl-prog" class="fin-hint"></span></div>
+      <table class="cl-table cl-prop"><thead><tr><th></th><th>Klient</th><th>Miasto</th><th class="num">Audyty</th><th>Jednostki</th><th>Inne zapisy nazwy</th><th>Akcja</th></tr></thead><tbody>` +
+      proposal.map((p, i) => `<tr><td><input type="checkbox" data-i="${i}" ${p.include ? "checked" : ""}></td><td><b>${escHtml(p.name)}</b>${p.onlyMeetings ? ' <small class="cl-sub">(tylko spotkania/szkolenia)</small>' : ""}</td>
+        <td>${escHtml(p.fields.City)}</td><td class="num">${p.audits.length}</td><td>${p.bodies.join(" · ")}</td><td class="cl-sub">${p.variants.map(escHtml).join("; ")}</td>
+        <td>${p.existingId == null ? "nowy klient" : "dopnij do istniejącego (" + p.toLink.length + ")"}</td></tr>`).join("") + `</tbody></table>`;
+    box.querySelectorAll("input[type=checkbox][data-i]").forEach(cb => cb.onchange = () => { proposal[parseInt(cb.dataset.i)].include = cb.checked; renderProposal(); });
+    $("cl-cancel").onclick = () => { proposal = null; render(); };
+    $("cl-apply").onclick = applyProposal;
+  }
+  async function applyProposal() {
+    const todo = proposal.filter(p => p.include); if (!todo.length) { showToast("Nic nie zaznaczono", "warn"); return; }
+    const prog = $("cl-prog"), btn = $("cl-apply"); btn.disabled = true; $("cl-cancel").disabled = true;
+    let made = 0, linked = 0; const errs = [];
+    try {
+      for (const p of todo) {
+        let id = p.existingId;
+        if (id == null) {
+          const f = {}; Object.keys(p.fields).forEach(k => { if (p.fields[k]) f[k] = p.fields[k]; });
+          if (p.variants.length) f.Aliases = p.variants.join("\n");
+          const r = await addClient(f); id = r.Id; made++;
+          clients.push(Object.assign({ Id: id }, f));
+        } else if (p.variants.length) {                       // istniejący klient: dopisz nowe warianty nazwy
+          const c = clients.find(x => x.Id === id), have = new Set(String(c.Aliases || "").split(/[\n;]+/).map(s => s.trim()).filter(Boolean));
+          const add = p.variants.filter(v => !have.has(v));
+          if (add.length) { const al = Array.from(have).concat(add).join("\n"); await updateClient(id, { Aliases: al }); c.Aliases = al; }
+        }
+        for (let i = 0; i < p.toLink.length; i += 4) {
+          await Promise.all(p.toLink.slice(i, i + 4).map(async a => {
+            try { await updateAudit(a.Id, { ClientId: id }); a.ClientId = id; linked++; }
+            catch (e) { errs.push((a.Title || a.Id) + ": " + e.message); }
+          }));
+          prog.textContent = `Klienci: ${made} · podpięte audyty: ${linked}…`;
+        }
+      }
+    } catch (e) { errs.push(e.message || String(e)); }
+    proposal = null;
+    showToast(`Utworzono ${made} klientów, podpięto ${linked} audytów` + (errs.length ? ` · błędy: ${errs.length}` : ""), errs.length ? "warn" : "success");
+    if (errs.length) console.warn("[Klienci]", errs);
+    render();
+  }
+
+  // ── konfiguracja listy ──
+  async function setupSchema() {
+    const b = $("cl-setup-btn"); b.disabled = true; $("cl-setup-msg").textContent = "Tworzę listę i kolumny…";
+    try {
+      const r = await ensureClientsSchema();
+      $("cl-setup-msg").textContent = "Gotowe: " + (r.created.length ? r.created.join(", ") : "nic do dodania") + (r.errors.length ? " · błędy: " + r.errors.join("; ") : "");
+      await load(); render();
+    } catch (e) { b.disabled = false; $("cl-setup-msg").textContent = "Błąd: " + (e.message || e); }
+  }
+
+  function render() {
+    if (!$("view-klienci")) return;
+    const missing = window.clientsListMissing || window.auditClientFieldMissing;
+    $("cl-setup").classList.toggle("hidden", !missing);
+    const by = groupAudits();
+    const unlinked = (allAudits || []).filter(a => clientIdOf(a, keyIndex()) == null).length;
+    $("cl-unlinked").textContent = unlinked ? unlinked + " audytów bez klienta" : "";
+    renderList(by);
+    if (proposal) renderProposal(); else renderCard(by);
+  }
+
+  function setup() {
+    if (!window.CLIENTS_ENABLED) return;
+    const nb = $("nav-klienci"); if (nb) nb.classList.remove("hidden");
+    $("cl-search").oninput = e => { q = e.target.value; render(); };
+    $("cl-extract").onclick = () => { proposal = buildProposal(); sel = null; if (!proposal.length) { proposal = null; showToast("Wszystkie audyty są już przypisane do klientów", "success"); render(); return; } render(); };
+    $("cl-add").onclick = async () => {
+      const name = (prompt("Nazwa nowego klienta:") || "").trim(); if (!name) return;
+      try { const r = await addClient({ Title: name }); clients.push({ Id: r.Id, Title: name }); sel = r.Id; proposal = null; render(); }
+      catch (e) { showToast("Nie utworzono: " + (e.message || e), "error"); }
+    };
+    $("cl-setup-btn").onclick = setupSchema;
+  }
+  function clientOfAudit(a) { if (!loaded) return null; const id = clientIdOf(a, keyIndex()); return id == null ? null : clients.find(c => c.Id === id); }
+  function auditsOf(id) { return groupAudits().get(id) || []; }
+  return { setup, load, render, norm, clientOfAudit, list: () => clients.slice().sort((a, b) => String(a.Title || "").localeCompare(String(b.Title || ""), "pl")), auditsOf };
+})();
+window.ClientsModule = ClientsModule;
+
+// ============================================================
+// MODUŁ: ROZLICZENIE Z LAURY — CSV z Škoda Connect → przejazdy → dopasowanie do okien delegacji (wyjazd–powrót) → plan vs rzeczywistość.
+// Zasady: jazda należy do audytu, gdy mieści się w oknie [wyjazd − 90 min, powrót + 3 h]; km z Laury NIE nadpisują rozliczenia same —
+// „Przyjmij km” to świadoma akcja per audyt. Jazdy poza oknami (≥ 10 km) pokazane osobno (prywatne/niepowiązane).
+// ============================================================
+const LauraModule = (function () {
+  const $ = id => document.getElementById(id);
+  let trips = [], month = "all";
+  const THRESH = 10;     // km poniżej progu nie trafiają na listę „niepowiązane”
+  const pad = n => String(n).padStart(2, "0");
+  const MIES = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
+  const ms = s => new Date(String(s).replace(" ", "T") + ":00").getTime();
+  const fmt = s => String(s).substring(8, 10) + "." + String(s).substring(5, 7) + " " + String(s).substring(11, 16);
+  const num = v => { const n = parseFloat(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
+
+  // ── parser CSV (cudzysłowy, przecinki, BOM) ──
+  function parseCsv(text) {
+    text = String(text).replace(/^﻿/, "");
+    const rows = []; let row = [], cur = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true;
+      else if (c === ",") { row.push(cur); cur = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cur); if (row.some(x => x !== "")) rows.push(row); row = []; cur = ""; }
+      else cur += c;
+    }
+    if (cur !== "" || row.length) { row.push(cur); if (row.some(x => x !== "")) rows.push(row); }
+    return rows;
+  }
+  function parseTrips(text, fileName) {
+    const rows = parseCsv(text); if (!rows.length) return [];
+    const head = rows[0].map(h => h.trim().toLowerCase());
+    const col = n => head.findIndex(h => h === n);
+    const iEnd = col("end of trip"), iS = col("start mileage in km"), iE = col("end mileage in km"), iKm = col("mileage in km"), iMin = col("travel time in minutes"),
+          iCost = col("total cost"), iPrice = col("fuel price per litre");
+    if (iEnd < 0 || iKm < 0) throw new Error("To nie wygląda na plik przejazdów z Laury (brak kolumn „End of trip” / „Mileage in km”).");
+    const out = [];
+    rows.slice(1).forEach(r => {
+      const m = String(r[iEnd] || "").match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{1,2}):(\d{2})/); if (!m) return;
+      const end = `${m[3]}-${m[2]}-${m[1]} ${pad(+m[4])}:${m[5]}`;
+      const endKm = num(r[iE]);
+      out.push({ key: end.replace(/[- :]/g, "") + "_" + endKm, end, startKm: num(r[iS]), endKm, km: num(r[iKm]), min: num(r[iMin]), cost: num(r[iCost]), price: num(r[iPrice]), file: fileName });
+    });
+    return out;
+  }
+
+  // ── dopasowanie ──
+  function windows() {
+    return (allAudits || []).filter(a => a.AuditorName === MY_AUDITOR && a.AuditStatus !== "REJECTED" && a.AuditDateStart && DelegModule.eligible(a)).map(a => {
+      const d = DelegModule.defaults(a);
+      return { a, w0: ms(d.depart[0] + " " + d.depart[1]) - 90 * 60000, w1: ms(d.ret[0] + " " + d.ret[1]) + 3 * 3600000, depart: d.depart, ret: d.ret };
+    });
+  }
+  function assign(list) {
+    const W = windows(), by = new Map(); const free = [];
+    list.forEach(t => {
+      const e = ms(t.end), s = e - t.min * 60000, mid = (s + e) / 2;
+      const hits = W.filter(w => s >= w.w0 && e <= w.w1);
+      if (!hits.length) { free.push(t); return; }
+      hits.sort((x, y) => Math.abs((x.w0 + x.w1) / 2 - mid) - Math.abs((y.w0 + y.w1) / 2 - mid));
+      const id = hits[0].a.Id; if (!by.has(id)) by.set(id, []); by.get(id).push(t);
+    });
+    return { W, by, free };
+  }
+
+  function months() { return Array.from(new Set(trips.map(t => t.Title ? t.EndTime.substring(0, 7) : "").filter(Boolean))).sort().reverse(); }
+  function norm() { return trips.map(t => ({ end: t.EndTime, km: num(t.Km), min: num(t.Minutes), cost: num(t.Cost), key: t.Title })); }
+
+  function render() {
+    const box = $("laura-body"); if (!box) return;
+    const missing = window.tripsListMissing;
+    $("laura-setup").classList.toggle("hidden", !missing);
+    if (missing) { box.innerHTML = ""; $("laura-kpis").innerHTML = ""; return; }
+    const ms_ = months();
+    $("laura-month").innerHTML = '<option value="all">Wszystkie okresy</option>' + ms_.map(m => `<option value="${m}">${MIES[+m.substring(5) - 1]} ${m.substring(0, 4)}</option>`).join("");
+    $("laura-month").value = ms_.includes(month) ? month : "all"; month = $("laura-month").value;
+    const all = norm().sort((a, b) => a.end.localeCompare(b.end));
+    if (!all.length) { $("laura-kpis").innerHTML = ""; box.innerHTML = '<div class="settle-empty">Brak przejazdów. Wgraj plik CSV z aplikacji Škoda Connect (Statystyki przejazdów → Eksport).</div>'; return; }
+    const inMonth = t => month === "all" || t.end.startsWith(month);
+    const { W, by, free } = assign(all);
+    const tripsM = all.filter(inMonth), freeM = free.filter(inMonth).filter(t => t.km >= THRESH);
+    const kmAll = tripsM.reduce((s, t) => s + t.km, 0), kmFree = freeM.reduce((s, t) => s + t.km, 0), cost = tripsM.reduce((s, t) => s + t.cost, 0);
+    $("laura-kpis").innerHTML = [["przejazdów", tripsM.length], ["km łącznie", Math.round(kmAll).toLocaleString("pl-PL")], ["km przypisane do audytów", Math.round(kmAll - free.filter(inMonth).reduce((s, t) => s + t.km, 0)).toLocaleString("pl-PL")],
+      ["km niepowiązane (≥ " + THRESH + ")", Math.round(kmFree).toLocaleString("pl-PL")], ["paliwo wg Laury", fmtPLN(cost)]]
+      .map(([l, v]) => `<div class="fin-kpi"><span class="k-label">${l}</span><span class="k-val">${v}</span></div>`).join("");
+    const rows = W.filter(w => month === "all" ? by.has(w.a.Id) : (w.depart[0].startsWith(month) || w.ret[0].startsWith(month) || (by.get(w.a.Id) || []).some(t => t.end.startsWith(month))))
+      .sort((x, y) => x.depart[0].localeCompare(y.depart[0]));
+    const head = `<thead><tr><th>Wyjazd – powrót</th><th>Klient</th><th>Miejscowość</th><th class="num">Jazd</th><th class="num">Km (Laura)</th><th class="num">Km (rozliczenie)</th><th class="num">Różnica</th><th></th></tr></thead>`;
+    const body = rows.map(w => {
+      const a = w.a, ts = by.get(a.Id) || [], k = Math.round(ts.reduce((s, t) => s + t.km, 0)), plan = Math.round(settleNum(a.SettleKm));
+      const diff = ts.length ? k - plan : null, cls = diff == null ? "" : Math.abs(diff) > Math.max(15, plan * 0.1) ? "cl-bad" : "";
+      return `<tr class="m" data-id="${a.Id}"><td>${fmt(w.depart[0] + " " + w.depart[1])} – ${fmt(w.ret[0] + " " + w.ret[1])}</td><td class="wrap">${escHtml(a.Title || "—")}</td><td>${escHtml(a.City || "—")}</td>
+        <td class="num">${ts.length || "—"}</td><td class="num"><strong>${ts.length ? k : "brak"}</strong></td><td class="num">${plan || "—"}</td><td class="num ${cls}">${diff == null ? "—" : (diff > 0 ? "+" : "") + diff}</td>
+        <td class="num">${ts.length && diff !== 0 ? `<button class="btn-ghost sm laura-take" data-id="${a.Id}" data-km="${k}">Przyjmij ${k} km</button>` : ""}</td></tr>`;
+    }).join("");
+    const freeHtml = freeM.length ? `<div class="laura-free"><b>Jazdy poza oknami delegacji (≥ ${THRESH} km)</b> — prywatne albo audyt bez wpisanej delegacji:<ul>` +
+      freeM.slice(-60).map(t => { const e = ms(t.end), nx = W.find(w => w.w0 - e > 0 && w.w0 - e < 36 * 3600000);
+        return `<li>${fmt(t.end)} · ${t.km} km · ${t.min} min${nx ? ` <em>← przed wyjazdem: ${escHtml((nx.a.Title || "").substring(0, 28))} (${nx.depart[0].substring(8)}.${nx.depart[0].substring(5, 7)})</em>` : ""}</li>`; }).join("") + `</ul>${freeM.length > 60 ? "<small>pokazano ostatnie 60</small>" : ""}</div>` : "";
+    box.innerHTML = `<div class="table-wrapper settle-table-wrap"><table class="settle-table fin-table" id="laura-table">${head}<tbody>${body || '<tr><td colspan="8" class="settle-empty">Brak delegacji w tym okresie.</td></tr>'}</tbody></table></div>${freeHtml}`;
+    box.querySelectorAll("tr.m").forEach(tr => tr.onclick = () => openModal(parseInt(tr.dataset.id)));
+    box.querySelectorAll(".laura-take").forEach(b => b.onclick = async e => {
+      e.stopPropagation(); const a = (allAudits || []).find(x => x.Id === parseInt(b.dataset.id)); if (!a) return;
+      const km = parseInt(b.dataset.km);
+      if (!confirm(`${a.Title}\nKm w rozliczeniu: ${Math.round(settleNum(a.SettleKm)) || "brak"} → km z Laury: ${km}\n\nZapisać km z Laury w rozliczeniu tego audytu?`)) return;
+      b.disabled = true;
+      try { await updateAudit(a.Id, { SettleKm: km }); a.SettleKm = km; showToast("Zapisano " + km + " km: " + (a.Title || ""), "success"); render(); try { DelegModule.render(); FinanceModule.render(); } catch {} }
+      catch (err) { b.disabled = false; showToast("Nie zapisano: " + (err.message || err), "error"); }
+    });
+  }
+
+  async function load() { if (!window.LAURA_ENABLED) return; trips = await fetchTrips(); render(); }
+
+  async function importFiles(files) {
+    const st = $("laura-status"); const have = new Set(trips.map(t => t.Title)); let all = [];
+    try {
+      for (const f of files) { all = all.concat(parseTrips(await f.text(), f.name)); }
+    } catch (e) { st.textContent = e.message; showToast(e.message, "error"); return; }
+    const seen = new Set(); const fresh = all.filter(t => { if (have.has(t.key) || seen.has(t.key)) return false; seen.add(t.key); return true; });
+    const dup = all.length - fresh.length;
+    if (!all.length) { st.textContent = "Nie znaleziono przejazdów w pliku."; return; }
+    const dates = all.map(t => t.end).sort();
+    st.textContent = `Plik: ${all.length} przejazdów (${dates[0].substring(0, 10)} – ${dates[dates.length - 1].substring(0, 10)}), nowych ${fresh.length}, już w bazie ${dup}.`;
+    if (!fresh.length) { showToast("Wszystkie przejazdy z pliku już są w bazie", "success"); return; }
+    if (!confirm(`Zapisać ${fresh.length} nowych przejazdów (pomijam ${dup} już istniejących)?`)) return;
+    const rows = fresh.map(t => ({ Title: t.key, EndTime: t.end, StartKm: t.startKm, EndKm: t.endKm, Km: t.km, Minutes: t.min, Cost: t.cost, FuelPrice: t.price, ImportFile: t.file }));
+    $("laura-pick").disabled = true;
+    try {
+      const r = await addTripsBatch(rows, (d, n) => { st.textContent = `Zapisuję przejazdy: ${d}/${n}…`; });
+      st.textContent = `Zapisano ${r.done} przejazdów` + (r.errs.length ? `, błędy: ${r.errs.length}` : "") + (dup ? ` · pominięto ${dup} istniejących` : "");
+      if (r.errs.length) console.warn("[Laura]", r.errs);
+      showToast(`Laura: zapisano ${r.done} przejazdów`, r.errs.length ? "warn" : "success");
+    } catch (e) { st.textContent = "Błąd: " + (e.message || e); showToast("Import Laury: " + (e.message || e), "error"); }
+    finally { $("laura-pick").disabled = false; await load(); }
+  }
+
+  async function setupSchema() {
+    const b = $("laura-setup-btn"); b.disabled = true;
+    try { const r = await ensureTripsSchema(); $("laura-status").textContent = "Gotowe: " + (r.created.join(", ") || "nic do dodania") + (r.errors.length ? " · błędy: " + r.errors.join("; ") : ""); await load(); }
+    catch (e) { b.disabled = false; $("laura-status").textContent = "Błąd: " + (e.message || e); }
+  }
+
+  function setup() {
+    const card = $("laura-card"); if (!card) return;
+    if (!window.LAURA_ENABLED) { card.classList.add("hidden"); return; }
+    $("laura-pick").onclick = () => $("laura-file").click();
+    $("laura-file").onchange = e => { const fs = Array.from(e.target.files || []); e.target.value = ""; if (fs.length) importFiles(fs); };
+    $("laura-month").onchange = e => { month = e.target.value; render(); };
+    $("laura-setup-btn").onclick = setupSchema;
+  }
+  return { setup, load, render, parseTrips, assign };
+})();
+window.LauraModule = LauraModule;
+
+// ============================================================
 // MODUŁ: DELEGACJE — dni poza Warszawą do oświadczeń o delegacji (Michał, nagranie 2026-10-09)
 // Zasady: 1 wiersz = 1 wyjazd; dni = ceil(dni audytu) + dni dojazdu; tylko On-site poza Warszawą; spotkania/szkolenia też (przełącznik).
 // Zakres „Zrealizowane” = DONE / wysłane / rozliczone; zaległe (po terminie bez DONE) NIE wchodzą — osobne ostrzeżenie.
@@ -5434,7 +6004,7 @@ const DelegModule = (function () {
     fillPeriodValues();
   }
   function renderAll() { if ($("deleg-pval")) { fillPeriodValues($("deleg-pval").value); render(); } }
-  return { setup, render: renderAll, exportPdf, openStatement, eligible };
+  return { setup, render: renderAll, exportPdf, openStatement, eligible, defaults };
 })();
 window.DelegModule = DelegModule;
 
