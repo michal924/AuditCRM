@@ -1934,3 +1934,7 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .test-banner .btn-ghost { color: var(--lfa-on-accent); border-color: color-mix(in srgb, var(--lfa-papier) 50%, transparent); }
 .test-banner .btn-ghost:hover { background: color-mix(in srgb, var(--lfa-papier) 18%, transparent); }
 .test-banner .fin-hint { color: var(--lfa-on-accent); opacity: .9; }
+
+/* Odwołanie audytu */
+.btn-cancel-audit { color: var(--lfa-warning-fg); border-color: var(--lfa-detail); }
+.btn-cancel-audit:hover { background: var(--lfa-warning-bg); }
