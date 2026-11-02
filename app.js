@@ -1520,15 +1520,27 @@ function mergeCombinedRecords(records) {
   return out;
 }
 
-// Wykryj dominujący Kwartał+Rok z parsowanego pliku
+// Recertyfikacja co roku ma ten sam PRJ → klucz dopasowania importu MUSI zawierać rok cyklu,
+// inaczej plan na nowy rok nadpisuje datę CU zeszłorocznego audytu (Michał 2026-11-02)
+function cucYearOf(r) { return String(r.Year || String(r.PlannedCUDate || "").substring(0, 4) || ""); }
+function cucMatchKey(r) { return `${certBodyOf(r)}_${parseInt(r.ProjectID)}_${cucYearOf(r)}_${r.Program || ""}`; }
+const DAY_MS = 86400000;
+// Wpis nadpisany starym błędem importu: data audytu LF dużo wcześniej niż data CU (inny cykl) → nie dopasowuj go do nowego planu
+function isStaleCycle(a) {
+  if (!a.AuditDateStart || !a.PlannedCUDate) return false;
+  return new Date(a.PlannedCUDate) - new Date(a.AuditDateStart) > 180 * DAY_MS;
+}
+
 // Znajdź istniejące importowane rekordy które są "poprzednią wersją" nowego pliku.
 // Strategia: nakładanie się ProjectID — jeśli >30% ProjectID z nowego pliku istnieje
 // w bazie jako importowane, to traktujemy je jako poprzednią wersję tego samego planu.
+// Tylko rekordy z tych samych lat co nowy plik: plan na nowy rok nie jest re-importem zeszłorocznego.
 function findPreviousImportBatch() {
   const newPrjSet = new Set(importParsed.map(r => parseInt(r.ProjectID)));
+  const newYears = new Set(importParsed.map(cucYearOf));
 
-  // Wszystkie importowane rekordy (mają ImportFile)
-  const allImported = allAudits.filter(a => a.ImportFile);
+  // Wszystkie importowane rekordy (mają ImportFile) z lat obecnych w nowym pliku
+  const allImported = allAudits.filter(a => a.ImportFile && newYears.has(cucYearOf(a)) && !isStaleCycle(a));
 
   if (!allImported.length || !newPrjSet.size) return [];
 
@@ -1569,15 +1581,14 @@ function computeReimportDiff(existingImported) {
   importParsed.forEach(r => { programCounts[r.Program||""] = (programCounts[r.Program||""] || 0) + 1; });
   const dominantProgram = Object.entries(programCounts).sort((a,b) => b[1]-a[1])[0]?.[0] || "";
 
-  const newKeys = new Set(importParsed.map(r => `${certBodyOf(r)}_${parseInt(r.ProjectID)}_${r.Program||""}`));
-  const existingKeys = new Set(existingImported.map(ex => `${certBodyOf(ex)}_${parseInt(ex.ProjectID)}_${ex.Program||""}`));
+  const newKeys = new Set(importParsed.map(cucMatchKey));
+  const existingKeys = new Set(allAudits.filter(a => !isStaleCycle(a)).map(cucMatchKey));
 
   const toDelete = [];
   const protected_ = [];
 
   existingImported.forEach(ex => {
-    const key = `${certBodyOf(ex)}_${parseInt(ex.ProjectID)}_${ex.Program||""}`;
-    if (newKeys.has(key)) return; // istnieje w nowym pliku — pomiń
+    if (newKeys.has(cucMatchKey(ex))) return; // istnieje w nowym pliku — pomiń
 
     // Tylko rekordy z tego samego Programu co nowy plik
     if (dominantProgram && ex.Program !== dominantProgram) return;
@@ -1590,9 +1601,7 @@ function computeReimportDiff(existingImported) {
     }
   });
 
-  const toAdd = importParsed.filter(r => {
-    return !existingKeys.has(`${certBodyOf(r)}_${parseInt(r.ProjectID)}_${r.Program||""}`);
-  });
+  const toAdd = importParsed.filter(r => !existingKeys.has(cucMatchKey(r)));
 
   console.log("[ReImport] dominantProgram:", dominantProgram,
     "toDelete:", toDelete.map(x=>x.Title),
@@ -1720,6 +1729,58 @@ function buildCucFields(rec) {
   };
 }
 
+// ── Naprawa wpisów nadpisanych starym błędem re-importu (plan nowego roku nadpisał zeszłoroczny audyt) ──
+// Z konsoli: await CucRepair.find()  → tabela kandydatów; await CucRepair.apply() → przywraca wpisy z auto = true.
+// Przywraca z historii wersji SharePoint tylko pola CUC, które od nadpisania nikt nie zmienił ręcznie.
+const CucRepair = (() => {
+  const CUC_FIELDS = Object.keys(buildCucFields({}));
+  const norm = v => (v === null || v === undefined) ? "" : String(v).substring(0, 10);
+  const day = v => v ? new Date(v).getTime() : NaN;
+  let last = [];
+
+  async function find() {
+    const all = await fetchAllAudits();
+    const cands = all.filter(a => a.ImportFile && a.PlannedCUDate);
+    last = [];
+    for (let n = 0; n < cands.length; n++) {
+      const a = cands[n];
+      if (n % 25 === 0) console.log(`[CucRepair] ${n}/${cands.length}`);
+      const vs = await fetchAuditVersions(a.Id);
+      let bad = null, before = null;
+      for (let i = 0; i < vs.length - 1; i++) {
+        if (day(vs[i].PlannedCUDate) - day(vs[i + 1].PlannedCUDate) > 180 * DAY_MS) { bad = vs[i]; before = vs[i + 1]; break; }
+      }
+      if (!bad) continue;
+      const restore = {};
+      CUC_FIELDS.forEach(f => { if (norm(a[f]) === norm(bad[f]) && norm(bad[f]) !== norm(before[f])) restore[f] = before[f] === undefined ? null : before[f]; });
+      // Automatycznie tylko gdy data audytu LF należy do starego cyklu (bliżej starej daty CU niż nowej)
+      const lf = day(a.AuditDateStart);
+      const auto = !isNaN(lf) && Math.abs(lf - day(before.PlannedCUDate)) < Math.abs(lf - day(a.PlannedCUDate)) && "PlannedCUDate" in restore;
+      last.push({ Id: a.Id, Title: a.Title, PRJ: a.ProjectID, Program: a.Program, Status: a.AuditStatus,
+        LF: norm(a.AuditDateStart), CU_teraz: norm(a.PlannedCUDate), CU_przed: norm(before.PlannedCUDate),
+        wersja: bad.VersionLabel, auto, restore });
+    }
+    console.table(last.map(r => Object.assign({}, r, { restore: Object.keys(r.restore).join(",") })));
+    return last;
+  }
+
+  async function apply(list) {
+    const todo = (list || last).filter(r => r.auto);
+    let ok = 0;
+    for (const r of todo) {
+      try { await updateAudit(r.Id, r.restore); ok++; }
+      catch (e) { console.error("[CucRepair]", r.Id, r.Title, e.message); }
+    }
+    allAudits = await fetchAllAudits();
+    renderTable();
+    console.log(`[CucRepair] przywrócono ${ok}/${todo.length}`);
+    return ok;
+  }
+
+  return { find, apply, get last() { return last; } };
+})();
+window.CucRepair = CucRepair;
+
 async function startImport() {
   if (!importParsed.length) return;
   hide("import-stage-2");
@@ -1730,16 +1791,10 @@ async function startImport() {
   const savedDiff = reimportDiff; // zachowaj przed null-owaniem
 
   try {
-    // Zbuduj mapę istniejących rekordów: klucz ProjectID_Program → {id, rekord}
+    // Zbuduj mapę istniejących rekordów: klucz jednostka_PRJ_rok_program → rekord
     // (używamy allAudits bo mamy pełne dane z ostatniego fetchAllAudits)
-    const existingMap = new Map(); // klucz → {Id, AuditStatus, AuditDateStart}
-    const existingKeySet = new Set(); // klucz Year-based (dla nowych importów)
-    allAudits.forEach(a => {
-      const keyPY = `${certBodyOf(a)}_${parseInt(a.ProjectID)}_${a.Program||""}`;
-      existingMap.set(keyPY, a);
-      const keyFull = `${certBodyOf(a)}_${parseInt(a.ProjectID)}_${a.Year||""}_${a.Program||""}`;
-      existingKeySet.add(keyFull);
-    });
+    const existingMap = new Map();
+    allAudits.forEach(a => { if (!isStaleCycle(a)) existingMap.set(cucMatchKey(a), a); });
 
     let imported = 0, updated = 0, skipped = 0, deleted = 0, errors = 0;
     let firstError = "";
@@ -1772,8 +1827,7 @@ async function startImport() {
       document.getElementById("import-progress-text").textContent =
         (isReimport ? "Aktualizowanie " : "Importowanie ") + (i+1) + "/" + total + " — " + (rec.Title || "");
 
-      const keyPY = `${certBodyOf(rec)}_${parseInt(rec.ProjectID)}_${rec.Program||""}`;
-      const existing = existingMap.get(keyPY);
+      const existing = existingMap.get(cucMatchKey(rec));
 
       if (existing) {
         if (isReimport) {

@@ -289,6 +289,12 @@ async function deleteAudit(id) {
   if (!r.ok) throw new Error(`Delete error ${r.status}`);
 }
 
+// Historia wersji wpisu (od najnowszej) — do naprawy danych nadpisanych importem
+async function fetchAuditVersions(id) {
+  const data = await spGet(`/_api/lists/getbytitle('${AUDITS_LIST}')/items(${id})/versions`);
+  return data.value || [];
+}
+
 
 // ============================================================
 // ŚRODOWISKO TESTOWE — listy *_TEST jako kopia schematu produkcji i (opcjonalnie) kopia danych. Produkcja tylko do odczytu.
