@@ -1740,22 +1740,22 @@ const CucRepair = (() => {
 
   async function find() {
     const all = await fetchAllAudits();
-    const cands = all.filter(a => a.ImportFile && a.PlannedCUDate);
+    const cands = all.filter(a => a.ImportFile && a.PlannedCUDate && a.AuditDateStart);
     last = [];
     for (let n = 0; n < cands.length; n++) {
       const a = cands[n];
       if (n % 25 === 0) console.log(`[CucRepair] ${n}/${cands.length}`);
       const vs = await fetchAuditVersions(a.Id);
+      // Pierwsza (najstarsza) wersja, w której data CU przestała pasować do daty LF — poprzednia mogła nie mieć daty CU wcale
       let bad = null, before = null;
-      for (let i = 0; i < vs.length - 1; i++) {
-        if (day(vs[i].PlannedCUDate) - day(vs[i + 1].PlannedCUDate) > 180 * DAY_MS) { bad = vs[i]; before = vs[i + 1]; break; }
+      for (let i = vs.length - 2; i >= 0; i--) {
+        if (isStaleCycle(vs[i]) && !isStaleCycle(vs[i + 1])) { bad = vs[i]; before = vs[i + 1]; break; }
       }
       if (!bad) continue;
       const restore = {};
       CUC_FIELDS.forEach(f => { if (norm(a[f]) === norm(bad[f]) && norm(bad[f]) !== norm(before[f])) restore[f] = before[f] === undefined ? null : before[f]; });
-      // Automatycznie tylko gdy data audytu LF należy do starego cyklu (bliżej starej daty CU niż nowej)
-      const lf = day(a.AuditDateStart);
-      const auto = !isNaN(lf) && Math.abs(lf - day(before.PlannedCUDate)) < Math.abs(lf - day(a.PlannedCUDate)) && "PlannedCUDate" in restore;
+      // Automatycznie tylko gdy wpis nadal jest zeszłorocznym audytem (LF w starym cyklu); przeplanowane na nowy rok → do decyzji
+      const auto = isStaleCycle(a) && "PlannedCUDate" in restore;
       last.push({ Id: a.Id, Title: a.Title, PRJ: a.ProjectID, Program: a.Program, Status: a.AuditStatus,
         LF: norm(a.AuditDateStart), CU_teraz: norm(a.PlannedCUDate), CU_przed: norm(before.PlannedCUDate),
         wersja: bad.VersionLabel, auto, restore });
