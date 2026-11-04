@@ -231,6 +231,10 @@ function statusKey(s) {
 
 // ── ROZLICZENIE — helpery (koszty + wynagrodzenie) ──
 function settleStatusOf(a) { return (a && a.SettleStatus) ? a.SettleStatus : "Nierozliczony"; }
+// Miesiąc rozliczenia „RRRR-MM”: SettleMonth (przeniesione do innego miesiąca) albo miesiąc daty audytu LF
+function settleMonthOf(a) { return (a && a.SettleMonth) || (a && a.AuditDateStart ? String(a.AuditDateStart).substring(0, 7) : null); }
+function monthLabel(ym) { const m = parseInt(String(ym || "").substring(5, 7)); return m ? ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"][m - 1] + " " + String(ym).substring(0, 4) : "—"; }
+function settleMonthMoved(a) { return !!(a && a.SettleMonth && a.AuditDateStart && a.SettleMonth !== String(a.AuditDateStart).substring(0, 7)); }
 function settleNum(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
 function settleCalc(a) {
   const km = settleNum(a.SettleKm);
@@ -272,6 +276,7 @@ function renderSettleView(a) {
   settleSetText("m-s-dayrate", has(a.SettleDayRate) ? fmtPLN(a.SettleDayRate) : (dayRateOf(a) != null ? fmtPLN(dayRateOf(a)) + " (" + dayRateSource(a) + ")" : "—"));
   settleSetText("m-s-basis",   a.SettleFeeBasis || "—");
   settleSetText("m-s-note",    a.SettleNote || "—");
+  settleSetText("m-s-month",   settleMonthMoved(a) ? monthLabel(a.SettleMonth) + " (przeniesiony)" : "wg daty audytu");
   settleSetText("m-s-costs",   fmtPLN(c.costs));
   settleSetText("m-s-total",   fmtPLN(c.total));
 }
@@ -1019,6 +1024,7 @@ function enterEditMode() {
   { const el = document.getElementById("e-s-dayrate"); if (el) el.value = hv(a.SettleDayRate); const t = document.getElementById("e-s-travel"); if (t) t.value = hv(a.SettleTravelDays); }
   document.getElementById("e-s-basis").value   = a.SettleFeeBasis || "";
   document.getElementById("e-s-note").value    = a.SettleNote || "";
+  { const el = document.getElementById("e-s-month"); if (el) el.value = a.SettleMonth || ""; }
   updateSettleCalcFromInputs();
   document.getElementById("modal-overlay").classList.add("edit-mode");
   updatePlanAuditBtn(originalAuditDate);
@@ -1169,7 +1175,7 @@ async function saveChanges() {
         fields.SettleOther    = num("e-s-other");
         fields.SettleTickets  = num("e-s-tickets");
         fields.SettleFee      = num("e-s-fee");
-        if (!window.settleRateFieldMissing) { fields.SettleDayRate = num("e-s-dayrate"); fields.SettleTravelDays = num("e-s-travel"); }
+        if (!window.settleRateFieldMissing) { fields.SettleDayRate = num("e-s-dayrate"); fields.SettleTravelDays = num("e-s-travel"); fields.SettleMonth = gs("e-s-month") || null; }
         fields.SettleFeeBasis = gs("e-s-basis").trim() || null;
         fields.SettleNote     = gs("e-s-note").trim() || null;
       }
@@ -4325,7 +4331,13 @@ const SettleModule = (function () {
     if (!m || (inc && inc.checked)) return [];
     return myRows().filter(a => a.AuditStatus === "REJECTED" && monthKeyOf(a) === m && (b === "all" || certBodyOf(a) === b));
   }
-  function monthKeyOf(a) { return a.AuditDateStart ? String(a.AuditDateStart).substring(0, 7) : null; }
+  function monthKeyOf(a) { return settleMonthOf(a); }
+  // Wykonane w tym miesiącu, ale przeniesione do rozliczenia w innym (SettleMonth)
+  function movedOutOfMonth() {
+    const m = $("settle-month") ? $("settle-month").value : "";
+    if (!m) return [];
+    return rowsByBody().filter(a => settleMonthMoved(a) && String(a.AuditDateStart).substring(0, 7) === m);
+  }
   function monthRows() {
     const m = $("settle-month").value; if (!m) return [];
     return rowsByBody().filter(a => monthKeyOf(a) === m).sort((x, y) => String(x.AuditDateStart).localeCompare(String(y.AuditDateStart)));
@@ -4587,8 +4599,9 @@ const SettleModule = (function () {
     if (!rows.length) { box.innerHTML = '<div class="settle-empty">Brak audytów w wybranym miesiącu.</div>'; return; }
     let costs = 0, fee = 0, total = 0; const byStatus = {};
     rows.forEach(a => { const c = settleCalc(a); costs += c.costs; fee += c.fee; total += c.total; const s = settleStatusOf(a); byStatus[s] = (byStatus[s] || 0) + 1; });
-    const rej = rejectedInMonth();
+    const rej = rejectedInMonth(), moved = movedOutOfMonth();
     box.innerHTML =
+      (moved.length ? '<div class="settle-import-hint">Przeniesione do rozliczenia w innym miesiącu: <b>' + moved.length + '</b> — ' + moved.map(a => escHtml(a.Title || "—") + " (" + formatDate(a.AuditDateStart) + " → " + escHtml(monthLabel(a.SettleMonth)) + ")").join("; ") + '.</div>' : '') +
       (rej.length ? '<div class="settle-import-hint">Pominięto odwołane (REJECTED): <b>' + rej.length + '</b> — ' + rej.map(a => escHtml(a.Title || "—") + " (" + formatDate(a.AuditDateStart) + ")").join("; ") + '. Zaznacz „uwzględnij odwołane”, jeśli mają być w rozliczeniu.</div>' : '') +
       '<div class="settle-kpis">' +
         kpi("Audyty", rows.length) + kpi("Koszty", fmtPLN(costs)) + kpi("Wynagrodzenie", fmtPLN(fee)) + kpi("Razem", fmtPLN(total)) +
@@ -4946,7 +4959,7 @@ const FinanceModule = (function () {
   const F = { year: [String(new Date().getFullYear())], month: [], quarter: [], program: [], cat: [], kind: [] };
   const F_LABEL = { year: "Rok", month: "Miesiąc", quarter: "Kwartał", program: "Program", cat: "Kategoria", kind: "Rodzaj" };
   const KIND_OPTS = [["Audyt", "Audyt"], ["Spotkanie", "Spotkanie"], ["Szkolenie", "Szkolenie"]];
-  function yearsAvailable() { const ys = new Set([new Date().getFullYear()]); (allAudits || []).forEach(a => { const d = dateOf(a); if (d) ys.add(parseInt(String(d).substring(0, 4))); }); return [...ys].filter(y => !isNaN(y)).sort((a, b) => b - a).map(String); }
+  function yearsAvailable() { const ys = new Set([new Date().getFullYear()]); (allAudits || []).forEach(a => { const d = periodOf(a); if (d) ys.add(parseInt(String(d).substring(0, 4))); }); return [...ys].filter(y => !isNaN(y)).sort((a, b) => b - a).map(String); }
   function programsAvailable() { const ps = new Set(); (allAudits || []).forEach(a => programsOf(a).forEach(p => ps.add(p))); return [...ps].sort(); }
   function options(key) {
     if (key === "year") return yearsAvailable().map(y => [y, y]);
@@ -4971,7 +4984,7 @@ const FinanceModule = (function () {
   }
   document.addEventListener("click", () => { const b = $("fin-filters"); if (b) b.querySelectorAll(".filter-multi-panel").forEach(p => p.classList.add("hidden")); });
   function passes(a) {
-    const d = String(dateOf(a)); const y = d.substring(0, 4), m = d.substring(5, 7), q = "Q" + (Math.floor((parseInt(m) - 1) / 3) + 1);
+    const d = String(periodOf(a)); const y = d.substring(0, 4), m = d.substring(5, 7), q = "Q" + (Math.floor((parseInt(m) - 1) / 3) + 1);
     if (F.year.length && !F.year.includes(y)) return false;
     if (F.month.length && !F.month.includes(m)) return false;
     if (F.quarter.length && !F.quarter.includes(q)) return false;
@@ -4993,6 +5006,8 @@ const FinanceModule = (function () {
     return null;                                   // REJECTED i inne — poza finansami
   }
   function dateOf(a) { return a.AuditDateStart || a.PlannedCUDate || null; }
+  // Okres w finansach (rok, miesiąc): przeniesione rozliczenie liczy się w swoim miesiącu, data na liście zostaje prawdziwa
+  function periodOf(a) { return a.SettleMonth ? a.SettleMonth + "-01" : dateOf(a); }
   function rows() {
     return (allAudits || []).filter(a => a.AuditorName === MY_AUDITOR && dateOf(a) && (body === "all" || bodyKey(a) === body) && catOf(a) && passes(a));
   }
@@ -5018,7 +5033,7 @@ const FinanceModule = (function () {
       `<div class="fin-kpi"><span class="k-label">Razem (${escHtml(yearLabel())})</span><span class="k-val">${money(yearAll.fee)}</span><span class="k-sub">${sfA ? sfA + " · " : ""}${yearAll.n} pozycji · ${dni(yearAll.days)}<br>koszty ${money(yearAll.costs)}${scA ? " (" + scA + ")" : ""} · z kosztami ${money(yearAll.total)}</span></div>`;
   }
   function monthData(all) {
-    return Array.from({ length: 12 }, (_, m) => { const inM = all.filter(a => parseInt(String(dateOf(a)).substring(5, 7)) - 1 === m);
+    return Array.from({ length: 12 }, (_, m) => { const inM = all.filter(a => parseInt(String(periodOf(a)).substring(5, 7)) - 1 === m);
       const d = { m, all: agg(inM), cats: {} }; CATS.forEach(c => d.cats[c] = agg(inM.filter(a => catOf(a) === c))); return d; });
   }
   function renderChart(md) {
@@ -5074,7 +5089,7 @@ const FinanceModule = (function () {
   function renderMonthList(all) {
     const box = $("fin-month-list"), ttl = $("fin-month-title"); if (!box) return;
     if (selMonth == null) { ttl.textContent = "Audyty w miesiącu"; box.className = "settle-empty"; box.textContent = "Wybierz miesiąc na wykresie lub w tabeli."; return; }
-    const its = all.filter(a => parseInt(String(dateOf(a)).substring(5, 7)) - 1 === selMonth).sort((x, y) => String(dateOf(x)).localeCompare(String(dateOf(y))));
+    const its = all.filter(a => parseInt(String(periodOf(a)).substring(5, 7)) - 1 === selMonth).sort((x, y) => String(dateOf(x)).localeCompare(String(dateOf(y))));
     ttl.textContent = `Audyty — ${MIES_FULL[selMonth]} ${yearLabel()} (${its.length})`; box.className = "";
     box.innerHTML = its.map(a => { const c = settleCalc(a), cat = catOf(a);
       return `<div class="fin-list-row" data-id="${a.Id}"><span class="d">${formatDate(dateOf(a))}</span><span class="t">${escHtml(a.Title || "—")}<small>${bodyLabel(a)} · ${escHtml(a.Program || "")}${isMeeting(a) ? " · " + escHtml(a.AuditType) : " · " + (settleNum(a.AuditDays) || "?") + " dni"} · <span class="fin-sw ${cat}" style="width:8px;height:8px;vertical-align:middle"></span> ${CAT_LABEL[cat]}</small></span><span class="n hide-m">koszty ${money(c.costs)}</span><span class="n"><strong>${money(c.fee)}</strong></span></div>`; }).join("") || '<div class="settle-empty">Brak pozycji.</div>';

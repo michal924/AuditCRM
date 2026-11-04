@@ -74,8 +74,9 @@ const SETTLE_FIELDS = [
   { name: "DelegDepart",   label: "Delegacja: wyjazd (data i godzina)",  type: "Text" },   // "2026-09-27 16:00" — oświadczenie o podróży służbowej
   { name: "DelegReturn",   label: "Delegacja: powrót (data i godzina)",  type: "Text" },
   { name: "DelegNo",       label: "Nr oświadczenia o delegacji",         type: "Text" },   // OD/RRRR/MM/nnn — nadany przy pierwszym wydruku
+  { name: "SettleMonth",   label: "Rozlicz w miesiącu",                  type: "Text" },   // "2026-11" — rozliczenie w innym miesiącu niż data audytu (Michał 2026-11-04)
 ];
-const SETTLE_NEWER_FIELDS = ["SettleDayRate", "SettleTravelDays", "DelegDepart", "DelegReturn", "DelegNo"];   // pola dodane później: gdy ich brak, reszta rozliczeń nadal działa
+const SETTLE_NEWER_FIELDS = ["SettleDayRate", "SettleTravelDays", "DelegDepart", "DelegReturn", "DelegNo", "SettleMonth"];   // pola dodane później: gdy ich brak, reszta rozliczeń nadal działa
 window.settleRateFieldMissing = false;
 const SETTLE_FIELD_NAMES = SETTLE_FIELDS.map(f => f.name);
 // true gdy lista nie ma jeszcze kolumn rozliczeń → UI pokaże przycisk konfiguracji, zapis pomija te pola
