@@ -558,27 +558,14 @@
     <div id="fin-late" class="fin-late hidden"></div>
     <div class="fin-kpis" id="fin-kpis"></div>
 
-    <div class="fin-grid">
-      <div class="fin-card">
-        <div class="fin-card-head"><h3>Miesiąc po miesiącu</h3><span class="fin-hint" id="fin-chart-hint">wynagrodzenie netto · kliknij słupek, aby zobaczyć audyty</span></div>
-        <div id="fin-chart" class="fin-chart"></div>
-        <div class="fin-legend">
-          <span><i class="fin-sw done"></i> Rozliczone</span>
-          <span><i class="fin-sw sent"></i> Wysłane do zleceniodawcy</span>
-          <span><i class="fin-sw open"></i> Do rozliczenia (wykonane)</span>
-          <span><i class="fin-sw late"></i> Zaległe (bez DONE)</span>
-          <span><i class="fin-sw plan"></i> Prognoza (SCHEDULED)</span>
-          <span><i class="fin-sw tent"></i> Wstępnie (PLANNED)</span>
-        </div>
-      </div>
-      <div class="fin-card">
-        <div class="fin-card-head"><h3>Wg zleceniodawcy</h3></div>
-        <div id="fin-bodies"></div>
-      </div>
+    <div class="fin-card">
+      <div class="fin-card-head"><h3>Plan finansowy wg miesięcy</h3><span class="fin-hint" id="fin-chart-hint">wynagrodzenie netto · kliknij miesiąc, aby zobaczyć audyty</span></div>
+      <div id="fin-chart" class="fin-chart"></div>
+      <div class="fin-legend" id="fin-legend"></div>
     </div>
 
     <div class="fin-card">
-      <div class="fin-card-head"><h3>Tabela miesięczna</h3><span class="fin-hint">dni audytowe · wynagrodzenie · koszty refakturowane</span></div>
+      <div class="fin-card-head"><h3>Plan miesiąc po miesiącu</h3><span class="fin-hint">wynagrodzenie netto · narastająco od początku roku · koszty refakturowane</span></div>
       <div class="table-wrapper settle-table-wrap"><table class="settle-table fin-table" id="fin-table"></table></div>
     </div>
 
@@ -627,6 +614,11 @@
           <h3>Dane firmy</h3>
           <div class="field-row"><label>PRJ</label><span id="m-prj">—</span></div>
           <div class="field-row"><label>Program</label><span id="m-program">—</span></div>
+          <div class="field-row hidden" id="row-eudr-role"><label for="e-eudr-role">Podmiot EUDR</label><span id="m-eudr-role" class="view-val">—</span>
+            <select id="e-eudr-role" class="edit-val field-input">
+              <option value="Operator">Operator / importer (stawka dzienna)</option>
+              <option value="DO">Podmiot w łańcuchu dostaw DO (700 za usługę)</option>
+            </select></div>
           <div class="field-row">
             <label>Jednostka</label>
             <span id="m-certbody" class="view-val">—</span>
@@ -947,6 +939,13 @@
               <option value="SURE">SURE</option><option value="EUDR">EUDR</option>
             </select>
           </div>
+          <div class="form-row hidden" id="new-eudr-row">
+            <label for="new-eudr-role">Podmiot EUDR *</label>
+            <select id="new-eudr-role" class="form-input">
+              <option value="Operator">Operator / importer (stawka dzienna)</option>
+              <option value="DO">Podmiot w łańcuchu dostaw DO (700 za usługę)</option>
+            </select>
+          </div>
           <div class="form-row">
             <label>Rodzaj wpisu *</label>
             <select id="new-kind" class="form-input">
@@ -1118,7 +1117,11 @@
         </div>
         <div class="form-row">
           <label for="settle-rate-CUC_EUDR">EUDR (CU)</label>
-          <input type="number" id="settle-rate-CUC_EUDR" class="form-input settle-rate" min="0" step="50" placeholder="np. 2100" title="Każdy wpis EUDR dla Control Union (audyt, weryfikacja, szkolenie) — stawka dzienna 2100">
+          <input type="number" id="settle-rate-CUC_EUDR" class="form-input settle-rate" min="0" step="50" placeholder="np. 2100" title="EUDR dla Control Union, operator lub importer: stawka dzienna 2100">
+        </div>
+        <div class="form-row">
+          <label for="settle-rate-CUC_EUDR_DO">EUDR DO (CU, za usługę)</label>
+          <input type="number" id="settle-rate-CUC_EUDR_DO" class="form-input settle-rate" min="0" step="50" placeholder="np. 700" title="EUDR dla Control Union, podmiot w łańcuchu dostaw (DO): stała opłata za usługę, niezależnie od liczby dni">
         </div>
         <div class="form-row">
           <label for="settle-rate-SGS">Stawka dzienna SGS</label>

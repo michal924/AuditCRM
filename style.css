@@ -1804,12 +1804,20 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .fin-kpi.open { border-top-color: var(--lfa-accent); background: var(--lfa-danger-bg); } .fin-kpi.open .k-val { color: var(--lfa-accent); }
 .fin-kpi.sent { border-top-color: var(--lfa-detail); background: var(--lfa-warning-bg); } .fin-kpi.sent .k-val { color: var(--lfa-warning-fg); }
 .fin-kpi.done { background: var(--lfa-primary); border-color: var(--lfa-primary); } .fin-kpi.done .k-val, .fin-kpi.done .k-label, .fin-kpi.done .k-sub { color: var(--lfa-on-primary); }
+/* Plan finansowy (2026-11-05): 4 kafle, większa liczba, jedna linia opisu */
+#fin-kpis { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+#fin-kpis .fin-kpi .k-val { font-size: 26px; }
+#fin-kpis .fin-kpi .k-sub { font-family: var(--lfa-font-ui); font-size: 12px; }
+.fin-kpi.total { border-top-color: var(--lfa-primary); }
 .fin-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 12px; margin-bottom: 12px; }
 .fin-card { background: var(--lfa-surface); border: 1px solid var(--lfa-border); border-radius: var(--lfa-radius-lg); padding: 14px 16px; margin-bottom: 12px; min-width: 0; }
 .fin-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .fin-card-head h3 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--lfa-eyebrow); }
 .fin-hint { font-size: 11.5px; color: var(--lfa-text-muted); }
-.fin-chart svg { width: 100%; height: 220px; display: block; }
+.fin-chart svg { width: 100%; height: auto; max-height: 320px; display: block; }
+.fin-chart .bar.earned { fill: var(--lfa-primary); }
+.fin-chart .now-line { stroke: var(--lfa-accent); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.fin-chart .hit { cursor: pointer; }
 .fin-chart .bar { cursor: pointer; }
 .fin-chart .bar.done { fill: var(--lfa-primary); }
 .fin-chart .bar.sent { fill: color-mix(in srgb, var(--lfa-mosiadz) 65%, var(--lfa-surface)); }
@@ -1817,11 +1825,15 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .fin-chart .bar.plan { fill: var(--lfa-info-bg); stroke: var(--lfa-primary); stroke-width: 1.2; }
 .fin-chart .bar.tent { fill: transparent; stroke: var(--lfa-text-subtle); stroke-width: 1; stroke-dasharray: 3 2; }
 .fin-chart .axis { stroke: var(--lfa-border); }
-.fin-chart .lbl { font-family: var(--lfa-font-data); font-size: 10px; fill: var(--lfa-text-muted); }
+.fin-chart .lbl { font-family: var(--lfa-font-data); font-size: 11.5px; fill: var(--lfa-text-muted); }
 .fin-chart .lbl.sel { fill: var(--lfa-primary); font-weight: 700; }
-.fin-chart .val { font-family: var(--lfa-font-data); font-size: 9.5px; fill: var(--lfa-text); }
+.fin-chart .val { font-family: var(--lfa-font-data); font-size: 11px; font-weight: 600; fill: var(--lfa-text); }
 .fin-chart .sel-bg { fill: var(--lfa-info-bg); }
-.fin-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; color: var(--lfa-text-muted); margin-top: 6px; }
+.fin-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--lfa-text-muted); margin-top: 8px; }
+.fin-legend b { color: var(--lfa-text); font-family: var(--lfa-font-data); font-weight: 600; }
+.fin-sw.earned { background: var(--lfa-primary); }
+.fin-sw.now { width: 0; height: 12px; border: 0; border-left: 2px dashed var(--lfa-accent); border-radius: 0; }
+.fin-sw.unsched { border: 1px dashed var(--lfa-accent); }
 .fin-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .fin-sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; border: 1px solid transparent; }
 .fin-sw.done { background: var(--lfa-primary); } .fin-sw.sent { background: color-mix(in srgb, var(--lfa-mosiadz) 65%, var(--lfa-surface)); }
@@ -1837,6 +1849,16 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .fin-table tr.m { cursor: pointer; }
 .fin-table td.num, .fin-table th.num { text-align: right; font-family: var(--lfa-font-data); font-variant-numeric: tabular-nums; }
 .fin-table tr.total td { font-weight: 700; background: var(--lfa-surface-3); }
+.fin-table tr.now td { font-weight: 600; box-shadow: inset 0 -2px 0 var(--lfa-accent); }
+.fin-table tr.future td { color: var(--lfa-text-muted); }
+.fin-table td small { color: var(--lfa-text-muted); font-weight: 400; }
+/* „Do zrobienia” w Finansach: zwinięte liczniki, rozwijane listy */
+.fin-late { background: var(--lfa-surface); border-color: var(--lfa-border); border-left-color: var(--lfa-accent); padding: 10px 14px; }
+.fin-todo-head { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--lfa-eyebrow); margin-bottom: 4px; }
+.fin-todo-item summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 8px 0; min-height: 44px; box-sizing: border-box; }
+.fin-todo-item summary b { color: var(--lfa-accent); font-size: 13.5px; }
+.fin-todo-item summary span { color: var(--lfa-text-muted); font-size: 12.5px; }
+.fin-todo-item + .fin-todo-item { border-top: 1px solid var(--lfa-hairline); }
 .fin-list-row { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 6px; border-bottom: 1px solid var(--lfa-hairline); cursor: pointer; }
 .fin-list-row:hover { background: var(--lfa-surface-2); }
 .fin-list-row .d { font-family: var(--lfa-font-data); font-size: 12px; color: var(--lfa-text-muted); }

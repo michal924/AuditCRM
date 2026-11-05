@@ -271,7 +271,7 @@ function renderSettleView(a) {
   settleSetText("m-s-highway", has(a.SettleHighway) ? fmtPLN(a.SettleHighway) : "—");
   settleSetText("m-s-other",   has(a.SettleOther)   ? fmtPLN(a.SettleOther)   : "—");
   settleSetText("m-s-tickets", has(a.SettleTickets) ? fmtPLN(a.SettleTickets) : "—");
-  settleSetText("m-s-fee",     has(a.SettleFee) ? fmtPLN(a.SettleFee) : (isMeeting(a) && !isPaidTraining(a)) ? "— (spotkanie: tylko koszty)" : c.fee ? fmtPLN(c.fee) + " (" + settleNum(a.AuditDays) + " dni × " + dayRateSource(a) + ")" : "— (brak stawki dziennej)");
+  settleSetText("m-s-fee",     has(a.SettleFee) ? fmtPLN(a.SettleFee) : isEudrDO(a) ? (c.fee ? fmtPLN(c.fee) + " (usługa EUDR, podmiot DO)" : "— (brak stawki EUDR DO)") : (isMeeting(a) && !isPaidTraining(a)) ? "— (spotkanie: tylko koszty)" : c.fee ? fmtPLN(c.fee) + " (" + settleNum(a.AuditDays) + " dni × " + dayRateSource(a) + ")" : "— (brak stawki dziennej)");
   settleSetText("m-s-travel",  has(a.SettleTravelDays) && settleNum(a.SettleTravelDays) ? "+" + settleNum(a.SettleTravelDays) + " dni" : "—");
   settleSetText("m-s-dayrate", has(a.SettleDayRate) ? fmtPLN(a.SettleDayRate) : (dayRateOf(a) != null ? fmtPLN(dayRateOf(a)) + " (" + dayRateSource(a) + ")" : "—"));
   settleSetText("m-s-basis",   a.SettleFeeBasis || "—");
@@ -789,6 +789,7 @@ function setupModal() {
     if (e.target === document.getElementById("modal-overlay") && !isEditMode) closeModal();
   };
   document.getElementById("btn-edit-audit").onclick = enterEditMode;
+  document.getElementById("e-certbody").addEventListener("change", e => { if (currentAudit) document.getElementById("row-eudr-role").classList.toggle("hidden", !isEudrCU(Object.assign({}, currentAudit, { CertBody: e.target.value }))); });
   document.getElementById("btn-cancel-edit").onclick = cancelEditMode;
 
   document.querySelectorAll(".status-btn").forEach(btn => {
@@ -929,6 +930,8 @@ function openModal(id) {
   document.getElementById("modal-title").textContent = a.Title || "—";
   document.getElementById("m-prj").textContent       = a.ProjectID || "—";
   document.getElementById("m-program").textContent   = a.Program || "—";
+  document.getElementById("row-eudr-role").classList.toggle("hidden", !isEudrCU(a));
+  document.getElementById("m-eudr-role").textContent = EUDR_ROLE_LABEL[a.EudrRole || "Operator"];
   document.getElementById("m-certbody").textContent   = certBodyOf(a);
   document.getElementById("m-type").textContent      = isMeeting(a) ? "—" : (a.AuditType || "—");
   { const mk = document.getElementById("m-kind"); if (mk) mk.textContent = kindOf(a); }
@@ -1010,6 +1013,7 @@ function enterEditMode() {
     syncKindType("e-kind", "e-type-row"); }
   document.getElementById("e-mode").value    = a.AuditMode || "On-site";
   document.getElementById("e-certbody").value = certBodyOf(a);
+  document.getElementById("e-eudr-role").value = a.EudrRole === "DO" ? "DO" : "Operator";
   document.getElementById("e-cu").value      = a.PlannedCUDate ? a.PlannedCUDate.substring(0, 10) : "";
   document.getElementById("e-notes").value   = a.Notes || "";
   // Rozliczenie — pola edycji
@@ -1192,7 +1196,7 @@ async function saveChanges() {
         fields.SettleOther    = num("e-s-other");
         fields.SettleTickets  = num("e-s-tickets");
         fields.SettleFee      = num("e-s-fee");
-        if (!window.settleRateFieldMissing) { fields.SettleDayRate = num("e-s-dayrate"); fields.SettleTravelDays = num("e-s-travel"); fields.SettleMonth = gs("e-s-month") || null; }
+        if (!window.settleRateFieldMissing) { fields.SettleDayRate = num("e-s-dayrate"); fields.SettleTravelDays = num("e-s-travel"); fields.SettleMonth = gs("e-s-month") || null; if (isEudrCU(Object.assign({}, currentAudit, { CertBody: fields.CertBody }))) fields.EudrRole = gs("e-eudr-role") || "Operator"; }
         fields.SettleFeeBasis = gs("e-s-basis").trim() || null;
         fields.SettleNote     = gs("e-s-note").trim() || null;
       }
@@ -1952,6 +1956,10 @@ function setupAddAudit() {
   });
 
   document.getElementById("new-certbody").addEventListener("change", updateProjectIdLabel);
+  // Wybór podmiotu EUDR widoczny tylko dla EUDR u Control Union (różne stawki)
+  const syncEudrRow = () => document.getElementById("new-eudr-row").classList.toggle("hidden", !(document.getElementById("new-program").value === "EUDR" && (document.getElementById("new-certbody").value || "CUC") === "CUC"));
+  document.getElementById("new-certbody").addEventListener("change", syncEudrRow);
+  document.getElementById("new-program").addEventListener("change", syncEudrRow);
 
   document.getElementById("new-days").addEventListener("change", e => {
     const days = parseFloat(e.target.value);
@@ -2115,6 +2123,8 @@ function openAddAuditModal() {
   document.getElementById("new-program").value  = "";
   document.getElementById("new-projectid").value = "";
   document.getElementById("new-certbody").value = "CUC";
+  document.getElementById("new-eudr-role").value = "Operator";
+  document.getElementById("new-eudr-row").classList.add("hidden");
   updateProjectIdLabel();
   document.getElementById("new-type").value     = "";
   document.getElementById("new-kind").value     = "Audyt";
@@ -2184,6 +2194,7 @@ async function saveNewAudit() {
     AuditorName:    MY_AUDITOR,
     Notes:          g("new-notes"),
   };
+  if (!window.settleRateFieldMissing && isEudrCU(rec)) rec.EudrRole = g("new-eudr-role") || "Operator";
 
   const btn = document.getElementById("btn-save-new-audit");
   btn.textContent = "Zapisywanie...";
@@ -2241,7 +2252,7 @@ function syncKindType(kindId, typeRowId) {
 // Stawka dzienna wg umowy z jednostką (CU: 1500 zł). Wartość NIE trafia do raportów, tylko iloczyn dni × stawka.
 const DAY_RATES_KEY = "lfa-day-rates";
 function getDayRates() {
-  const def = { CUC: 1500, CUC_COMBO: 2100, CUC_EUDR: 2100, SGS: 800, LF: null };   // CUC_EUDR = każda praca EUDR dla CU (audyt/weryfikacja/szkolenie) = 2100 (Michał 2026-10-09)   // CUC_COMBO = audyt łączony FSC+PEFC u CU (Michał 2026-10-07)   // wg umów (Michał 2026-09-30); nadpisanie w panelu Rozliczenie zapisuje się lokalnie
+  const def = { CUC: 1500, CUC_COMBO: 2100, CUC_EUDR: 2100, CUC_EUDR_DO: 700, SGS: 800, LF: null };   // CUC_EUDR_DO = EUDR dla CU, podmiot w łańcuchu dostaw (DO): 700 za usługę, nie za dzień (Michał 2026-11-05)   // CUC_EUDR = każda praca EUDR dla CU (audyt/weryfikacja/szkolenie) = 2100 (Michał 2026-10-09)   // CUC_COMBO = audyt łączony FSC+PEFC u CU (Michał 2026-10-07)   // wg umów (Michał 2026-09-30); nadpisanie w panelu Rozliczenie zapisuje się lokalnie
   try { const saved = JSON.parse(localStorage.getItem(DAY_RATES_KEY) || "{}"); if (saved.CUC_TRAIN_EUDR != null && saved.CUC_EUDR == null) saved.CUC_EUDR = saved.CUC_TRAIN_EUDR; Object.keys(saved).forEach(k => { if (k in def && saved[k] != null && !isNaN(+saved[k])) def[k] = +saved[k]; }); } catch {}
   return def;
 }
@@ -2262,9 +2273,14 @@ function dayRateSource(a) {
   return (bodyKey(a) === "CUC" && isCombinedAudit(a)) ? "stawka łączona CU" : "stawka " + bodyLabel(a);
 }
 // Wynagrodzenie audytu: ręcznie wpisane SettleFee ma pierwszeństwo; inaczej dni × stawka jednostki; spotkanie = 0
+// EUDR dla CU: importer / operator = stawka dzienna CUC_EUDR; podmiot w łańcuchu dostaw (DO) = stała opłata CUC_EUDR_DO za usługę
+function isEudrCU(a) { return bodyKey(a) === "CUC" && hasProgram(a, "EUDR"); }
+function isEudrDO(a) { return isEudrCU(a) && a.EudrRole === "DO"; }
+const EUDR_ROLE_LABEL = { Operator: "Operator / importer", DO: "Podmiot w łańcuchu dostaw (DO)" };
 function settleFeeOf(a) {
   if (a.SettleFee != null && a.SettleFee !== "") return { fee: settleNum(a.SettleFee), auto: false };
   if (isMeeting(a) && !isPaidTraining(a)) return { fee: 0, auto: true };
+  if (isEudrDO(a)) { const r = getDayRates().CUC_EUDR_DO; return { fee: r == null ? 0 : settleNum(r), auto: true }; }
   const rate = dayRateOf(a), days = settleNum(a.AuditDays);
   return { fee: rate != null && days ? Math.round(days * rate * 100) / 100 : 0, auto: true };
 }
@@ -4827,8 +4843,8 @@ const SettleModule = (function () {
     const ex = $("settle-export-btn"); if (ex) ex.onclick = exportMonth;
     const eo = $("settle-export-open-btn"); if (eo) eo.onclick = exportOpen;
     const pb = $("settle-pdf-btn"); if (pb) pb.onclick = exportPdf;
-    BODY_KEYS.concat(["CUC_COMBO", "CUC_EUDR"]).forEach(bk => { const inp = $("settle-rate-" + bk); if (!inp) return; const r = getDayRates()[bk]; inp.value = r == null ? "" : r;
-      inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + (bk === "CUC_COMBO" ? "CU łączony FSC+PEFC" : bk === "CUC_EUDR" ? "EUDR (CU)" : BODY_INFO[bk].label) + " zapisana (na tym urządzeniu)", "success"); }; });
+    BODY_KEYS.concat(["CUC_COMBO", "CUC_EUDR", "CUC_EUDR_DO"]).forEach(bk => { const inp = $("settle-rate-" + bk); if (!inp) return; const r = getDayRates()[bk]; inp.value = r == null ? "" : r;
+      inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + (bk === "CUC_COMBO" ? "CU łączony FSC+PEFC" : bk === "CUC_EUDR" ? "EUDR (CU)" : bk === "CUC_EUDR_DO" ? "EUDR DO (CU, za usługę)" : BODY_INFO[bk].label) + " zapisana (na tym urządzeniu)", "success"); }; });
     const mo = $("settle-month"); if (mo) mo.onchange = renderMonthSummary;
     const bd = $("settle-body-select"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
     const ir = $("settle-incl-rejected"); if (ir) ir.onchange = () => { renderMonthSummary(); renderReports(); };
@@ -4975,8 +4991,8 @@ const FinanceModule = (function () {
   const $ = id => document.getElementById(id);
   const MIES = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
   const MIES_FULL = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
-  const CATS = ["done", "sent", "open", "late", "plan", "tent"];
-  const CAT_LABEL = { done: "Rozliczone", sent: "Wysłane", open: "Do rozliczenia", late: "Zaległe (bez DONE)", plan: "Prognoza", tent: "Wstępnie" };
+  const CATS = ["done", "sent", "open", "late", "plan", "tent", "unsched"];
+  const CAT_LABEL = { done: "Rozliczone", sent: "Wysłane", open: "Do rozliczenia", late: "Odbyte bez DONE", plan: "Zaplanowane (SCHEDULED)", tent: "Wstępnie (PLANNED)", unsched: "Do zaplanowania" };
   const todayKey = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
   // Audyt z datą w przeszłości, który wciąż ma status PLANNED/SCHEDULED/CHANGE — ktoś zapomniał przestawić na DONE/REJECTED.
   // Nie wlicza się do prognozy (Michał 2026-10-07: „to teraz jest bardzo mylące”).
@@ -4987,7 +5003,10 @@ const FinanceModule = (function () {
     const e = new Date(d + "T12:00:00"); e.setDate(e.getDate() + days - 1);
     return e.getFullYear() + "-" + String(e.getMonth() + 1).padStart(2, "0") + "-" + String(e.getDate()).padStart(2, "0");
   }
-  function isLate(a) { const e = endKey(a); return e && e < todayKey() && ["PLANNED", "SCHEDULED", "CHANGE"].includes(a.AuditStatus) && settleStatusOf(a) === "Nierozliczony"; }
+  // „Zaległy” tylko gdy jest data audytu LF (audyt miał się odbyć). Sama minięta data CU bez terminu LF = „do zaplanowania”, nie zaległy status (Michał 2026-11-05)
+  function isPastOpen(a) { const e = endKey(a); return e && e < todayKey() && ["PLANNED", "SCHEDULED", "CHANGE"].includes(a.AuditStatus) && settleStatusOf(a) === "Nierozliczony"; }
+  function isLate(a) { return !!a.AuditDateStart && isPastOpen(a); }
+  function isUnscheduled(a) { return !a.AuditDateStart && isPastOpen(a); }
   let body = "all", selMonth = null;
   // Filtry (maksymalna segregacja): lata, miesiące, kwartały, programy, kategorie, rodzaj wpisu — wielokrotny wybór
   const F = { year: [String(new Date().getFullYear())], month: [], quarter: [], program: [], cat: [], kind: [] };
@@ -5035,6 +5054,7 @@ const FinanceModule = (function () {
     if (ss === "Wysłany do CU") return "sent";
     if (st === "DONE") return "open";
     if (isLate(a)) return "late";
+    if (isUnscheduled(a)) return "unsched";
     if (st === "SCHEDULED" || st === "CHANGE") return "plan";
     if (st === "PLANNED") return "tent";
     return null;                                   // REJECTED i inne — poza finansami
@@ -5055,69 +5075,94 @@ const FinanceModule = (function () {
   const money = n => fmtPLN(n);
   const dni = d => (Number.isInteger(d) ? d : d.toFixed(2).replace(".", ",")) + (d === 1 ? " dzień" : " dni");
 
+  // ── Plan finansowy (Michał 2026-11-05): 4 liczby, kompaktowe „do zrobienia”, czytelny wykres, tabela miesięcy z narastająco ──
+  // Grupy planu: zarobione (rozliczone + wysłane), do rozliczenia (DONE), zaplanowane (SCHEDULED), wstępnie (PLANNED)
+  const GROUPS = [
+    { key: "earned", cats: ["done", "sent"], label: "Zarobione", hint: "rozliczone i wysłane do zleceniodawcy" },
+    { key: "open",   cats: ["open"],         label: "Do rozliczenia", hint: "wykonane (DONE), jeszcze nierozliczone" },
+    { key: "plan",   cats: ["plan"],         label: "Zaplanowane", hint: "termin potwierdzony (SCHEDULED)" },
+    { key: "tent",   cats: ["tent"],         label: "Wstępnie", hint: "z planu CU, termin niepotwierdzony (PLANNED)" },
+  ];
+  const inGroup = (g, a) => g.cats.includes(catOf(a));
+  const inPlan = a => GROUPS.some(g => inGroup(g, a));
+  const tys = v => (v / 1000).toLocaleString("pl-PL", { maximumFractionDigits: 1 }) + " tys.";
+  // Podział wg zleceniodawcy do dymka (title), gdy widok „Wszyscy”
+  const splitTitle = list => body !== "all" ? "" : BODY_KEYS.map(k => { const o = agg(list.filter(a => bodyKey(a) === k)); return o.n ? BODY_INFO[k].label + ": " + money(o.fee) : ""; }).filter(Boolean).join("\n");
   function renderKpis(all) {
     const box = $("fin-kpis"); if (!box) return;
-    const by = {}; CATS.forEach(c => by[c] = agg(all.filter(a => catOf(a) === c)));
-    // Podział wg zleceniodawcy w podtytule (gdy widok „Wszyscy”): „CU 4 172 · SGS 1 840” — żeby suma nie myliła (Michał 2026-10-09)
-    const split = (list, key) => body !== "all" ? "" : BODY_KEYS.map(k => { const o = agg(list.filter(a => bodyKey(a) === k)); return o.n ? BODY_INFO[k].short + " " + money(o[key]).replace(" zł", "") : ""; }).filter(Boolean).join(" · ");
-    const kpi = (c, label) => { const o = by[c]; const its = all.filter(a => catOf(a) === c); const sf = split(its, "fee"), sc = split(its, "costs");
-      return `<div class="fin-kpi ${c}"><span class="k-label">${label}</span><span class="k-val">${money(o.fee)}</span><span class="k-sub">${sf ? sf + " · " : ""}${o.n} audytów · ${dni(o.days)}<br>koszty ${money(o.costs)}${sc ? " (" + sc + ")" : ""}</span></div>`; };
-    const yearAll = agg(all); const sfA = split(all, "fee"), scA = split(all, "costs");
-    box.innerHTML = kpi("plan", "Prognoza (SCHEDULED)") + kpi("tent", "Wstępnie (PLANNED)") + kpi("open", "Do rozliczenia") + kpi("sent", "Wysłane do zleceniodawcy") + kpi("done", "Rozliczone") + (by.late.n ? kpi("late", "Zaległe — brak statusu DONE") : "") +
-      `<div class="fin-kpi"><span class="k-label">Razem (${escHtml(yearLabel())})</span><span class="k-val">${money(yearAll.fee)}</span><span class="k-sub">${sfA ? sfA + " · " : ""}${yearAll.n} pozycji · ${dni(yearAll.days)}<br>koszty ${money(yearAll.costs)}${scA ? " (" + scA + ")" : ""} · z kosztami ${money(yearAll.total)}</span></div>`;
+    const tile = (cls, label, list, sub) => { const o = agg(list);
+      return `<div class="fin-kpi ${cls}" title="${escHtml(splitTitle(list))}"><span class="k-label">${label}</span><span class="k-val">${money(o.fee)}</span><span class="k-sub">${sub(o)}</span></div>`; };
+    const g = key => all.filter(a => inGroup(GROUPS.find(x => x.key === key), a));
+    const earned = g("earned"), plan = all.filter(a => ["plan", "tent"].includes(catOf(a))), planAll = all.filter(inPlan);
+    const done = agg(earned.filter(a => catOf(a) === "done")), sched = agg(g("plan"));
+    box.innerHTML =
+      tile("done", "Zarobione", earned, o => `${o.n} audytów · w tym rozliczone ${money(done.fee)}`) +
+      tile("open", "Do rozliczenia", g("open"), o => `${o.n} wykonanych · koszty ${money(o.costs)}`) +
+      tile("plan", "Zaplanowane", plan, o => `${o.n} audytów · potwierdzone ${money(sched.fee)}`) +
+      tile("total", "Plan " + escHtml(yearLabel()), planAll, o => `${dni(o.days)} · z kosztami ${money(o.total)}`);
   }
   function monthData(all) {
     return Array.from({ length: 12 }, (_, m) => { const inM = all.filter(a => parseInt(String(periodOf(a)).substring(5, 7)) - 1 === m);
-      const d = { m, all: agg(inM), cats: {} }; CATS.forEach(c => d.cats[c] = agg(inM.filter(a => catOf(a) === c))); return d; });
+      const d = { m, all: agg(inM.filter(inPlan)), g: {} }; GROUPS.forEach(g => d.g[g.key] = agg(inM.filter(a => inGroup(g, a)))); return d; });
   }
   function renderChart(md) {
     const box = $("fin-chart"); if (!box) return;
-    const W = 720, H = 220, L = 46, R = 8, T = 14, B = 26, pw = W - L - R, ph = H - T - B;
-    const max = Math.max(1, ...md.map(d => CATS.reduce((s, c) => s + d.cats[c].fee, 0)));
-    const nice = Math.pow(10, Math.floor(Math.log10(max))); const top = Math.ceil(max / nice) * nice;
+    const W = 760, H = 260, L = 56, R = 10, T = 22, B = 30, pw = W - L - R, ph = H - T - B;
+    const sum = d => GROUPS.reduce((s, g) => s + d.g[g.key].fee, 0);
+    const max = Math.max(1, ...md.map(sum));
+    const step = Math.pow(10, Math.floor(Math.log10(max))) * (max / Math.pow(10, Math.floor(Math.log10(max))) > 5 ? 2 : max / Math.pow(10, Math.floor(Math.log10(max))) > 2 ? 1 : 0.5);
+    const top = Math.ceil(max / step) * step;
     const y = v => T + ph - (v / top) * ph;
-    const cw = pw / 12, bw = Math.min(34, cw * 0.62);
-    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wynagrodzenie wg miesięcy">`;
-    for (let i = 0; i <= 4; i++) { const v = top * i / 4; svg += `<line class="axis" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="lbl" x="${L - 6}" y="${y(v) + 3}" text-anchor="end">${v >= 1000 ? Math.round(v / 1000) + "k" : v}</text>`; }
+    const cw = pw / 12, bw = Math.min(40, cw * 0.66);
+    const now = new Date(), nowM = F.year.length === 1 && F.year[0] === String(now.getFullYear()) ? now.getMonth() : -1;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Plan finansowy: wynagrodzenie wg miesięcy">`;
+    for (let v = 0; v <= top + 1e-6; v += step) svg += `<line class="axis" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="lbl" x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v ? tys(v) : "0"}</text>`;
     md.forEach(d => { const x0 = L + d.m * cw, x = x0 + (cw - bw) / 2;
-      if (selMonth === d.m) svg += `<rect class="sel-bg" x="${x0}" y="${T - 4}" width="${cw}" height="${ph + 8}" rx="4"/>`;
+      if (selMonth === d.m) svg += `<rect class="sel-bg" x="${x0}" y="${T - 6}" width="${cw}" height="${ph + 6}" rx="4"/>`;
+      if (d.m === nowM) svg += `<line class="now-line" x1="${x0 + cw / 2}" x2="${x0 + cw / 2}" y1="${T - 6}" y2="${T + ph}"/>`;
       let acc = 0;
-      CATS.forEach(c => { const v = d.cats[c].fee; if (!v) return; const h = (v / top) * ph; acc += v; svg += `<rect class="bar ${c}" data-m="${d.m}" x="${x}" y="${y(acc)}" width="${bw}" height="${Math.max(h, 1)}"><title>${MIES_FULL[d.m]} · ${CAT_LABEL[c]}: ${money(v)}</title></rect>`; });
-      if (acc) svg += `<text class="val" x="${x + bw / 2}" y="${y(acc) - 3}" text-anchor="middle">${acc >= 1000 ? (acc / 1000).toFixed(1).replace(".", ",") + "k" : Math.round(acc)}</text>`;
-      svg += `<text class="lbl${selMonth === d.m ? " sel" : ""}" x="${x0 + cw / 2}" y="${H - 8}" text-anchor="middle">${MIES[d.m]}</text>`;
-      svg += `<rect class="bar" data-m="${d.m}" x="${x0}" y="${T}" width="${cw}" height="${ph}" fill="transparent"/>`; });
+      GROUPS.forEach(g => { const v = d.g[g.key].fee; if (!v) return; const h = (v / top) * ph; acc += v; svg += `<rect class="bar ${g.key}" data-m="${d.m}" x="${x}" y="${y(acc)}" width="${bw}" height="${Math.max(h, 1.5)}" rx="2"><title>${MIES_FULL[d.m]} · ${g.label}: ${money(v)}</title></rect>`; });
+      if (acc) svg += `<text class="val" x="${x + bw / 2}" y="${y(acc) - 5}" text-anchor="middle">${tys(acc)}</text>`;
+      svg += `<text class="lbl${selMonth === d.m || d.m === nowM ? " sel" : ""}" x="${x0 + cw / 2}" y="${H - 9}" text-anchor="middle">${MIES[d.m]}</text>`;
+      svg += `<rect class="hit" data-m="${d.m}" x="${x0}" y="${T}" width="${cw}" height="${ph + B}" fill="transparent"><title>${MIES_FULL[d.m]}: ${money(acc)}</title></rect>`; });
     svg += "</svg>"; box.innerHTML = svg;
-    box.querySelectorAll("rect.bar").forEach(r => r.onclick = () => selectMonth(parseInt(r.dataset.m)));
-  }
-  function renderBodies(all) {
-    const box = $("fin-bodies"); if (!box) return;
-    const keys = body === "all" ? BODY_KEYS : [body];
-    box.innerHTML = keys.map(k => { const its = all.filter(a => bodyKey(a) === k); if (!its.length) return ""; const o = agg(its);
-      const parts = CATS.map(c => agg(its.filter(a => catOf(a) === c)).fee); const sum = parts.reduce((a, b) => a + b, 0) || 1;
-      return `<div class="fin-body"><b>${BODY_INFO[k].label}</b><span class="n">${money(o.fee)}</span><small>${o.n} pozycji · ${dni(o.days)} · koszty ${money(o.costs)} · rozliczone ${money(parts[0])}</small><div class="fin-bar">${CATS.map((c, i) => `<i class="fin-sw ${c}" style="width:${(parts[i] / sum * 100).toFixed(1)}%;border-radius:0"></i>`).join("")}</div></div>`; }).join("") || '<div class="settle-empty">Brak danych w tym roku.</div>';
+    box.querySelectorAll("rect[data-m]").forEach(r => r.onclick = () => selectMonth(parseInt(r.dataset.m)));
+    const lg = $("fin-legend"); if (lg) { const tot = {}; GROUPS.forEach(g => tot[g.key] = md.reduce((s, d) => s + d.g[g.key].fee, 0));
+      lg.innerHTML = GROUPS.map(g => `<span title="${escHtml(g.hint)}"><i class="fin-sw ${g.key}"></i> ${g.label} <b>${money(tot[g.key])}</b></span>`).join("") + (nowM >= 0 ? `<span><i class="fin-sw now"></i> bieżący miesiąc</span>` : ""); }
   }
   function renderTable(md) {
     const t = $("fin-table"); if (!t) return;
-    const head = `<thead><tr><th>Miesiąc</th><th class="num">Poz.</th><th class="num">Dni</th><th class="num">Rozliczone</th><th class="num">Wysłane</th><th class="num">Do rozl.</th><th class="num">Zaległe</th><th class="num">Prognoza</th><th class="num">Wstępnie</th><th class="num">Wynagrodzenie</th><th class="num">Koszty</th><th class="num">Razem</th></tr></thead>`;
-    const tot = { n: 0, days: 0, fee: 0, costs: 0, total: 0, c: {} }; CATS.forEach(c => tot.c[c] = 0);
-    const body_ = md.map(d => { if (!d.all.n) return ""; tot.n += d.all.n; tot.days += d.all.days; tot.fee += d.all.fee; tot.costs += d.all.costs; tot.total += d.all.total; CATS.forEach(c => tot.c[c] += d.cats[c].fee);
-      return `<tr class="m${selMonth === d.m ? " sel" : ""}" data-m="${d.m}"><td>${MIES_FULL[d.m]}</td><td class="num">${d.all.n}</td><td class="num">${d.all.days}</td>${CATS.map(c => `<td class="num">${d.cats[c].fee ? money(d.cats[c].fee) : "—"}</td>`).join("")}<td class="num"><strong>${money(d.all.fee)}</strong></td><td class="num">${money(d.all.costs)}</td><td class="num">${money(d.all.total)}</td></tr>`; }).join("");
-    t.innerHTML = head + "<tbody>" + (body_ || `<tr><td colspan="12" class="settle-empty">Brak pozycji dla wybranych filtrów.</td></tr>`) +
-      (tot.n ? `<tr class="total"><td>Razem</td><td class="num">${tot.n}</td><td class="num">${r2(tot.days)}</td>${CATS.map(c => `<td class="num">${money(tot.c[c])}</td>`).join("")}<td class="num">${money(tot.fee)}</td><td class="num">${money(tot.costs)}</td><td class="num">${money(tot.total)}</td></tr>` : "") + "</tbody>";
+    const nowM = F.year.length === 1 && F.year[0] === String(new Date().getFullYear()) ? new Date().getMonth() : -1;
+    const head = `<thead><tr><th>Miesiąc</th>${GROUPS.map(g => `<th class="num" title="${escHtml(g.hint)}">${g.label}</th>`).join("")}<th class="num">Razem</th><th class="num">Narastająco</th><th class="num">Dni</th><th class="num">Koszty</th></tr></thead>`;
+    let cum = 0; const tot = { fee: 0, days: 0, costs: 0, g: {} }; GROUPS.forEach(g => tot.g[g.key] = 0);
+    const rows_ = md.map(d => { cum += d.all.fee; if (!d.all.n) return "";
+      tot.fee += d.all.fee; tot.days += d.all.days; tot.costs += d.all.costs; GROUPS.forEach(g => tot.g[g.key] += d.g[g.key].fee);
+      const cls = ["m", selMonth === d.m ? "sel" : "", d.m === nowM ? "now" : "", nowM >= 0 && d.m > nowM ? "future" : ""].filter(Boolean).join(" ");
+      return `<tr class="${cls}" data-m="${d.m}"><td>${MIES_FULL[d.m]}${d.m === nowM ? " <small>(teraz)</small>" : ""}</td>${GROUPS.map(g => `<td class="num">${d.g[g.key].fee ? money(d.g[g.key].fee) : "—"}</td>`).join("")}<td class="num"><strong>${money(d.all.fee)}</strong></td><td class="num">${money(cum)}</td><td class="num">${r2(d.all.days)}</td><td class="num">${money(d.all.costs)}</td></tr>`; }).join("");
+    t.innerHTML = head + "<tbody>" + (rows_ || `<tr><td colspan="9" class="settle-empty">Brak pozycji dla wybranych filtrów.</td></tr>`) +
+      (tot.fee || tot.days ? `<tr class="total"><td>Razem</td>${GROUPS.map(g => `<td class="num">${money(tot.g[g.key])}</td>`).join("")}<td class="num">${money(tot.fee)}</td><td class="num">—</td><td class="num">${r2(tot.days)}</td><td class="num">${money(tot.costs)}</td></tr>` : "") + "</tbody>";
     t.querySelectorAll("tr.m").forEach(tr => tr.onclick = () => selectMonth(parseInt(tr.dataset.m)));
   }
+  // „Do zrobienia”: zwinięte liczniki; rozwinięcie pokazuje listy z szybkimi akcjami
   function renderLate(all) {
     const box = $("fin-late"); if (!box) return;
-    const its = all.filter(a => catOf(a) === "late").sort((x, y) => String(dateOf(x)).localeCompare(String(dateOf(y))));
-    if (!its.length) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+    const byDate = (x, y) => String(dateOf(x)).localeCompare(String(dateOf(y)));
+    const late = all.filter(a => catOf(a) === "late").sort(byDate), uns = all.filter(a => catOf(a) === "unsched").sort(byDate);
+    if (!late.length && !uns.length) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+    const open = box.dataset.open ? box.dataset.open.split(",") : [];
+    const row = (a, acts) => `<div class="fin-list-row late" data-id="${a.Id}"><span class="d">${formatDate(dateOf(a))}</span><span class="t">${escHtml(a.Title || "—")}<small>${bodyLabel(a)} · ${escHtml(a.Program || "")} · ${statusLabel(a.AuditStatus)}${a.AuditDateStart ? "" : " · data CU"}</small></span><span class="fin-late-actions">${acts}</span></div>`;
+    const sec = (key, title, hint, list, acts) => !list.length ? "" : `<details class="fin-todo-item" data-key="${key}"${open.includes(key) ? " open" : ""}><summary><b>${title}</b><span>${hint}</span></summary>${list.map(a => row(a, acts(a))).join("")}</details>`;
     box.classList.remove("hidden");
-    box.innerHTML = `<div class="fin-late-head"><b>⚠ ${its.length} ${its.length === 1 ? "audyt z minionego terminu nadal ma" : "audytów z minionych terminów nadal ma"} status PLANNED / SCHEDULED</b>
-      <span>Nie wliczam ich do prognozy ani do wykonania. Ustaw status: odbył się → <b>DONE</b>, nie doszedł do skutku → <b>REJECTED</b>.</span></div>` +
-      its.map(a => `<div class="fin-list-row late" data-id="${a.Id}"><span class="d">${formatDate(dateOf(a))}</span><span class="t">${escHtml(a.Title || "—")}<small>${bodyLabel(a)} · ${escHtml(a.Program || "")} · ${statusLabel(a.AuditStatus)} · ${settleNum(a.AuditDays) || "?"} dni</small></span>
-        <span class="fin-late-actions"><button class="btn-ghost sm" data-act="DONE" data-id="${a.Id}">✓ DONE</button><button class="btn-ghost sm danger" data-act="REJECTED" data-id="${a.Id}">REJECTED</button></span></div>`).join("");
+    box.innerHTML = `<div class="fin-todo-head">Do zrobienia</div>` +
+      sec("late", `⚠ ${late.length} ${late.length === 1 ? "audyt odbył się" : "audytów odbyło się"}, brak statusu DONE`, "Nie wliczam ich do planu. Ustaw DONE albo REJECTED.", late,
+        a => `<button class="btn-ghost sm" data-act="DONE" data-id="${a.Id}">✓ DONE</button><button class="btn-ghost sm danger" data-act="REJECTED" data-id="${a.Id}">REJECTED</button>`) +
+      sec("unsched", `📅 ${uns.length} ${uns.length === 1 ? "pozycja" : "pozycji"} z planu CU bez terminu LF`, "Termin CU minął, a audyt nie ma daty. Otwórz i ustaw termin albo REJECTED.", uns,
+        a => `<button class="btn-ghost sm" data-open="${a.Id}">Ustaw termin</button><button class="btn-ghost sm danger" data-act="REJECTED" data-id="${a.Id}">REJECTED</button>`);
+    box.querySelectorAll("details").forEach(d => d.ontoggle = () => { box.dataset.open = [...box.querySelectorAll("details[open]")].map(x => x.dataset.key).join(","); });
     box.querySelectorAll(".fin-list-row .t, .fin-list-row .d").forEach(el => el.onclick = () => openModal(parseInt(el.parentElement.dataset.id)));
+    box.querySelectorAll("button[data-open]").forEach(b => b.onclick = e => { e.stopPropagation(); openModal(parseInt(b.dataset.open)); enterEditMode(); });
     box.querySelectorAll("button[data-act]").forEach(b => b.onclick = async e => { e.stopPropagation(); const id = parseInt(b.dataset.id), a = (allAudits || []).find(x => x.Id === id); if (!a) return;
-      b.disabled = true; try { const prev = a.AuditStatus; await updateAudit(id, { AuditStatus: b.dataset.act }); a.AuditStatus = b.dataset.act; showToast((a.Title || "") + " → " + b.dataset.act, "success"); render(); if (typeof renderTable === "function") renderTable(); await cancelIfRejected(a, prev); }
+      b.disabled = true; try { const prev = a.AuditStatus; await updateAudit(id, { AuditStatus: b.dataset.act }); a.AuditStatus = b.dataset.act; showToast((a.Title || "") + " → " + b.dataset.act, "success"); render(); window.renderTable(); await cancelIfRejected(a, prev); }
       catch (err) { b.disabled = false; showToast("Nie udało się zmienić statusu: " + (err.message || err), "error"); } });
   }
   function renderMonthList(all) {
@@ -5132,7 +5177,7 @@ const FinanceModule = (function () {
   function selectMonth(m) { selMonth = (selMonth === m) ? null : m; render(); }
   function render() {
     const all = rows(); renderFilters();
-    renderKpis(all); renderLate(all); const md = monthData(all); renderChart(md); renderBodies(all); renderTable(md); renderMonthList(all);
+    renderKpis(all); renderLate(all); const md = monthData(all); renderChart(md); renderTable(md); renderMonthList(all);
   }
   function setup() {
     const c = $("fin-clear"); if (c) c.onclick = () => { Object.keys(F).forEach(k => F[k] = []); F.year = [String(new Date().getFullYear())]; body = "all"; document.querySelectorAll("#fin-body-switch .op-view-btn").forEach(x => x.classList.toggle("active", x.dataset.body === "all")); selMonth = null; render(); };
