@@ -429,6 +429,9 @@ tbody td.date-col {
   box-shadow: var(--shadow);
 }
 
+/* Okno formularza: szersze i bez zamykania klikiem w tło (design/COMPONENTS.md → Modal, wariant formularz) */
+.modal.modal-form { max-width: var(--lfa-modal-w-form); max-height: 94vh; }
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -1693,6 +1696,7 @@ tr.imp-write td { background: var(--lfa-success-bg); }
   /* Modale na pełny ekran */
   .modal-overlay { padding: 0; align-items: stretch; }
   .modal { max-width: none; width: 100%; max-height: none; height: 100dvh; border-radius: 0; border: 0; }
+  .modal.modal-form { max-width: none; max-height: none; }
   .modal-header { padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 12px; }
   .modal-body { padding: 14px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
 }

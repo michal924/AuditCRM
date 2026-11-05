@@ -20,6 +20,7 @@
   --lfa-surface-2:     color-mix(in srgb, var(--lfa-granat) 6%, var(--lfa-papier));   /* podniesione / hover */
   --lfa-surface-3:     color-mix(in srgb, var(--lfa-granat) 10%, var(--lfa-papier));  /* nagłówki tabel, zebra */
   --lfa-overlay:       rgba(22, 38, 63, 0.55);                              /* tło pod modalem (granat) */
+  --lfa-modal-w-form:  1120px;                                              /* szerokość okna formularza (dodawanie audytu) */
 
   /* --- Tekst --- */
   --lfa-text:          var(--lfa-atrament);

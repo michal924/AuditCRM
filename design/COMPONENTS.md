@@ -69,6 +69,8 @@ Wysokość 36 px, obrys `--lfa-border-strong`, focus ring, `.is-error` = obrys b
 
 Overlay `--lfa-overlay`. Modal: `--lfa-surface`, promień 12px, cień `--lfa-shadow-lg`, max-width 960px, nagłówek z tytułem 600 i `✕`. Sekcje `.lfa-section` z `h3` 11px uppercase mosiądz + linia `--lfa-border`. Zamykanie: ✕, klik w overlay, Esc.
 
+Wariant **formularz** (`.modal.modal-form`, docelowo `.lfa-modal.form`): okno, w którym się wpisuje dane (dodawanie audytu, edycja audytu). Szerokość `--lfa-modal-w-form`, wysokość do 94vh. **Klik w overlay nie zamyka** okna formularza (ani okna audytu w trybie edycji). Zamykanie: ✕ lub Esc; gdy są niezapisane zmiany, najpierw pytanie „Masz niezapisane zmiany. Zamknąć okno bez zapisu?”. Pierwszy Esc w polu z listą podpowiedzi chowa tylko listę.
+
 ## Alert — `.lfa-alert[data-kind]`
 
 `info` (granat), `success` (granat + ✓), `warning` (mosiądz), `danger` (bordo). Pasek 3px po lewej w kolorze roli, tło z `--lfa-*-bg`.
