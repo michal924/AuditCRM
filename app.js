@@ -783,9 +783,10 @@ function renderAuditorsTable() {
 // MODAL SZCZEGÓŁÓW
 // ============================================================
 function setupModal() {
-  document.getElementById("modal-close").onclick = closeModal;
+  document.getElementById("modal-close").onclick = requestCloseModal;
   document.getElementById("modal-overlay").onclick = e => {
-    if (e.target === document.getElementById("modal-overlay")) closeModal();
+    // W trybie edycji klik w tło nie zamyka okna — łatwo stracić wpisane zmiany (Michał 2026-11-05)
+    if (e.target === document.getElementById("modal-overlay") && !isEditMode) closeModal();
   };
   document.getElementById("btn-edit-audit").onclick = enterEditMode;
   document.getElementById("btn-cancel-edit").onclick = cancelEditMode;
@@ -1027,6 +1028,7 @@ function enterEditMode() {
   { const el = document.getElementById("e-s-month"); if (el) el.value = a.SettleMonth || ""; }
   updateSettleCalcFromInputs();
   document.getElementById("modal-overlay").classList.add("edit-mode");
+  editSnapshot = editStateSnapshot();
   updatePlanAuditBtn(originalAuditDate);
   renderDayBusy("e-daybusy", originalAuditDate || "");
 }
@@ -1114,7 +1116,22 @@ async function deleteCurrentAudit() {
   finally { btn.disabled = false; }
 }
 
+// ── Ochrona przed utratą wpisanych danych przy zamykaniu okien formularzy ──
+// Migawka wartości pól + stanów przycisków; różnica = niezapisane zmiany
+function formSnapshot(rootId) {
+  const root = document.getElementById(rootId); if (!root) return "";
+  return JSON.stringify([...root.querySelectorAll("input, select, textarea")].map(el => el.type === "checkbox" ? el.checked : el.value));
+}
+const UNSAVED_Q = "Masz niezapisane zmiany. Zamknąć okno bez zapisu?";
+let editSnapshot = null;
+function editStateSnapshot() { return formSnapshot("modal-overlay") + "|" + [currentStatus, currentProforma, currentSettleStatus, currentSettleDate, currentPlanSent, currentPlanSentDate].join("|"); }
+function requestCloseModal() {
+  if (isEditMode && editSnapshot !== null && editStateSnapshot() !== editSnapshot && !confirm(UNSAVED_Q)) return;
+  closeModal();
+}
+
 function closeModal() {
+  editSnapshot = null;
   hide("modal-overlay");
   if (isEditMode) {
     isEditMode = false;
@@ -1908,12 +1925,20 @@ async function startImport() {
 // ============================================================
 // DODAJ NIEPLANOWANY AUDYT
 // ============================================================
+// Esc zamyka okno formularza (z pytaniem o niezapisane zmiany); nie gdy otwarta lista podpowiedzi firmy
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape" || e.defaultPrevented) return;
+  const ac = document.getElementById("autocomplete-list");
+  if (ac && !ac.classList.contains("hidden")) return;
+  const vis = id => { const el = document.getElementById(id); return el && !el.classList.contains("hidden"); };
+  if (vis("add-audit-overlay")) requestCloseAddAudit();
+  else if (vis("modal-overlay")) requestCloseModal();
+});
+
 function setupAddAudit() {
   document.getElementById("btn-add-audit").onclick = openAddAuditModal;
-  document.getElementById("add-audit-close").onclick = closeAddAudit;
-  document.getElementById("add-audit-overlay").onclick = e => {
-    if (e.target === document.getElementById("add-audit-overlay")) closeAddAudit();
-  };
+  document.getElementById("add-audit-close").onclick = requestCloseAddAudit;
+  // Klik w tło NIE zamyka formularza (gubił wpisane dane); zamykanie: ✕ albo Esc, z pytaniem gdy coś wpisano (Michał 2026-11-05)
   document.getElementById("btn-save-new-audit").onclick = saveNewAudit;
 
   document.getElementById("new-date").addEventListener("change", e => {
@@ -2026,6 +2051,7 @@ function setupFirmaAutocomplete() {
       e.preventDefault();
       selectFirma(items[activeIdx].textContent);
     } else if (e.key === "Escape") {
+      e.preventDefault();   // pierwszy Esc chowa podpowiedzi, nie zamyka okna
       list.classList.add("hidden");
     }
   });
@@ -2104,9 +2130,17 @@ function openAddAuditModal() {
   updateCustodyWarning("");
   renderDayBusy("new-daybusy", "");
   show("add-audit-overlay");
+  addAuditSnapshot = formSnapshot("add-audit-overlay");
+}
+
+let addAuditSnapshot = null;
+function requestCloseAddAudit() {
+  if (addAuditSnapshot !== null && formSnapshot("add-audit-overlay") !== addAuditSnapshot && !confirm(UNSAVED_Q)) return;
+  closeAddAudit();
 }
 
 function closeAddAudit() {
+  addAuditSnapshot = null;
   hide("add-audit-overlay");
 }
 
