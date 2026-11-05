@@ -1853,7 +1853,7 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .fin-table tr.future td { color: var(--lfa-text-muted); }
 .fin-table td small { color: var(--lfa-text-muted); font-weight: 400; }
 /* „Do zrobienia” w Finansach: zwinięte liczniki, rozwijane listy */
-.fin-late { background: var(--lfa-surface); border-color: var(--lfa-border); border-left-color: var(--lfa-accent); padding: 10px 14px; }
+#fin-late.fin-late { background: var(--lfa-surface); border-color: var(--lfa-border); border-left-color: var(--lfa-accent); padding: 10px 14px; }
 .fin-todo-head { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--lfa-eyebrow); margin-bottom: 4px; }
 .fin-todo-item summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 8px 0; min-height: 44px; box-sizing: border-box; }
 .fin-todo-item summary b { color: var(--lfa-accent); font-size: 13.5px; }

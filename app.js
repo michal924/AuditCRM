@@ -5150,13 +5150,14 @@ const FinanceModule = (function () {
     const late = all.filter(a => catOf(a) === "late").sort(byDate), uns = all.filter(a => catOf(a) === "unsched").sort(byDate);
     if (!late.length && !uns.length) { box.classList.add("hidden"); box.innerHTML = ""; return; }
     const open = box.dataset.open ? box.dataset.open.split(",") : [];
-    const row = (a, acts) => `<div class="fin-list-row late" data-id="${a.Id}"><span class="d">${formatDate(dateOf(a))}</span><span class="t">${escHtml(a.Title || "—")}<small>${bodyLabel(a)} · ${escHtml(a.Program || "")} · ${statusLabel(a.AuditStatus)}${a.AuditDateStart ? "" : " · data CU"}</small></span><span class="fin-late-actions">${acts}</span></div>`;
+    const pl = (n, one, few, many) => n === 1 ? one : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? few : many;
+  const row = (a, acts) => `<div class="fin-list-row late" data-id="${a.Id}"><span class="d">${formatDate(dateOf(a))}</span><span class="t">${escHtml(a.Title || "—")}<small>${bodyLabel(a)} · ${escHtml(a.Program || "")} · ${statusLabel(a.AuditStatus)}${a.AuditDateStart ? "" : " · data CU"}</small></span><span class="fin-late-actions">${acts}</span></div>`;
     const sec = (key, title, hint, list, acts) => !list.length ? "" : `<details class="fin-todo-item" data-key="${key}"${open.includes(key) ? " open" : ""}><summary><b>${title}</b><span>${hint}</span></summary>${list.map(a => row(a, acts(a))).join("")}</details>`;
     box.classList.remove("hidden");
     box.innerHTML = `<div class="fin-todo-head">Do zrobienia</div>` +
-      sec("late", `⚠ ${late.length} ${late.length === 1 ? "audyt odbył się" : "audytów odbyło się"}, brak statusu DONE`, "Nie wliczam ich do planu. Ustaw DONE albo REJECTED.", late,
+      sec("late", `⚠ ${late.length} ${pl(late.length, "audyt odbył się", "audyty odbyły się", "audytów odbyło się")}, brak statusu DONE`, "Nie wliczam ich do planu. Ustaw DONE albo REJECTED.", late,
         a => `<button class="btn-ghost sm" data-act="DONE" data-id="${a.Id}">✓ DONE</button><button class="btn-ghost sm danger" data-act="REJECTED" data-id="${a.Id}">REJECTED</button>`) +
-      sec("unsched", `📅 ${uns.length} ${uns.length === 1 ? "pozycja" : "pozycji"} z planu CU bez terminu LF`, "Termin CU minął, a audyt nie ma daty. Otwórz i ustaw termin albo REJECTED.", uns,
+      sec("unsched", `📅 ${uns.length} ${pl(uns.length, "pozycja", "pozycje", "pozycji")} z planu CU bez terminu LF`, "Termin CU minął, a audyt nie ma daty. Otwórz i ustaw termin albo REJECTED.", uns,
         a => `<button class="btn-ghost sm" data-open="${a.Id}">Ustaw termin</button><button class="btn-ghost sm danger" data-act="REJECTED" data-id="${a.Id}">REJECTED</button>`);
     box.querySelectorAll("details").forEach(d => d.ontoggle = () => { box.dataset.open = [...box.querySelectorAll("details[open]")].map(x => x.dataset.key).join(","); });
     box.querySelectorAll(".fin-list-row .t, .fin-list-row .d").forEach(el => el.onclick = () => openModal(parseInt(el.parentElement.dataset.id)));
