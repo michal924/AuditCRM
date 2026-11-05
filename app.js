@@ -271,9 +271,12 @@ function renderSettleView(a) {
   settleSetText("m-s-highway", has(a.SettleHighway) ? fmtPLN(a.SettleHighway) : "—");
   settleSetText("m-s-other",   has(a.SettleOther)   ? fmtPLN(a.SettleOther)   : "—");
   settleSetText("m-s-tickets", has(a.SettleTickets) ? fmtPLN(a.SettleTickets) : "—");
-  settleSetText("m-s-fee",     has(a.SettleFee) ? fmtPLN(a.SettleFee) : isEudrDO(a) ? (c.fee ? fmtPLN(c.fee) + " (usługa EUDR, podmiot DO)" : "— (brak stawki EUDR DO)") : (isMeeting(a) && !isPaidTraining(a)) ? "— (spotkanie: tylko koszty)" : c.fee ? fmtPLN(c.fee) + " (" + settleNum(a.AuditDays) + " dni × " + dayRateSource(a) + ")" : "— (brak stawki dziennej)");
+  settleSetText("m-s-fee",     has(a.SettleFee) ? fmtPLN(a.SettleFee) : isEudrDO(a) ? (c.fee ? fmtPLN(c.fee) + (has(a.SettleDayRate) ? " (usługa EUDR DO, stawka wynegocjowana)" : " (usługa EUDR, podmiot DO)") : "— (brak stawki EUDR DO)") : (isMeeting(a) && !isPaidTraining(a)) ? "— (spotkanie: tylko koszty)" : c.fee ? fmtPLN(c.fee) + " (" + settleNum(a.AuditDays) + " dni × " + dayRateSource(a) + ")" : "— (brak stawki dziennej)");
   settleSetText("m-s-travel",  has(a.SettleTravelDays) && settleNum(a.SettleTravelDays) ? "+" + settleNum(a.SettleTravelDays) + " dni" : "—");
-  settleSetText("m-s-dayrate", has(a.SettleDayRate) ? fmtPLN(a.SettleDayRate) : (dayRateOf(a) != null ? fmtPLN(dayRateOf(a)) + " (" + dayRateSource(a) + ")" : "—"));
+  syncRateLabel(a);
+  settleSetText("m-s-dayrate", isEudrDO(a)
+    ? (has(a.SettleDayRate) ? fmtPLN(a.SettleDayRate) + " (wynegocjowana)" : getDayRates().CUC_EUDR_DO != null ? fmtPLN(getDayRates().CUC_EUDR_DO) + " (cennik EUDR DO)" : "—")
+    : has(a.SettleDayRate) ? fmtPLN(a.SettleDayRate) + (isEudrCU(a) ? " (wynegocjowana)" : "") : (dayRateOf(a) != null ? fmtPLN(dayRateOf(a)) + " (" + dayRateSource(a) + ")" : "—"));
   settleSetText("m-s-basis",   a.SettleFeeBasis || "—");
   settleSetText("m-s-note",    a.SettleNote || "—");
   settleSetText("m-s-month",   settleMonthMoved(a) ? monthLabel(a.SettleMonth) + " (przeniesiony)" : "wg daty audytu");
@@ -308,12 +311,21 @@ function updateSettleHead(a) {
   const br = document.getElementById("settle-head-break"); if (br) br.innerHTML = settleBreakHtml(a);
 }
 // Przeliczenie na żywo w trybie edycji
+// Pole stawki w rozliczeniu: dla EUDR DO to stawka za usługę, w pozostałych przypadkach stawka dzienna; wpisana = wynegocjowana, ma pierwszeństwo
+function syncRateLabel(a) {
+  const lbl = document.getElementById("lbl-s-dayrate"), inp = document.getElementById("e-s-dayrate"); if (!lbl || !inp) return;
+  const r = getDayRates();
+  if (isEudrDO(a)) { lbl.textContent = "Stawka za usługę"; inp.placeholder = r.CUC_EUDR_DO != null ? r.CUC_EUDR_DO + " wg cennika" : "wg cennika"; inp.title = "EUDR, podmiot w łańcuchu dostaw (DO): stała opłata za usługę. Puste = cennik. Wpisz, jeśli wynegocjowano inną stawkę."; }
+  else if (isEudrCU(a)) { lbl.textContent = "Stawka dzienna"; inp.placeholder = r.CUC_EUDR != null ? r.CUC_EUDR + " wg cennika" : "wg cennika"; inp.title = "EUDR, operator lub importer: stawka dzienna. Puste = cennik. Wpisz, jeśli wynegocjowano inną stawkę."; }
+  else { lbl.textContent = "Stawka dzienna"; inp.placeholder = "wg cennika"; inp.title = "Puste = stawka podmiotu z cennika (CU 1500, CU łączony FSC+PEFC 2100, SGS 800). Wpisana ma pierwszeństwo."; }
+}
 function updateSettleCalcFromInputs() {
   const g = id => { const el = document.getElementById(id); return el ? el.value : ""; };
   const tmp = { SettleKm: g("e-s-km"), SettleKmRate: g("e-s-rate"), SettleHotel: g("e-s-hotel"),
     SettleHighway: g("e-s-highway"), SettleOther: g("e-s-other"), SettleTickets: g("e-s-tickets"), SettleFee: g("e-s-fee"),
-    SettleDayRate: g("e-s-dayrate"), AuditDays: g("e-days"), CertBody: g("e-certbody") || (currentAudit && currentAudit.CertBody), Program: currentAudit && currentAudit.Program, AuditType: g("e-type") || (currentAudit && currentAudit.AuditType) };
+    SettleDayRate: g("e-s-dayrate"), AuditDays: g("e-days"), EudrRole: g("e-eudr-role") || (currentAudit && currentAudit.EudrRole), CertBody: g("e-certbody") || (currentAudit && currentAudit.CertBody), Program: currentAudit && currentAudit.Program, AuditType: g("e-type") || (currentAudit && currentAudit.AuditType) };
   const c = settleCalc(tmp);
+  syncRateLabel(tmp);
   settleSetText("m-s-kmcost", c.km ? fmtPLN(c.kmCost) : "—");
   settleSetText("m-s-costs",  fmtPLN(c.costs));
   settleSetText("m-s-total",  fmtPLN(c.total));
@@ -846,9 +858,10 @@ function setupModal() {
     };
   });
   document.getElementById("settle-date").addEventListener("change", e => { currentSettleDate = e.target.value || null; });
-  ["e-s-km", "e-s-rate", "e-s-hotel", "e-s-highway", "e-s-other", "e-s-tickets", "e-s-fee"].forEach(id => {
+  ["e-s-km", "e-s-rate", "e-s-hotel", "e-s-highway", "e-s-other", "e-s-tickets", "e-s-fee", "e-s-dayrate", "e-days"].forEach(id => {
     document.getElementById(id).addEventListener("input", updateSettleCalcFromInputs);
   });
+  document.getElementById("e-eudr-role").addEventListener("change", updateSettleCalcFromInputs);
   // "Rozlicz audyt" — rozwija sekcję rozliczenia, włącza edycję i ustawia kursor w pierwszym polu
   document.getElementById("btn-settle-audit").addEventListener("click", () => {
     if (!currentAudit) return;
@@ -2280,7 +2293,8 @@ const EUDR_ROLE_LABEL = { Operator: "Operator / importer", DO: "Podmiot w łańc
 function settleFeeOf(a) {
   if (a.SettleFee != null && a.SettleFee !== "") return { fee: settleNum(a.SettleFee), auto: false };
   if (isMeeting(a) && !isPaidTraining(a)) return { fee: 0, auto: true };
-  if (isEudrDO(a)) { const r = getDayRates().CUC_EUDR_DO; return { fee: r == null ? 0 : settleNum(r), auto: true }; }
+  // DO: stała opłata za usługę; wynegocjowana stawka w audycie (SettleDayRate) ma pierwszeństwo przed cennikiem (Michał 2026-11-05)
+  if (isEudrDO(a)) { const own = a.SettleDayRate != null && a.SettleDayRate !== "" && !isNaN(+a.SettleDayRate); const r = own ? +a.SettleDayRate : getDayRates().CUC_EUDR_DO; return { fee: r == null ? 0 : settleNum(r), auto: true }; }
   const rate = dayRateOf(a), days = settleNum(a.AuditDays);
   return { fee: rate != null && days ? Math.round(days * rate * 100) / 100 : 0, auto: true };
 }
