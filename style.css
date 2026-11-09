@@ -1852,6 +1852,12 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .fin-table tr.now td { font-weight: 600; box-shadow: inset 0 -2px 0 var(--lfa-accent); }
 .fin-table tr.future td { color: var(--lfa-text-muted); }
 .fin-table td small { color: var(--lfa-text-muted); font-weight: 400; }
+/* Certyfikaty klientów (2026-11-09) */
+.cert-table td { vertical-align: top; }
+.cert-table .cert-client { white-space: normal; min-width: 200px; }
+.cert-table .cert-client small, .cert-table .cert-st { display: block; color: var(--lfa-text-muted); font-size: 11.5px; font-weight: 400; white-space: normal; margin-top: 2px; }
+.cert-table .cert-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.cert-form-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 /* „Do zrobienia” w Finansach: zwinięte liczniki, rozwijane listy */
 #fin-late.fin-late { background: var(--lfa-surface); border-color: var(--lfa-border); border-left-color: var(--lfa-accent); padding: 10px 14px; }
 .fin-todo-head { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--lfa-eyebrow); margin-bottom: 4px; }

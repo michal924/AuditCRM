@@ -299,6 +299,46 @@ async function fetchAuditVersions(id) {
 
 
 // ============================================================
+// CERTYFIKATY KLIENTÓW — lista Certificates: jeden wpis = klient × system (FSC, PEFC, KZR INiG, SURE) (Michał 2026-11-09)
+// ============================================================
+const CERTS_LIST = IS_TEST ? "Certificates_TEST" : "Certificates";
+const CERT_FIELDS = [
+  { name: "ProjectID",      label: "PRJ / nr uczestnika", type: "Text" },
+  { name: "Scheme",         label: "System",              type: "Text" },   // FSC | PEFC | KZR INiG | SURE
+  { name: "CertBody",       label: "Jednostka",           type: "Text" },
+  { name: "CertNo",         label: "Nr certyfikatu",      type: "Text" },
+  { name: "ValidFrom",      label: "Ważny od",            type: "DateTime" },
+  { name: "ValidTo",        label: "Ważny do",            type: "DateTime" },
+  { name: "RegistryStatus", label: "Status w bazie",      type: "Text" },   // ważny | zawieszony | wygasły | wycofany
+  { name: "CheckedOn",      label: "Sprawdzono",          type: "DateTime" },
+  { name: "Source",         label: "Źródło",              type: "Text" },   // Plan CU | Baza | Ręcznie
+  { name: "CertNotes",      label: "Uwagi",               type: "Note" },
+];
+async function fetchCertificates() {
+  return spAllItems(CERTS_LIST, ["Id", "Title"].concat(CERT_FIELDS.map(f => f.name)).join(","));
+}
+// Utwórz listę i brakujące kolumny (wywoływane raz przy pierwszym użyciu)
+async function ensureCertificatesList() {
+  if (!(await spListExists(CERTS_LIST))) await spCreateList(CERTS_LIST, "Ważność certyfikatów klientów — LFA CRM System");
+  const d = await spGet(`/_api/lists/getbytitle('${CERTS_LIST}')/fields?$select=InternalName&$top=1000`);
+  const have = new Set((d.value || []).map(f => f.InternalName));
+  for (const f of CERT_FIELDS) if (!have.has(f.name)) await spCreateFieldXml(CERTS_LIST, settleFieldSchemaXml(f));
+}
+async function addCertificate(fields) {
+  const token = await getToken(); const digest = await getDigest(token);
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${CERTS_LIST}')/items`, { method: "POST",
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=nometadata", "Content-Type": "application/json;odata=nometadata", "X-RequestDigest": digest }, body: JSON.stringify(fields) });
+  if (!r.ok) throw new Error(`Certyfikat: ${r.status} ${(await r.text().catch(() => "")).substring(0, 120)}`);
+  return r.json();
+}
+async function updateCertificate(id, fields) { await spPatch(`/_api/lists/getbytitle('${CERTS_LIST}')/items(${id})`, fields); }
+async function deleteCertificate(id) {
+  const token = await getToken(); const digest = await getDigest(token);
+  const r = await fetch(`${SITE_URL}/_api/lists/getbytitle('${CERTS_LIST}')/items(${id})`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "X-RequestDigest": digest, "X-HTTP-Method": "DELETE", "IF-MATCH": "*" } });
+  if (!r.ok) throw new Error(`Usuwanie certyfikatu: ${r.status}`);
+}
+
+// ============================================================
 // ŚRODOWISKO TESTOWE — listy *_TEST jako kopia schematu produkcji i (opcjonalnie) kopia danych. Produkcja tylko do odczytu.
 // ============================================================
 async function spListExists(title) {
@@ -306,11 +346,11 @@ async function spListExists(title) {
   const r = await fetch(`${SITE_URL}/_api/web/lists/getbytitle('${title}')?$select=Id`, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=nometadata" } });
   return r.ok;
 }
-async function spCreateList(title) {
+async function spCreateList(title, description) {
   const token = await getToken(); const digest = await getDigest(token);
   const r = await fetch(`${SITE_URL}/_api/web/lists`, { method: "POST",
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json;odata=verbose", "Content-Type": "application/json;odata=verbose", "X-RequestDigest": digest },
-    body: JSON.stringify({ __metadata: { type: "SP.List" }, BaseTemplate: 100, Title: title, Description: "Kopia testowa — LFA CRM System (staging)" }) });
+    body: JSON.stringify({ __metadata: { type: "SP.List" }, BaseTemplate: 100, Title: title, Description: description || "Kopia testowa — LFA CRM System (staging)" }) });
   if (!r.ok) throw new Error(`Lista ${title}: ${r.status} ${(await r.text().catch(() => "")).substring(0, 160)}`);
 }
 // Kolumny niestandardowe listy (bez systemowych); SchemaXml bez identyfikatorów, żeby odtworzyć je na innej liście

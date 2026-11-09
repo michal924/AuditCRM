@@ -174,6 +174,7 @@ function setupNav() {
       if (view === "mapa")       MapModule.render();
       if (view === "kalendarz")  AuditCalModule.render();
       if (view === "finanse")    { FinanceModule.render(); DelegModule.render(); }
+      if (view === "certyfikaty") CertModule.render();
       if (view === "pulpit")     DashboardModule.render();
     };
   });
@@ -197,6 +198,7 @@ async function loadAudits() {
     '<tr><td colspan="13" class="loading">Ładowanie danych...</td></tr>';
   try {
     allAudits = await fetchAllAudits();
+    await CertModule.load();
     renderTable();
     try { SideCalModule.render(); } catch {}
     migrateInvoiceStatus();
@@ -977,7 +979,10 @@ function openModal(id) {
   document.getElementById("m-year").textContent      = a.Year || "—";
   document.getElementById("m-auditor").textContent   = a.AuditorName || "—";
   document.getElementById("m-cu").textContent        = formatDate(a.PlannedCUDate);
-  document.getElementById("m-certvalid").textContent = formatDate(a.CertValidTo);
+  { const cs = CertModule.forAudit(a);
+    document.getElementById("m-certvalid").textContent = cs.length
+      ? cs.map(c => CertModule.schemeInfo(c.Scheme).label + ": " + (formatDate(c.ValidTo) || "—") + " · " + CertModule.statusOf(c).text).join(" | ")
+      : (formatDate(a.CertValidTo) || "brak danych (zakładka Certyfikaty)"); }
   document.getElementById("m-notes").textContent     = a.Notes || "—";
 
   // Rozliczenie — widok + status
@@ -1534,6 +1539,8 @@ function parseImportRows(rows, filename) {
       Quarter:        detectQuarter(cuDate),
       Year:           detectYear(cuDate),
       AuditorName:    normAuditor(row["Lead auditor"] || row["Auditor"] || row["AUDITOR"]),
+      // Ważność certyfikatu klienta z planu CU → lista Certificates (nie zapisuje się w audycie)
+      CertValidTo:    safeDate(row["Certificate ValidTillOrPerDate"] || ""),
       ImportFile:     filename,
       CreatedFrom:    "WebImport",
     });
@@ -1908,6 +1915,8 @@ async function startImport() {
 
     allAudits = await fetchAllAudits();
     reimportDiff = null;
+    let certRes = null;
+    try { certRes = await CertModule.upsertFromPlan(importParsed, "Plan CU"); } catch (e) { console.warn("[Cert] import planu:", e.message); }
 
     hide("import-stage-3");
     show("import-stage-4");
@@ -1918,6 +1927,7 @@ async function startImport() {
         (updated > 0  ? '<div class="result-item success">🔄 Zaktualizowano (audytor, data CU, miasto…): <strong>' + updated + '</strong></div>' : '') +
         (deleted > 0  ? '<div class="result-item delete">🗑️ Usunięto osierocone: <strong>' + deleted + '</strong></div>' : '') +
         (skipped > 0  ? '<div class="result-item skip">⏭ Pominięto (duplikaty): <strong>' + skipped + '</strong></div>' : '') +
+        (certRes && (certRes.added || certRes.updated) ? '<div class="result-item success">📜 Certyfikaty: nowe ' + certRes.added + ', zaktualizowana ważność ' + certRes.updated + '</div>' : '') +
         (errors > 0   ? '<div class="result-item error">❌ Błędy: <strong>' + errors + '</strong>' + (firstError ? '<br><small>' + escHtml(firstError.substring(0,200)) + '</small>' : '') + '</div>' : '') +
       '</div>';
 
@@ -5204,6 +5214,184 @@ const FinanceModule = (function () {
 window.FinanceModule = FinanceModule;
 
 // ============================================================
+// MODUŁ: CERTYFIKATY — ważność certyfikatów klientów i planowanie audytu przed wygaśnięciem (Michał 2026-11-09)
+// Jeden wpis = klient × system. Audyt musi się odbyć najpóźniej BUFFER dni przed końcem ważności.
+// ============================================================
+let allCerts = [];
+const CertModule = (function () {
+  const $ = id => document.getElementById(id);
+  const BUFFER = 20;
+  const SCHEMES = [
+    { key: "FSC",      label: "FSC",      url: "https://search.fsc.org/en/" },
+    { key: "PEFC",     label: "PEFC",     url: "https://pefc.org/find-certified" },
+    { key: "KZR INiG", label: "KZR INiG", url: "https://kzr.inig.eu/certyfikacja/wydane-certyfikaty/" },
+    { key: "SURE",     label: "SURE-EU",  url: "https://certification.sure-system.org/SearchVerifications" },
+  ];
+  const schemeInfo = k => SCHEMES.find(x => x.key === k) || { key: k, label: k, url: "" };
+  // Program audytu → systemy certyfikatów (audyt łączony FSC+PEFC = oba)
+  const schemesOf = a => programsOf(a).map(p => { const k = normProgramKey(p); return k === "FSC" ? "FSC" : k === "PEFC" ? "PEFC" : k.startsWith("KZR") ? "KZR INiG" : k.startsWith("SURE") ? "SURE" : null; }).filter(Boolean);
+  const normTitle = t => String(t || "").toLowerCase().replace(/[^a-ząćęłńóśźż0-9]/g, "");
+  const prjOf = v => { const n = parseInt(String(v || "").replace(/\D/g, ""), 10); return isNaN(n) ? "" : String(n); };
+  const clientKey = (prj, title) => prjOf(prj) ? "P" + prjOf(prj) : "T" + normTitle(title).slice(0, 24);
+  const keyOf = (prj, title, scheme) => clientKey(prj, title) + "|" + scheme;
+  const d10 = v => String(v || "").substring(0, 10);
+  const DAY = 86400000;
+  const addDays = (k, n) => { const d = new Date(k + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().substring(0, 10); };
+  const daysTo = k => Math.round((new Date(k + "T12:00:00") - new Date(todayK() + "T12:00:00")) / DAY);
+  const todayK = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  let scheme = "all", onlyAttention = false, q = "", inited = false, editing = null, formSnap = null;
+
+  function auditsFor(c) {
+    const pk = prjOf(c.ProjectID), tk = normTitle(c.Title);
+    return (allAudits || []).filter(a => a.AuditStatus !== "REJECTED" && schemesOf(a).includes(c.Scheme)
+      && (pk ? prjOf(a.ProjectID) === pk : normTitle(a.Title) === tk));
+  }
+  // Status certyfikatu → { level: ok|warn|danger|none, text, next }
+  function statusOf(c) {
+    const tk = todayK(), vt = d10(c.ValidTo);
+    if (!vt) return { level: "none", text: "Brak danych o ważności" };
+    const deadline = addDays(vt, -BUFFER);
+    const cand = auditsFor(c).map(a => ({ a, d: d10(a.AuditDateStart || a.PlannedCUDate), lf: !!a.AuditDateStart }))
+      .filter(x => x.d && x.d > addDays(vt, -330) && x.d <= addDays(vt, 120)).sort((x, y) => x.d.localeCompare(y.d));
+    const next = cand[0] || null;
+    const rs = String(c.RegistryStatus || "").toLowerCase();
+    if (rs === "zawieszony" || rs === "wycofany") return { level: "danger", text: "Certyfikat " + rs + " w bazie", next };
+    if (next && next.a.AuditStatus === "DONE") return { level: vt < tk ? "warn" : "ok", text: "Audyt wykonany " + formatDate(next.d) + (vt < tk ? ", wpisz nowy certyfikat" : ""), next };
+    if (vt < tk) return { level: "danger", text: "Wygasł " + formatDate(vt) + (next ? ", audyt " + formatDate(next.d) : ", brak audytu"), next };
+    if (next && next.lf) {
+      if (next.d > vt) return { level: "danger", text: "Audyt " + formatDate(next.d) + " po wygaśnięciu", next };
+      if (next.d > deadline) return { level: "warn", text: "Audyt " + formatDate(next.d) + " za późno, termin do " + formatDate(deadline), next };
+      return { level: "ok", text: "Audyt " + formatDate(next.d) + " przed terminem", next };
+    }
+    const left = daysTo(deadline);
+    if (next) return left <= 60 ? { level: "warn", text: "Termin CU " + formatDate(next.d) + ", ustaw datę audytu do " + formatDate(deadline), next } : { level: "ok", text: "W planie CU " + formatDate(next.d), next };
+    if (left < 0) return { level: "danger", text: "Minął termin audytu (" + formatDate(deadline) + ")", next };
+    if (left <= 60) return { level: "warn", text: "Zaplanuj audyt do " + formatDate(deadline) + " (" + left + " dni)", next };
+    return { level: "ok", text: "Ważny, audyt do " + formatDate(deadline), next };
+  }
+  // Wiersze: certyfikaty z listy + klienci z moich audytów bez wpisu certyfikatu („Brak danych”)
+  function rowsAll() {
+    const rows = (allCerts || []).map(c => Object.assign({ _cert: true }, c));
+    const have = new Set(rows.map(c => keyOf(c.ProjectID, c.Title, c.Scheme)));
+    const y0 = String(new Date().getFullYear() - 1);
+    (allAudits || []).filter(a => a.AuditorName === MY_AUDITOR && a.AuditStatus !== "REJECTED" && d10(a.AuditDateStart || a.PlannedCUDate) >= y0).forEach(a => {
+      schemesOf(a).forEach(sc => { const k = keyOf(a.ProjectID, a.Title, sc); if (have.has(k)) return; have.add(k);
+        rows.push({ _cert: false, Title: a.Title, ProjectID: a.ProjectID ? String(a.ProjectID) : "", Scheme: sc, CertBody: certBodyOf(a) }); });
+    });
+    return rows.map(r => Object.assign(r, { _st: statusOf(r) }));
+  }
+  const ORDER = { danger: 0, warn: 1, none: 2, ok: 3 };
+  function filtered() {
+    const qq = normTitle(q);
+    return rowsAll().filter(r => (scheme === "all" || r.Scheme === scheme) && (!onlyAttention || r._st.level !== "ok")
+      && (!qq || normTitle(r.Title).includes(qq) || prjOf(r.ProjectID).includes(qq) || normTitle(r.CertNo).includes(qq)))
+      .sort((x, y) => (ORDER[x._st.level] - ORDER[y._st.level]) || d10(x.ValidTo || "9999").localeCompare(d10(y.ValidTo || "9999")) || String(x.Title).localeCompare(String(y.Title)));
+  }
+  // Wymagające uwagi (Pulpit): do zaplanowania, za późno, wygasłe, zawieszone
+  function attention() { return rowsAll().filter(r => r._cert && (r._st.level === "danger" || r._st.level === "warn")); }
+  function forAudit(a) {
+    return schemesOf(a).map(sc => (allCerts || []).find(c => c.Scheme === sc && (prjOf(a.ProjectID) ? prjOf(c.ProjectID) === prjOf(a.ProjectID) : normTitle(c.Title) === normTitle(a.Title)))).filter(Boolean);
+  }
+  const BADGE = { ok: "done", warn: "sent", danger: "open", none: "" };
+  const LEVEL_LABEL = { ok: "W porządku", warn: "Do zaplanowania", danger: "Pilne", none: "Brak danych" };
+
+  function render() {
+    if (!inited) { setup(); inited = true; }
+    const all = rowsAll(), list = filtered();
+    const cnt = l => all.filter(r => r._st.level === l).length;
+    $("cert-kpis").innerHTML = ["danger", "warn", "none", "ok"].map(l => `<div class="fin-kpi ${l === "danger" ? "open" : l === "warn" ? "sent" : l === "ok" ? "plan" : "tent"}"><span class="k-label">${LEVEL_LABEL[l]}</span><span class="k-val">${cnt(l)}</span><span class="k-sub">${l === "danger" ? "wygasłe, zawieszone, audyt po terminie" : l === "warn" ? "termin audytu w ciągu 60 dni" : l === "none" ? "klienci bez wpisanej ważności" : "audyt zaplanowany lub czas w zapasie"}</span></div>`).join("");
+    const t = $("cert-table");
+    t.innerHTML = `<thead><tr><th>Klient</th><th>System</th><th>Nr certyfikatu</th><th>Ważny do</th><th>Ostatni termin audytu</th><th>Status</th><th></th></tr></thead><tbody>` +
+      (list.map((r, i) => { const vt = d10(r.ValidTo);
+        return `<tr data-i="${i}"><td class="cert-client"><b>${escHtml(r.Title || "—")}</b><small>${r.ProjectID ? "PRJ " + escHtml(r.ProjectID) + " · " : ""}${escHtml(r.CertBody || "")}</small></td>
+          <td>${escHtml(schemeInfo(r.Scheme).label)}</td><td class="date-col">${escHtml(r.CertNo || "—")}</td>
+          <td class="date-col">${vt ? formatDate(vt) : "—"}</td><td class="date-col">${vt ? formatDate(addDays(vt, -BUFFER)) : "—"}</td>
+          <td><span class="settle-badge ${BADGE[r._st.level]}">${LEVEL_LABEL[r._st.level]}</span><small class="cert-st">${escHtml(r._st.text)}</small></td>
+          <td class="cert-actions"><button class="btn-ghost sm" data-act="check" data-i="${i}" title="Otwiera bazę ${escHtml(schemeInfo(r.Scheme).label)} i kopiuje numer do schowka">🔎 Sprawdź w bazie</button><button class="btn-ghost sm" data-act="edit" data-i="${i}">${r._cert ? "Edytuj" : "Uzupełnij"}</button></td></tr>`; }).join("")
+      || `<tr><td colspan="7" class="settle-empty">Brak certyfikatów dla wybranych filtrów.</td></tr>`) + "</tbody>";
+    t.querySelectorAll("button[data-act]").forEach(b => b.onclick = () => { const r = list[parseInt(b.dataset.i)]; if (b.dataset.act === "check") checkInRegistry(r); else openForm(r); });
+    $("cert-missing").classList.toggle("hidden", !window.certsMissing);
+  }
+  async function checkInRegistry(r) {
+    const info = schemeInfo(r.Scheme), val = r.CertNo || prjOf(r.ProjectID) || r.Title || "";
+    try { await navigator.clipboard.writeText(val); showToast("Skopiowano „" + val + "”. Wklej w wyszukiwarkę " + info.label + ".", "success"); } catch { showToast("Szukaj: " + val, "info"); }
+    if (info.url) window.open(info.url, "_blank", "noopener");
+  }
+  // ── Formularz certyfikatu (okno formularza: klik w tło nie zamyka, Esc/✕ pytają o niezapisane zmiany) ──
+  const F_IDS = ["cf-title", "cf-prj", "cf-scheme", "cf-body", "cf-no", "cf-from", "cf-to", "cf-status", "cf-checked", "cf-notes"];
+  function openForm(r) {
+    editing = r && r._cert ? r : null;
+    const v = (id, x) => { $(id).value = x == null ? "" : x; };
+    v("cf-title", r ? r.Title : ""); v("cf-prj", r ? r.ProjectID : ""); v("cf-scheme", r ? r.Scheme : "KZR INiG"); v("cf-body", r && r.CertBody ? r.CertBody : "CUC");
+    v("cf-no", r ? r.CertNo : ""); v("cf-from", r ? d10(r.ValidFrom) : ""); v("cf-to", r ? d10(r.ValidTo) : ""); v("cf-status", r && r.RegistryStatus ? r.RegistryStatus : "ważny");
+    v("cf-checked", r && r.CheckedOn ? d10(r.CheckedOn) : todayK()); v("cf-notes", r ? r.CertNotes : "");
+    $("cf-heading").textContent = editing ? "Certyfikat: " + (r.Title || "") : "Nowy certyfikat";
+    $("cf-delete").classList.toggle("hidden", !editing);
+    show("cert-form-overlay"); formSnap = formSnapshot("cert-form-overlay");
+  }
+  function requestCloseForm() { if (formSnap !== null && formSnapshot("cert-form-overlay") !== formSnap && !confirm(UNSAVED_Q)) return; closeForm(); }
+  function closeForm() { formSnap = null; editing = null; hide("cert-form-overlay"); }
+  async function saveForm() {
+    const g = id => ($(id).value || "").trim();
+    if (!g("cf-title")) { showToast("Podaj nazwę klienta", "error"); return; }
+    if (!g("cf-to")) { showToast("Podaj datę „Ważny do”", "error"); return; }
+    const fields = { Title: g("cf-title"), ProjectID: g("cf-prj") || null, Scheme: g("cf-scheme"), CertBody: g("cf-body") || null, CertNo: g("cf-no") || null,
+      ValidFrom: g("cf-from") ? safeDate(g("cf-from")) : null, ValidTo: safeDate(g("cf-to")), RegistryStatus: g("cf-status") || null,
+      CheckedOn: g("cf-checked") ? safeDate(g("cf-checked")) : null, Source: editing && editing.Source === "Plan CU" && g("cf-to") === d10(editing.ValidTo) ? "Plan CU" : "Baza / ręcznie", CertNotes: g("cf-notes") || null };
+    const btn = $("cf-save"); btn.disabled = true;
+    try {
+      await ensureReady();
+      if (editing) { await updateCertificate(editing.Id, fields); Object.assign(allCerts.find(c => c.Id === editing.Id), fields); }
+      else { const res = await addCertificate(fields); allCerts.push(Object.assign({ Id: res.Id || res.ID }, fields)); }
+      showToast("Zapisano certyfikat: " + fields.Title, "success"); closeForm(); render();
+    } catch (e) { showToast("Nie udało się zapisać: " + String(e.message || e).substring(0, 100), "error"); }
+    finally { btn.disabled = false; }
+  }
+  async function removeCert() {
+    if (!editing || !confirm("Usunąć wpis certyfikatu „" + (editing.Title || "") + " · " + editing.Scheme + "”? Trafi do kosza SharePoint.")) return;
+    try { await deleteCertificate(editing.Id); allCerts = allCerts.filter(c => c.Id !== editing.Id); showToast("Usunięto wpis certyfikatu", "success"); closeForm(); render(); }
+    catch (e) { showToast("Nie udało się usunąć: " + String(e.message || e).substring(0, 100), "error"); }
+  }
+  let ready = false;
+  async function ensureReady() { if (ready || !window.certsMissing) { ready = true; return; } await ensureCertificatesList(); window.certsMissing = false; ready = true; }
+  async function load() {
+    try { allCerts = await fetchCertificates(); window.certsMissing = false; }
+    catch { allCerts = []; window.certsMissing = true; }   // lista jeszcze nie istnieje → tworzona przy pierwszym zapisie
+  }
+  // Import planu CU: data ważności z kolumny „Certificate ValidTillOrPerDate”. Nowy wpis albo uzupełnienie, gdy w liście jest starsza data z planu CU.
+  // Wpisów sprawdzonych w bazie lub ręcznych nie nadpisuje.
+  async function upsertFromPlan(recs, source) {
+    const best = new Map();
+    recs.forEach(r => { const vt = d10(r.CertValidTo); if (!vt || r.AuditorName !== MY_AUDITOR) return;   // tylko moi klienci schemesOf(r).forEach(sc => { const k = keyOf(r.ProjectID, r.Title, sc); const b = best.get(k); if (!b || vt > b.vt) best.set(k, { r, sc, vt }); }); });
+    if (!best.size) return { added: 0, updated: 0 };
+    await ensureReady();
+    let added = 0, updated = 0;
+    for (const [k, { r, sc, vt }] of best) {
+      const ex = allCerts.find(c => keyOf(c.ProjectID, c.Title, c.Scheme) === k);
+      if (ex) {
+        if (String(ex.Source || "").startsWith("Plan CU") && vt > d10(ex.ValidTo)) { const f = { ValidTo: safeDate(vt), Source: source || "Plan CU" }; await updateCertificate(ex.Id, f); Object.assign(ex, f); updated++; }
+        continue;
+      }
+      const f = { Title: r.Title, ProjectID: r.ProjectID ? String(r.ProjectID) : null, Scheme: sc, CertBody: certBodyOf(r), ValidTo: safeDate(vt), Source: source || "Plan CU" };
+      const res = await addCertificate(f); allCerts.push(Object.assign({ Id: res.Id || res.ID }, f)); added++;
+    }
+    return { added, updated };
+  }
+  function setup() {
+    document.querySelectorAll("#cert-scheme-switch .op-view-btn").forEach(b => b.onclick = () => { scheme = b.dataset.scheme; document.querySelectorAll("#cert-scheme-switch .op-view-btn").forEach(x => x.classList.toggle("active", x === b)); render(); });
+    $("cert-attention").onchange = e => { onlyAttention = e.target.checked; render(); };
+    $("cert-search").oninput = e => { q = e.target.value; render(); };
+    $("cert-add").onclick = () => openForm(null);
+    $("cf-close").onclick = requestCloseForm; $("cf-cancel").onclick = requestCloseForm;
+    $("cf-save").onclick = saveForm; $("cf-delete").onclick = removeCert;
+    $("cf-check").onclick = () => checkInRegistry({ Scheme: $("cf-scheme").value, CertNo: $("cf-no").value, ProjectID: $("cf-prj").value, Title: $("cf-title").value });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("cert-form-overlay").classList.contains("hidden")) requestCloseForm(); });
+  }
+  return { render, load, upsertFromPlan, attention, forAudit, statusOf, schemeInfo, BUFFER, LEVEL_LABEL };
+})();
+window.CertModule = CertModule;
+
+// ============================================================
 // MODUŁ: PULPIT — ekran startowy (dziś · 14 dni · do zrobienia · rok w liczbach). Tylko odczyt, każda liczba to link.
 // ============================================================
 const DashboardModule = (function () {
@@ -5283,14 +5471,15 @@ const DashboardModule = (function () {
     const noPro = all.filter(a => a.AuditStatus === "DONE" && (!a.Proforma || a.Proforma === "Brak") && !isMeeting(a)).sort((x, y) => startOf(x).localeCompare(startOf(y)));
     card("warn", noPro.length, "Proforma do wysłania", "wykonane, proforma „Brak”", noPro, { status: ["DONE"] }, a => `<span><small>${formatDate(a.AuditDateStart)}</small> ${escHtml(a.Title || "")}</span>`);
     // 6) certyfikaty wygasające w 60 dni bez zaplanowanego audytu
-    const hasFuture = t => all.some(b => (b.Title || "").trim().toLowerCase() === t && startOf(b) >= tk && ["PLANNED", "SCHEDULED"].includes(b.AuditStatus));
-    const seen = new Set();
-    const expiring = all.filter(a => { const v = String(a.CertValidTo || "").substring(0, 10); if (!v || v < tk || v > in60) return false; const t = (a.Title || "").trim().toLowerCase(); if (seen.has(t) || hasFuture(t)) return false; seen.add(t); return true; })
-      .sort((x, y) => String(x.CertValidTo).localeCompare(String(y.CertValidTo)));
-    card("info", expiring.length, "Certyfikaty wygasają", "w ciągu 60 dni, bez zaplanowanego audytu", expiring, { search: expiring.length === 1 ? (expiring[0].Title || "") : "" }, a => `<span><small>${formatDate(a.CertValidTo)}</small> ${escHtml(a.Title || "")} <small>${bodyLabel(a)}</small></span>`);
+    // 6) certyfikaty wymagające uwagi (lista Certificates): do zaplanowania, audyt za późno, wygasłe, zawieszone
+    const certAtt = CertModule.attention().sort((x, y) => String(x.ValidTo).localeCompare(String(y.ValidTo)));
+    if (certAtt.length) cards.push({ cls: "info", n: certAtt.length, label: "Certyfikaty do pilnowania", sub: "termin audytu przed końcem ważności (−" + CertModule.BUFFER + " dni)",
+      list: certAtt.slice(0, 4).map(c => `<span><small>${formatDate(c.ValidTo)}</small> ${escHtml(c.Title || "")} · ${escHtml(CertModule.schemeInfo(c.Scheme).label)}</span>`), more: Math.max(0, certAtt.length - 4), preset: { view: "certyfikaty" } });
+    // (stara karta z pola CertValidTo w audycie zastąpiona listą Certificates powyżej)
     if (!cards.length) { box.innerHTML = '<div class="dash-empty">✓ Nic nie czeka — wszystkie statusy, plany i rozliczenia są na bieżąco.</div>'; return; }
     box.innerHTML = cards.map((c, i) => `<div class="dash-todo-card ${c.cls}" data-i="${i}"><div class="t-num">${c.n}</div><div class="t-label">${c.label}</div><div class="t-sub">${c.sub}</div><div class="t-list">${c.list.join("")}${c.more ? `<span><small>…i ${c.more} więcej</small></span>` : ""}</div></div>`).join("");
-    box.querySelectorAll(".dash-todo-card").forEach(el => el.onclick = () => goAudits(cards[parseInt(el.dataset.i)].preset));
+    box.querySelectorAll(".dash-todo-card").forEach(el => el.onclick = () => { const pr = cards[parseInt(el.dataset.i)].preset;
+      if (pr && pr.view) { const b = document.querySelector(`.nav-btn[data-view="${pr.view}"]`); if (b) b.click(); } else goAudits(pr); });
   }
   function renderYear(today) {
     const box = $("dash-year-box"), yl = $("dash-year"); if (!box) return;

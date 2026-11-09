@@ -86,6 +86,7 @@
       <button class="nav-btn" data-view="opieka"><span class="nav-ico">👨‍👦</span><span class="nav-lbl">Opieka — Szymon</span></button>
       <button class="nav-btn" data-view="mapa"><span class="nav-ico">🗺</span><span class="nav-lbl">Mapa audytów</span></button>
       <button class="nav-btn" data-view="finanse"><span class="nav-ico">💰</span><span class="nav-lbl">Finanse</span></button>
+      <button class="nav-btn" data-view="certyfikaty"><span class="nav-ico">📜</span><span class="nav-lbl">Certyfikaty</span></button>
     </div>
     <div class="nav-right">
       <button id="btn-import" class="btn-action" title="Importuj kwartalny plan z CUC">⬆ Import CUC</button>
@@ -538,6 +539,31 @@
     </div>
   </div>
 
+  <!-- WIDOK: CERTYFIKATY — ważność certyfikatów klientów i termin audytu przed wygaśnięciem -->
+  <div id="view-certyfikaty" class="view hidden">
+    <div class="view-header">
+      <h2>Certyfikaty klientów</h2>
+      <div class="header-filters">
+        <div class="op-view-switcher" id="cert-scheme-switch">
+          <button class="op-view-btn active" data-scheme="all">Wszystkie</button>
+          <button class="op-view-btn" data-scheme="FSC">FSC</button>
+          <button class="op-view-btn" data-scheme="PEFC">PEFC</button>
+          <button class="op-view-btn" data-scheme="KZR INiG">KZR INiG</button>
+          <button class="op-view-btn" data-scheme="SURE">SURE-EU</button>
+        </div>
+        <input type="search" id="cert-search" class="search-input" placeholder="Szukaj klienta, PRJ, nr certyfikatu" aria-label="Szukaj certyfikatu">
+        <label class="settle-import-opt"><input type="checkbox" id="cert-attention"> tylko wymagające uwagi</label>
+        <button id="cert-add" class="btn-primary" style="width:auto">＋ Dodaj certyfikat</button>
+      </div>
+    </div>
+    <div id="cert-missing" class="settle-import-hint hidden">Lista certyfikatów zostanie utworzona w SharePoint przy pierwszym zapisie.</div>
+    <div class="fin-kpis" id="cert-kpis"></div>
+    <div class="fin-card">
+      <div class="fin-card-head"><h3>Ważność i termin audytu</h3><span class="fin-hint">ostatni termin audytu = ważny do minus 20 dni · „Sprawdź w bazie” kopiuje numer i otwiera bazę systemu</span></div>
+      <div class="table-wrapper settle-table-wrap"><table class="settle-table fin-table cert-table" id="cert-table"></table></div>
+    </div>
+  </div>
+
   <!-- WIDOK: FINANSE — plan finansowy i rozliczenia (prognoza vs wykonanie) -->
   <div id="view-finanse" class="view hidden">
     <div class="view-header">
@@ -896,6 +922,45 @@
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CERTYFIKAT KLIENTA (okno formularza: klik w tło nie zamyka) -->
+<div id="cert-form-overlay" class="modal-overlay hidden">
+  <div class="modal modal-form">
+    <div class="modal-header">
+      <h2 id="cf-heading">Nowy certyfikat</h2>
+      <button id="cf-close" class="btn-ghost" aria-label="Zamknij">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid">
+        <div class="modal-section">
+          <h3>Klient i system</h3>
+          <div class="form-row"><label for="cf-title">Klient *</label><input type="text" id="cf-title" class="form-input" placeholder="Nazwa firmy"></div>
+          <div class="form-row"><label for="cf-prj">PRJ / nr uczestnika</label><input type="text" id="cf-prj" class="form-input" placeholder="np. 885112"></div>
+          <div class="form-row"><label for="cf-scheme">System *</label>
+            <select id="cf-scheme" class="form-input"><option value="FSC">FSC</option><option value="PEFC">PEFC</option><option value="KZR INiG">KZR INiG</option><option value="SURE">SURE-EU</option></select></div>
+          <div class="form-row"><label for="cf-body">Jednostka</label>
+            <select id="cf-body" class="form-input"><option value="CUC">CUC</option><option value="SGS">SGS</option><option value="Inna">Inna jednostka</option></select></div>
+          <div class="form-row"><label for="cf-no">Nr certyfikatu</label><input type="text" id="cf-no" class="form-input" placeholder="np. KZR INiG CU – 891406/4"></div>
+        </div>
+        <div class="modal-section">
+          <h3>Ważność</h3>
+          <div class="form-row"><label for="cf-from">Ważny od</label><input type="date" id="cf-from" class="form-input"></div>
+          <div class="form-row"><label for="cf-to">Ważny do *</label><input type="date" id="cf-to" class="form-input"></div>
+          <div class="form-row"><label for="cf-status">Status w bazie</label>
+            <select id="cf-status" class="form-input"><option value="ważny">ważny</option><option value="zawieszony">zawieszony</option><option value="wygasły">wygasły</option><option value="wycofany">wycofany</option></select></div>
+          <div class="form-row"><label for="cf-checked">Sprawdzono w bazie</label><input type="date" id="cf-checked" class="form-input"></div>
+          <div class="form-row"><label for="cf-notes">Uwagi</label><textarea id="cf-notes" class="form-input" rows="2" placeholder="np. zakres, lokalizacje"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-actions cert-form-actions">
+        <button id="cf-check" class="btn-action" type="button">🔎 Sprawdź w bazie</button>
+        <button id="cf-delete" class="btn-ghost sm danger hidden" type="button">Usuń wpis</button>
+        <button id="cf-cancel" class="btn-ghost" type="button">Anuluj</button>
+        <button id="cf-save" class="btn-primary" type="button" style="width:auto">💾 Zapisz certyfikat</button>
+      </div>
     </div>
   </div>
 </div>
