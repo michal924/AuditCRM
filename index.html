@@ -86,7 +86,6 @@
       <button class="nav-btn" data-view="opieka"><span class="nav-ico">👨‍👦</span><span class="nav-lbl">Opieka — Szymon</span></button>
       <button class="nav-btn" data-view="mapa"><span class="nav-ico">🗺</span><span class="nav-lbl">Mapa audytów</span></button>
       <button class="nav-btn" data-view="finanse"><span class="nav-ico">💰</span><span class="nav-lbl">Finanse</span></button>
-      <button class="nav-btn" data-view="certyfikaty"><span class="nav-ico">📜</span><span class="nav-lbl">Certyfikaty</span></button>
     </div>
     <div class="nav-right">
       <button id="btn-import" class="btn-action" title="Importuj kwartalny plan z CUC">⬆ Import CUC</button>
@@ -234,6 +233,7 @@
             <th data-sort="AuditType"      data-label="Typ"           onclick="setSort('AuditType')"       style="cursor:pointer">Typ</th>
             <th data-sort="PlannedCUDate"  data-label="Data CU"       onclick="setSort('PlannedCUDate')"   style="cursor:pointer">Data CU ↑</th>
             <th data-sort="AuditDateStart" data-label="Data audytu LF" onclick="setSort('AuditDateStart')" style="cursor:pointer">Data audytu LF</th>
+            <th data-sort="_certTo"        data-label="Cert. ważny do" onclick="setSort('_certTo')"       style="cursor:pointer" title="Ważność certyfikatu klienta. Audyt najpóźniej 20 dni przed końcem. Kliknij komórkę, aby edytować.">Cert. ważny do</th>
             <th data-sort="City"           data-label="Miasto"        onclick="setSort('City')"            style="cursor:pointer">Miasto</th>
             <th data-sort="AuditMode"      data-label="Tryb"          onclick="setSort('AuditMode')"       style="cursor:pointer">Tryb</th>
             <th data-sort="AuditStatus"    data-label="Status"        onclick="setSort('AuditStatus')"     style="cursor:pointer">Status</th>
@@ -536,31 +536,6 @@
         <span><i class="op-sw today"></i> Dziś</span>
         <span><i class="op-sw conflict"></i> Kolizja audyt + opieka</span>
       </div>
-    </div>
-  </div>
-
-  <!-- WIDOK: CERTYFIKATY — ważność certyfikatów klientów i termin audytu przed wygaśnięciem -->
-  <div id="view-certyfikaty" class="view hidden">
-    <div class="view-header">
-      <h2>Certyfikaty klientów</h2>
-      <div class="header-filters">
-        <div class="op-view-switcher" id="cert-scheme-switch">
-          <button class="op-view-btn active" data-scheme="all">Wszystkie</button>
-          <button class="op-view-btn" data-scheme="FSC">FSC</button>
-          <button class="op-view-btn" data-scheme="PEFC">PEFC</button>
-          <button class="op-view-btn" data-scheme="KZR INiG">KZR INiG</button>
-          <button class="op-view-btn" data-scheme="SURE">SURE-EU</button>
-        </div>
-        <input type="search" id="cert-search" class="search-input" placeholder="Szukaj klienta, PRJ, nr certyfikatu" aria-label="Szukaj certyfikatu">
-        <label class="settle-import-opt"><input type="checkbox" id="cert-attention"> tylko wymagające uwagi</label>
-        <button id="cert-add" class="btn-primary" style="width:auto">＋ Dodaj certyfikat</button>
-      </div>
-    </div>
-    <div id="cert-missing" class="settle-import-hint hidden">Lista certyfikatów zostanie utworzona w SharePoint przy pierwszym zapisie.</div>
-    <div class="fin-kpis" id="cert-kpis"></div>
-    <div class="fin-card">
-      <div class="fin-card-head"><h3>Ważność i termin audytu</h3><span class="fin-hint">ostatni termin audytu = ważny do minus 20 dni · „Sprawdź w bazie” kopiuje numer i otwiera bazę systemu</span></div>
-      <div class="table-wrapper settle-table-wrap"><table class="settle-table fin-table cert-table" id="cert-table"></table></div>
     </div>
   </div>
 

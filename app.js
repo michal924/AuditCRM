@@ -174,7 +174,6 @@ function setupNav() {
       if (view === "mapa")       MapModule.render();
       if (view === "kalendarz")  AuditCalModule.render();
       if (view === "finanse")    { FinanceModule.render(); DelegModule.render(); }
-      if (view === "certyfikaty") CertModule.render();
       if (view === "pulpit")     DashboardModule.render();
     };
   });
@@ -195,7 +194,7 @@ async function migrateInvoiceStatus() {
 
 async function loadAudits() {
   document.getElementById("audits-tbody").innerHTML =
-    '<tr><td colspan="13" class="loading">Ładowanie danych...</td></tr>';
+    '<tr><td colspan="14" class="loading">Ładowanie danych...</td></tr>';
   try {
     allAudits = await fetchAllAudits();
     await CertModule.load();
@@ -205,7 +204,7 @@ async function loadAudits() {
     try { if (!document.getElementById("view-pulpit").classList.contains("hidden")) DashboardModule.render(); } catch {}
   } catch (e) {
     document.getElementById("audits-tbody").innerHTML =
-      `<tr><td colspan="13" class="loading">Błąd: ${e.message}</td></tr>`;
+      `<tr><td colspan="14" class="loading">Błąd: ${e.message}</td></tr>`;
   }
 }
 
@@ -476,8 +475,8 @@ function applyFilters(audits) {
 // ============================================================
 function sortAudits(arr) {
   return [...arr].sort((a, b) => {
-    let va = a[sortCol];
-    let vb = b[sortCol];
+    let va = sortCol === "_certTo" ? CertModule.certToOf(a) : a[sortCol];
+    let vb = sortCol === "_certTo" ? CertModule.certToOf(b) : b[sortCol];
     // Puste wartości (brak daty itp.) zawsze na koniec — niezależnie od kierunku sortowania
     const aEmpty = va === null || va === undefined || va === "";
     const bEmpty = vb === null || vb === undefined || vb === "";
@@ -529,18 +528,18 @@ function renderTable() {
       if (ex.custody) items.push(`<span class="di-item di-custody">👨‍👦 Opieka: ${escHtml(ex.custody)}</span>`);
       (ex.outlook || []).forEach(o => items.push(`<span class="di-item di-ext">📆 ${o.time ? escHtml(o.time) + " " : ""}${escHtml(o.subject)}</span>`));
       const dLbl = new Date(calDayFilter + "T12:00:00").toLocaleDateString("pl-PL");
-      extrasRow = `<tr class="day-info-row"><td colspan="13"><div class="day-info"><span class="day-info-title">📅 ${dLbl} — poza audytami:</span>${items.join("")}</div></td></tr>`;
+      extrasRow = `<tr class="day-info-row"><td colspan="14"><div class="day-info"><span class="day-info-title">📅 ${dLbl} — poza audytami:</span>${items.join("")}</div></td></tr>`;
     }
   }
 
   if (!filtered.length) {
     tbody.innerHTML = extrasRow
-      ? '<tr><td colspan="13" class="loading" style="padding:10px 0 2px">Brak audytów tego dnia — ale masz zaplanowane:</td></tr>' + extrasRow
-      : '<tr><td colspan="13" class="loading">Brak wyników</td></tr>';
+      ? '<tr><td colspan="14" class="loading" style="padding:10px 0 2px">Brak audytów tego dnia — ale masz zaplanowane:</td></tr>' + extrasRow
+      : '<tr><td colspan="14" class="loading">Brak wyników</td></tr>';
     return;
   }
 
-  const NCOLS = 13; // liczba kolumn tabeli
+  const NCOLS = 14; // liczba kolumn tabeli
   tbody.innerHTML = filtered.map(a => {
     // Barwa wiersza = jednostka (CUC niebieski / SGS pomarańcz), jasność = status
     const bodyCls = "row-body-" + window.bodyCls(a);
@@ -586,6 +585,7 @@ function renderTable() {
       '<td>' + (a.AuditType ? shortType(a.AuditType) : '—') + '</td>' +
       '<td class="date-col">' + (formatDate(a.PlannedCUDate) || '—') + '</td>' +
       '<td class="date-col">' + formatDate(a.AuditDateStart) + custodyMark + '</td>' +
+      '<td class="date-col cert-col" onclick="event.stopPropagation(); CertModule.openForAudit(' + aid + ')">' + CertModule.cellHtml(a) + '</td>' +
       '<td>' + escHtml(a.City || '—') + '</td>' +
       '<td class="' + (a.AuditMode === 'Online' ? 'mode-online' : 'mode-onsite') + '">' + (a.AuditMode === 'Online' ? '💻' : '📍') + ' ' + (a.AuditMode || '—') + '</td>' +
       '<td>' + statusBadge(a.AuditStatus) + '</td>' +
@@ -614,6 +614,7 @@ function renderTable() {
             '<div class="rp-field"><span class="rp-label">Status</span><span class="rp-val">' + statusBadge(a.AuditStatus) + '</span></div>' +
             '<div class="rp-field"><span class="rp-label">Proforma</span><span class="rp-val">' + proformaBadge(a.Proforma) + '</span></div>' +
             '<div class="rp-field"><span class="rp-label">Data CU</span><span class="rp-val">' + (formatDate(a.PlannedCUDate) || '—') + '</span></div>' +
+            '<div class="rp-field"><span class="rp-label">Cert. ważny do</span><span class="rp-val cert-col" onclick="event.stopPropagation(); CertModule.openForAudit(' + aid + ')">' + CertModule.cellHtml(a) + '</span></div>' +
             '<div class="rp-field"><span class="rp-label">Data audytu LF</span><span class="rp-val">' + (formatDate(a.AuditDateStart) || '—') + custodyMark + '</span></div>' +
             '<div class="rp-field"><span class="rp-label">Miasto</span><span class="rp-val">' + escHtml(a.City || '—') + '</span></div>' +
             '<div class="rp-field"><span class="rp-label">Tryb</span><span class="rp-val">' + (a.AuditMode === 'Online' ? '💻 Online' : '📍 On-site') + '</span></div>' +
@@ -5239,7 +5240,7 @@ const CertModule = (function () {
   const addDays = (k, n) => { const d = new Date(k + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().substring(0, 10); };
   const daysTo = k => Math.round((new Date(k + "T12:00:00") - new Date(todayK() + "T12:00:00")) / DAY);
   const todayK = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
-  let scheme = "all", onlyAttention = false, q = "", inited = false, editing = null, formSnap = null;
+  let inited = false, editing = null, formSnap = null;
 
   function auditsFor(c) {
     const pk = prjOf(c.ProjectID), tk = normTitle(c.Title);
@@ -5280,13 +5281,6 @@ const CertModule = (function () {
     });
     return rows.map(r => Object.assign(r, { _st: statusOf(r) }));
   }
-  const ORDER = { danger: 0, warn: 1, none: 2, ok: 3 };
-  function filtered() {
-    const qq = normTitle(q);
-    return rowsAll().filter(r => (scheme === "all" || r.Scheme === scheme) && (!onlyAttention || r._st.level !== "ok")
-      && (!qq || normTitle(r.Title).includes(qq) || prjOf(r.ProjectID).includes(qq) || normTitle(r.CertNo).includes(qq)))
-      .sort((x, y) => (ORDER[x._st.level] - ORDER[y._st.level]) || d10(x.ValidTo || "9999").localeCompare(d10(y.ValidTo || "9999")) || String(x.Title).localeCompare(String(y.Title)));
-  }
   // Wymagające uwagi (Pulpit): do zaplanowania, za późno, wygasłe, zawieszone
   function attention() { return rowsAll().filter(r => r._cert && (r._st.level === "danger" || r._st.level === "warn")); }
   function forAudit(a) {
@@ -5296,23 +5290,26 @@ const CertModule = (function () {
   const BADGE = { ok: 'data-status="done"', warn: 'data-settle="sent"', danger: 'data-status="change"', none: "" };
   const LEVEL_LABEL = { ok: "W porządku", warn: "Do zaplanowania", danger: "Pilne", none: "Brak danych" };
 
-  function render() {
-    if (!inited) { setup(); inited = true; }
-    const all = rowsAll(), list = filtered();
-    const cnt = l => all.filter(r => r._st.level === l).length;
-    $("cert-kpis").innerHTML = ["danger", "warn", "none", "ok"].map(l => `<div class="fin-kpi ${l === "danger" ? "open" : l === "warn" ? "sent" : l === "ok" ? "plan" : "tent"}"><span class="k-label">${LEVEL_LABEL[l]}</span><span class="k-val">${cnt(l)}</span><span class="k-sub">${l === "danger" ? "wygasłe, zawieszone, audyt po terminie" : l === "warn" ? "termin audytu w ciągu 60 dni" : l === "none" ? "klienci bez wpisanej ważności" : "audyt zaplanowany lub czas w zapasie"}</span></div>`).join("");
-    const t = $("cert-table");
-    t.innerHTML = `<thead><tr><th>Klient</th><th>System</th><th>Nr certyfikatu</th><th>Ważny do</th><th>Ostatni termin audytu</th><th>Status</th><th></th></tr></thead><tbody>` +
-      (list.map((r, i) => { const vt = d10(r.ValidTo);
-        return `<tr data-i="${i}"><td class="cert-client"><b>${escHtml(r.Title || "—")}</b><small>${r.ProjectID ? "PRJ " + escHtml(r.ProjectID) + " · " : ""}${escHtml(r.CertBody || "")}</small></td>
-          <td>${escHtml(schemeInfo(r.Scheme).label)}</td><td class="date-col">${escHtml(r.CertNo || "—")}</td>
-          <td class="date-col">${vt ? formatDate(vt) : "—"}</td><td class="date-col">${vt ? formatDate(addDays(vt, -BUFFER)) : "—"}</td>
-          <td><span class="lfa-badge" ${BADGE[r._st.level]}>${r._st.level === "ok" ? "✓ " : ""}${LEVEL_LABEL[r._st.level]}</span><small class="cert-st">${escHtml(r._st.text)}</small></td>
-          <td class="cert-actions"><button class="btn-ghost sm" data-act="check" data-i="${i}" title="Otwiera bazę ${escHtml(schemeInfo(r.Scheme).label)} i kopiuje numer do schowka">🔎 Sprawdź w bazie</button><button class="btn-ghost sm" data-act="edit" data-i="${i}">${r._cert ? "Edytuj" : "Uzupełnij"}</button></td></tr>`; }).join("")
-      || `<tr><td colspan="7" class="settle-empty">Brak certyfikatów dla wybranych filtrów.</td></tr>`) + "</tbody>";
-    t.querySelectorAll("button[data-act]").forEach(b => b.onclick = () => { const r = list[parseInt(b.dataset.i)]; if (b.dataset.act === "check") checkInRegistry(r); else openForm(r); });
-    $("cert-missing").classList.toggle("hidden", !window.certsMissing);
+  // ── Kolumna „Cert. ważny do” w tabeli audytów (zamiast osobnej zakładki, Michał 2026-11-09) ──
+  // Najwcześniejsza data ważności certyfikatów systemów tego audytu (do sortowania)
+  function certToOf(a) { const ds = forAudit(a).map(c => d10(c.ValidTo)).filter(Boolean).sort(); return ds[0] || ""; }
+  function cellHtml(a) {
+    const sc = schemesOf(a); if (!sc.length) return "—";
+    const cs = forAudit(a);
+    if (!cs.length) return '<span class="cert-add" title="Brak danych o certyfikacie. Kliknij, aby uzupełnić.">＋ dodaj</span>';
+    return cs.map(c => { const st = statusOf(c), vt = d10(c.ValidTo);
+      return `<span class="cert-cell" title="${escHtml(schemeInfo(c.Scheme).label + ": " + st.text)}">${vt ? formatDate(vt) : "—"}${cs.length > 1 ? " <small>" + escHtml(schemeInfo(c.Scheme).label) + "</small>" : ""}` +
+        (st.level === "danger" || st.level === "warn" ? `<span class="lfa-badge" ${BADGE[st.level]}>${LEVEL_LABEL[st.level]}</span>` : "") + `</span>`; }).join("");
   }
+  // Klik w komórkę: istniejący certyfikat → edycja; brak → nowy, wypełniony danymi audytu
+  function openForAudit(id) {
+    const a = (allAudits || []).find(x => x.Id === id); if (!a) return;
+    const cs = forAudit(a);
+    if (cs.length) { openForm(Object.assign({ _cert: true }, cs[0])); return; }
+    const sc = schemesOf(a)[0]; if (!sc) return;
+    openForm({ _cert: false, Title: a.Title, ProjectID: a.ProjectID ? String(a.ProjectID) : "", Scheme: sc, CertBody: certBodyOf(a) });
+  }
+  const refresh = () => { if (typeof window.renderTable === "function") window.renderTable(); };
   async function checkInRegistry(r) {
     const info = schemeInfo(r.Scheme), val = r.CertNo || prjOf(r.ProjectID) || r.Title || "";
     try { await navigator.clipboard.writeText(val); showToast("Skopiowano „" + val + "”. Wklej w wyszukiwarkę " + info.label + ".", "success"); } catch { showToast("Szukaj: " + val, "info"); }
@@ -5321,6 +5318,7 @@ const CertModule = (function () {
   // ── Formularz certyfikatu (okno formularza: klik w tło nie zamyka, Esc/✕ pytają o niezapisane zmiany) ──
   const F_IDS = ["cf-title", "cf-prj", "cf-scheme", "cf-body", "cf-no", "cf-from", "cf-to", "cf-status", "cf-checked", "cf-notes"];
   function openForm(r) {
+    if (!inited) { setup(); inited = true; }
     editing = r && r._cert ? r : null;
     const v = (id, x) => { $(id).value = x == null ? "" : x; };
     v("cf-title", r ? r.Title : ""); v("cf-prj", r ? r.ProjectID : ""); v("cf-scheme", r ? r.Scheme : "KZR INiG"); v("cf-body", r && r.CertBody ? r.CertBody : "CUC");
@@ -5344,13 +5342,13 @@ const CertModule = (function () {
       await ensureReady();
       if (editing) { await updateCertificate(editing.Id, fields); Object.assign(allCerts.find(c => c.Id === editing.Id), fields); }
       else { const res = await addCertificate(fields); allCerts.push(Object.assign({ Id: res.Id || res.ID }, fields)); }
-      showToast("Zapisano certyfikat: " + fields.Title, "success"); closeForm(); render();
+      showToast("Zapisano certyfikat: " + fields.Title, "success"); closeForm(); refresh();
     } catch (e) { showToast("Nie udało się zapisać: " + String(e.message || e).substring(0, 100), "error"); }
     finally { btn.disabled = false; }
   }
   async function removeCert() {
     if (!editing || !confirm("Usunąć wpis certyfikatu „" + (editing.Title || "") + " · " + editing.Scheme + "”? Trafi do kosza SharePoint.")) return;
-    try { await deleteCertificate(editing.Id); allCerts = allCerts.filter(c => c.Id !== editing.Id); showToast("Usunięto wpis certyfikatu", "success"); closeForm(); render(); }
+    try { await deleteCertificate(editing.Id); allCerts = allCerts.filter(c => c.Id !== editing.Id); showToast("Usunięto wpis certyfikatu", "success"); closeForm(); refresh(); }
     catch (e) { showToast("Nie udało się usunąć: " + String(e.message || e).substring(0, 100), "error"); }
   }
   let ready = false;
@@ -5380,16 +5378,12 @@ const CertModule = (function () {
     return { added, updated };
   }
   function setup() {
-    document.querySelectorAll("#cert-scheme-switch .op-view-btn").forEach(b => b.onclick = () => { scheme = b.dataset.scheme; document.querySelectorAll("#cert-scheme-switch .op-view-btn").forEach(x => x.classList.toggle("active", x === b)); render(); });
-    $("cert-attention").onchange = e => { onlyAttention = e.target.checked; render(); };
-    $("cert-search").oninput = e => { q = e.target.value; render(); };
-    $("cert-add").onclick = () => openForm(null);
     $("cf-close").onclick = requestCloseForm; $("cf-cancel").onclick = requestCloseForm;
     $("cf-save").onclick = saveForm; $("cf-delete").onclick = removeCert;
     $("cf-check").onclick = () => checkInRegistry({ Scheme: $("cf-scheme").value, CertNo: $("cf-no").value, ProjectID: $("cf-prj").value, Title: $("cf-title").value });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("cert-form-overlay").classList.contains("hidden")) requestCloseForm(); });
   }
-  return { render, load, upsertFromPlan, attention, forAudit, statusOf, schemeInfo, BUFFER, LEVEL_LABEL };
+  return { load, upsertFromPlan, attention, forAudit, statusOf, schemeInfo, cellHtml, certToOf, openForAudit, BUFFER, LEVEL_LABEL };
 })();
 window.CertModule = CertModule;
 
@@ -5476,7 +5470,7 @@ const DashboardModule = (function () {
     // 6) certyfikaty wymagające uwagi (lista Certificates): do zaplanowania, audyt za późno, wygasłe, zawieszone
     const certAtt = CertModule.attention().sort((x, y) => String(x.ValidTo).localeCompare(String(y.ValidTo)));
     if (certAtt.length) cards.push({ cls: "info", n: certAtt.length, label: "Certyfikaty do pilnowania", sub: "termin audytu przed końcem ważności (−" + CertModule.BUFFER + " dni)",
-      list: certAtt.slice(0, 4).map(c => `<span><small>${formatDate(c.ValidTo)}</small> ${escHtml(c.Title || "")} · ${escHtml(CertModule.schemeInfo(c.Scheme).label)}</span>`), more: Math.max(0, certAtt.length - 4), preset: { view: "certyfikaty" } });
+      list: certAtt.slice(0, 4).map(c => `<span><small>${formatDate(c.ValidTo)}</small> ${escHtml(c.Title || "")} · ${escHtml(CertModule.schemeInfo(c.Scheme).label)}</span>`), more: Math.max(0, certAtt.length - 4), preset: { search: certAtt.length === 1 ? (certAtt[0].Title || "") : "" } });
     // (stara karta z pola CertValidTo w audycie zastąpiona listą Certificates powyżej)
     if (!cards.length) { box.innerHTML = '<div class="dash-empty">✓ Nic nie czeka — wszystkie statusy, plany i rozliczenia są na bieżąco.</div>'; return; }
     box.innerHTML = cards.map((c, i) => `<div class="dash-todo-card ${c.cls}" data-i="${i}"><div class="t-num">${c.n}</div><div class="t-label">${c.label}</div><div class="t-sub">${c.sub}</div><div class="t-list">${c.list.join("")}${c.more ? `<span><small>…i ${c.more} więcej</small></span>` : ""}</div></div>`).join("");
