@@ -5257,7 +5257,7 @@ const CertModule = (function () {
     const next = cand[0] || null;
     const rs = String(c.RegistryStatus || "").toLowerCase();
     if (rs === "zawieszony" || rs === "wycofany") return { level: "danger", text: "Certyfikat " + rs + " w bazie", next };
-    if (next && next.a.AuditStatus === "DONE") return { level: vt < tk ? "warn" : "ok", text: "Audyt wykonany " + formatDate(next.d) + (vt < tk ? ", wpisz nowy certyfikat" : ""), next };
+    if (next && next.a.AuditStatus === "DONE") return { level: vt < tk ? "update" : "ok", text: "Audyt wykonany " + formatDate(next.d) + (vt < tk ? ", wpisz datę nowego certyfikatu" : ""), next };
     if (vt < tk) return { level: "danger", text: "Wygasł " + formatDate(vt) + (next ? ", audyt " + formatDate(next.d) : ", brak audytu"), next };
     if (next && next.lf) {
       if (next.d > vt) return { level: "danger", text: "Audyt " + formatDate(next.d) + " po wygaśnięciu", next };
@@ -5282,13 +5282,13 @@ const CertModule = (function () {
     return rows.map(r => Object.assign(r, { _st: statusOf(r) }));
   }
   // Wymagające uwagi (Pulpit): do zaplanowania, za późno, wygasłe, zawieszone
-  function attention() { return rowsAll().filter(r => r._cert && (r._st.level === "danger" || r._st.level === "warn")); }
+  function attention() { return rowsAll().filter(r => r._cert && ["danger", "warn", "update"].includes(r._st.level)); }
   function forAudit(a) {
     return schemesOf(a).map(sc => (allCerts || []).find(c => c.Scheme === sc && (prjOf(a.ProjectID) ? prjOf(c.ProjectID) === prjOf(a.ProjectID) : normTitle(c.Title) === normTitle(a.Title)))).filter(Boolean);
   }
   // Odznaki z design systemu (.lfa-badge): pilne = bordo, do zaplanowania = mosiądz, w porządku = granat z ✓, brak danych = neutralna
-  const BADGE = { ok: 'data-status="done"', warn: 'data-settle="sent"', danger: 'data-status="change"', none: "" };
-  const LEVEL_LABEL = { ok: "W porządku", warn: "Do zaplanowania", danger: "Pilne", none: "Brak danych" };
+  const BADGE = { ok: 'data-status="done"', warn: 'data-settle="sent"', danger: 'data-status="change"', update: 'data-status="planned"', none: "" };
+  const LEVEL_LABEL = { ok: "W porządku", warn: "Do zaplanowania", danger: "Pilne", update: "Wpisz nowy certyfikat", none: "Brak danych" };
 
   // ── Kolumna „Cert. ważny do” w tabeli audytów (zamiast osobnej zakładki, Michał 2026-11-09) ──
   // Najwcześniejsza data ważności certyfikatów systemów tego audytu (do sortowania)
@@ -5299,7 +5299,7 @@ const CertModule = (function () {
     if (!cs.length) return '<span class="cert-add" title="Brak danych o certyfikacie. Kliknij, aby uzupełnić.">＋ dodaj</span>';
     return cs.map(c => { const st = statusOf(c), vt = d10(c.ValidTo);
       return `<span class="cert-cell" title="${escHtml(schemeInfo(c.Scheme).label + ": " + st.text)}">${vt ? formatDate(vt) : "—"}${cs.length > 1 ? " <small>" + escHtml(schemeInfo(c.Scheme).label) + "</small>" : ""}` +
-        (st.level === "danger" || st.level === "warn" ? `<span class="lfa-badge" ${BADGE[st.level]}>${LEVEL_LABEL[st.level]}</span>` : "") + `</span>`; }).join("");
+        (["danger", "warn", "update"].includes(st.level) ? `<span class="lfa-badge" ${BADGE[st.level]}>${LEVEL_LABEL[st.level]}</span>` : "") + `</span>`; }).join("");
   }
   // Klik w komórkę: istniejący certyfikat → edycja; brak → nowy, wypełniony danymi audytu
   function openForAudit(id) {
