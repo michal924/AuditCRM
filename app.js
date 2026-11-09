@@ -5362,7 +5362,8 @@ const CertModule = (function () {
   // Wpisów sprawdzonych w bazie lub ręcznych nie nadpisuje.
   async function upsertFromPlan(recs, source) {
     const best = new Map();
-    recs.forEach(r => { const vt = d10(r.CertValidTo); if (!vt || r.AuditorName !== MY_AUDITOR) return;   // tylko moi klienci schemesOf(r).forEach(sc => { const k = keyOf(r.ProjectID, r.Title, sc); const b = best.get(k); if (!b || vt > b.vt) best.set(k, { r, sc, vt }); }); });
+    // tylko moi klienci (AuditorName)
+    recs.forEach(r => { const vt = d10(r.CertValidTo); if (!vt || r.AuditorName !== MY_AUDITOR) return; schemesOf(r).forEach(sc => { const k = keyOf(r.ProjectID, r.Title, sc); const b = best.get(k); if (!b || vt > b.vt) best.set(k, { r, sc, vt }); }); });
     if (!best.size) return { added: 0, updated: 0 };
     await ensureReady();
     let added = 0, updated = 0;
