@@ -5292,7 +5292,8 @@ const CertModule = (function () {
   function forAudit(a) {
     return schemesOf(a).map(sc => (allCerts || []).find(c => c.Scheme === sc && (prjOf(a.ProjectID) ? prjOf(c.ProjectID) === prjOf(a.ProjectID) : normTitle(c.Title) === normTitle(a.Title)))).filter(Boolean);
   }
-  const BADGE = { ok: "done", warn: "sent", danger: "open", none: "" };
+  // Odznaki z design systemu (.lfa-badge): pilne = bordo, do zaplanowania = mosiądz, w porządku = granat z ✓, brak danych = neutralna
+  const BADGE = { ok: 'data-status="done"', warn: 'data-settle="sent"', danger: 'data-status="change"', none: "" };
   const LEVEL_LABEL = { ok: "W porządku", warn: "Do zaplanowania", danger: "Pilne", none: "Brak danych" };
 
   function render() {
@@ -5306,7 +5307,7 @@ const CertModule = (function () {
         return `<tr data-i="${i}"><td class="cert-client"><b>${escHtml(r.Title || "—")}</b><small>${r.ProjectID ? "PRJ " + escHtml(r.ProjectID) + " · " : ""}${escHtml(r.CertBody || "")}</small></td>
           <td>${escHtml(schemeInfo(r.Scheme).label)}</td><td class="date-col">${escHtml(r.CertNo || "—")}</td>
           <td class="date-col">${vt ? formatDate(vt) : "—"}</td><td class="date-col">${vt ? formatDate(addDays(vt, -BUFFER)) : "—"}</td>
-          <td><span class="settle-badge ${BADGE[r._st.level]}">${LEVEL_LABEL[r._st.level]}</span><small class="cert-st">${escHtml(r._st.text)}</small></td>
+          <td><span class="lfa-badge" ${BADGE[r._st.level]}>${r._st.level === "ok" ? "✓ " : ""}${LEVEL_LABEL[r._st.level]}</span><small class="cert-st">${escHtml(r._st.text)}</small></td>
           <td class="cert-actions"><button class="btn-ghost sm" data-act="check" data-i="${i}" title="Otwiera bazę ${escHtml(schemeInfo(r.Scheme).label)} i kopiuje numer do schowka">🔎 Sprawdź w bazie</button><button class="btn-ghost sm" data-act="edit" data-i="${i}">${r._cert ? "Edytuj" : "Uzupełnij"}</button></td></tr>`; }).join("")
       || `<tr><td colspan="7" class="settle-empty">Brak certyfikatów dla wybranych filtrów.</td></tr>`) + "</tbody>";
     t.querySelectorAll("button[data-act]").forEach(b => b.onclick = () => { const r = list[parseInt(b.dataset.i)]; if (b.dataset.act === "check") checkInRegistry(r); else openForm(r); });
