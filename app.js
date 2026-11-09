@@ -5245,7 +5245,7 @@ const CertModule = (function () {
   function auditsFor(c) {
     const pk = prjOf(c.ProjectID), tk = normTitle(c.Title);
     return (allAudits || []).filter(a => a.AuditStatus !== "REJECTED" && schemesOf(a).includes(c.Scheme)
-      && (pk ? prjOf(a.ProjectID) === pk : normTitle(a.Title) === tk));
+      && ((pk && prjOf(a.ProjectID) === pk) || normTitle(a.Title) === tk));   // PRJ albo nazwa (ręczne wpisy bywają bez PRJ)
   }
   // Status certyfikatu → { level: ok|warn|danger|none, text, next }
   function statusOf(c) {
