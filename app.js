@@ -453,8 +453,10 @@ function applyFilters(audits) {
   const f = getFilters();
   return audits.filter(a => {
     if (f.search       && !((a.Title || "").toLowerCase().includes(f.search))) return false;
-    if (f.quarters.length > 0 && !f.quarters.includes(a.Quarter)) return false;
-    if (f.months.length > 0 && !f.months.includes(auditMonthKey(a))) return false;
+    // Rekord bez terminu (brak daty LF i daty CU) nie ma miesiąca ani kwartału, więc te filtry go nie ukrywają (Michał 2026-11-10)
+    const undated = !a.AuditDateStart && !a.PlannedCUDate;
+    if (f.quarters.length > 0 && !undated && !f.quarters.includes(a.Quarter)) return false;
+    if (f.months.length > 0 && !undated && !f.months.includes(auditMonthKey(a))) return false;
     if (f.years.length > 0    && !f.years.includes(String(a.Year))) return false;
     if (f.programs.length > 0 && !f.programs.some(p => hasProgram(a, p))) return false;
     if (f.statuses.length > 0 && !f.statuses.includes(a.AuditStatus)) return false;
