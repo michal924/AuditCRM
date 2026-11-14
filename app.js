@@ -1376,7 +1376,7 @@ async function createCalendarEvent(audit) {
     end:   { dateTime: `${nextStr}T00:00:00`,  timeZone: "Europe/Warsaw" },
     showAs: "busy",
     body:  { contentType: "text", content: body },
-    categories: ["Audyt LogisticFit"],
+    categories: ["Audyt LFA CRM"],
   };
 
   const r = await fetch("https://graph.microsoft.com/v1.0/me/events", {
@@ -1421,7 +1421,8 @@ async function createAuditCalendarEvents(audit) {
   const sp = siteParts(audit);
   const start = audit.StartTime || "", end = audit.EndTime || (start ? addHours(start, DEFAULT_AUDIT_HOURS) : "");
   const rangeLabel = (days > 1 ? `${formatDate(dateStr)}–${formatDate(lastStr)}` : formatDate(dateStr)) + (start ? `, ${start}–${end}` : "");
-  const subj = `📅 ${start ? start + " " : ""}Audyt ${audit.Program || ""}: ${audit.Title || ""}${sp[1] ? " — " + sp[1] : ""}${days > 1 ? ` (${days} dni)` : ""}`.trim();
+  // Tytuł: godziny na początku (widać je w widoku kalendarza), potem „Audyt LFA CRM” i program (Michał 2026-11-14)
+  const subj = `📅 ${start ? start + "–" + end + " · " : ""}Audyt LFA CRM · ${audit.Program || ""}: ${audit.Title || ""}${sp[1] ? " — " + sp[1] : ""}${days > 1 ? ` (${days} dni)` : ""}`.replace(/\s+/g, " ").trim();
   const route = routeUrl(audit);
 
   const bodyText = [
@@ -1449,7 +1450,7 @@ async function createAuditCalendarEvents(audit) {
     showAs: "busy",
     location: loc ? { displayName: loc, address: { street: sp[0] || "", city: sp[1] || "", postalCode: sp[2] || "", countryOrRegion: "Polska" } } : undefined,
     body:  { contentType: "html", content: bodyHtml },
-    categories: ["Audyt LogisticFit"],
+    categories: ["Audyt LFA CRM"],
     attendees: [
       {
         emailAddress: { address: "office@logisticfit.com", name: "LogisticFit Office" },
