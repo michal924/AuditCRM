@@ -648,7 +648,7 @@
             </select></div>
           <div class="field-row"><label>Standard</label><span id="m-standard">—</span></div>
           <div class="field-row">
-            <label>Adres</label>
+            <label>Adres rejestrowy</label>
             <span id="m-address" class="view-val">—</span>
             <input id="e-address" type="text" class="edit-val field-input" placeholder="Ulica i numer">
           </div>
@@ -659,6 +659,20 @@
             <div id="e-city-wrap" class="edit-val edit-city-wrap">
               <input id="e-city" type="text" class="field-input" placeholder="Miasto">
               <input id="e-postal" type="text" class="field-input field-input-sm" placeholder="00-000">
+            </div>
+          </div>
+          <div class="field-row">
+            <label>Miejsce audytu</label>
+            <span id="m-site" class="view-val">jak adres rejestrowy</span>
+            <div class="edit-val site-edit">
+              <label class="site-same"><input type="checkbox" id="e-site-same" checked> taki sam jak adres rejestrowy</label>
+              <div id="e-site-fields" class="site-fields hidden">
+                <input id="e-site-address" type="text" class="field-input" placeholder="Ulica i numer miejsca audytu" aria-label="Miejsce audytu: adres">
+                <div class="edit-city-wrap site-city-row">
+                  <input id="e-site-city" type="text" class="field-input" placeholder="Miasto" aria-label="Miejsce audytu: miasto">
+                  <input id="e-site-postal" type="text" class="field-input field-input-sm" placeholder="00-000" aria-label="Miejsce audytu: kod">
+                </div>
+              </div>
             </div>
           </div>
           <div class="field-row">
@@ -690,6 +704,15 @@
                 <button id="btn-plan-audit" type="button" class="btn-plan-audit" title="Przy zapisaniu daty — wyślij zaproszenie do kalendarzy office@logisticfit.com i michal@logisticfit.com">📅 Zaplanuj audyt</button>
               </div>
               <div id="e-daybusy" class="daybusy hidden"></div>
+            </div>
+          </div>
+          <div class="field-row">
+            <label>Godziny</label>
+            <span id="m-time" class="view-val">—</span>
+            <div class="edit-val time-edit">
+              <input id="e-start" type="time" class="field-input" aria-label="Godzina rozpoczęcia" title="Godzina rozpoczęcia wg planu audytu">
+              <span class="time-dash">do</span>
+              <input id="e-end" type="time" class="field-input" aria-label="Godzina zakończenia" title="Puste = rozpoczęcie + 8 h">
             </div>
           </div>
           <div class="field-row">

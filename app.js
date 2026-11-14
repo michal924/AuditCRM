@@ -16,7 +16,9 @@ let importParsed = [];
 let sortCol = "PlannedCUDate";
 let sortDir = 1; // 1 = ASC, -1 = DESC
 let isEditMode = false;
-let originalAuditDate = null;  // śledzi oryginał daty AuditDateStart przy wejściu w tryb edycji
+let originalAuditDate = null;
+let originalPlanKey = "";   // godziny + miejsce audytu przy wejściu w edycję (zmiana → pytanie o aktualizację wydarzenia w Outlooku)
+function planKeyOf(a) { return [a.StartTime, a.EndTime, a.SiteAddress, a.SiteCity, a.SitePostal].map(v => v || "").join("|"); }  // śledzi oryginał daty AuditDateStart przy wejściu w tryb edycji
 let planAuditRequested = false; // true tylko gdy użytkownik świadomie kliknął "Zaplanuj audyt"
 let calDayFilter = null; // "YYYY-MM-DD" — filtr tabeli do jednego dnia (z bocznego kalendarzyka)
 
@@ -231,6 +233,15 @@ function statusKey(s) {
 }
 
 // ── ROZLICZENIE — helpery (koszty + wynagrodzenie) ──
+// ── Planowanie: godziny i miejsce audytu ──
+const DEFAULT_AUDIT_HOURS = 8;
+function hasSite(a) { return !!(a && (a.SiteAddress || a.SiteCity)); }
+// Miejsce audytu: osobny adres, a gdy brak — adres rejestrowy
+function siteParts(a) { return hasSite(a) ? [a.SiteAddress, a.SiteCity, a.SitePostal] : [a.Address, a.City, a.PostalCode]; }
+function siteText(a) { return siteParts(a).filter(Boolean).join(", "); }
+function routeUrl(a) { const t = siteText(a); return t ? "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(t) : ""; }
+function addHours(hhmm, h) { const [H, M] = String(hhmm).split(":").map(Number); const t = (H * 60 + (M || 0) + h * 60) % (24 * 60); return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); }
+function timeLabel(a) { return a && a.StartTime ? a.StartTime + (a.EndTime ? "–" + a.EndTime : "") : ""; }
 function settleStatusOf(a) { return (a && a.SettleStatus) ? a.SettleStatus : "Nierozliczony"; }
 // Miesiąc rozliczenia „RRRR-MM”: SettleMonth (przeniesione do innego miesiąca) albo miesiąc daty audytu LF
 function settleMonthOf(a) { return (a && a.SettleMonth) || (a && a.AuditDateStart ? String(a.AuditDateStart).substring(0, 7) : null); }
@@ -598,7 +609,7 @@ function renderTable() {
       '<td class="program-col">' + certBodyBadge(a) + ' ' + programBadge(a.Program) + '</td>' +
       '<td>' + (a.AuditType ? shortType(a.AuditType) : '—') + '</td>' +
       '<td class="date-col">' + (formatDate(a.PlannedCUDate) || '—') + '</td>' +
-      '<td class="date-col">' + formatDate(a.AuditDateStart) + custodyMark + '</td>' +
+      '<td class="date-col">' + formatDate(a.AuditDateStart) + custodyMark + (a.StartTime && a.AuditDateStart ? '<small class="time-sub">🕘 ' + escHtml(timeLabel(a)) + '</small>' : '') + '</td>' +
       '<td class="date-col cert-col" onclick="event.stopPropagation(); CertModule.openForAudit(' + aid + ')">' + CertModule.cellHtml(a) + '</td>' +
       '<td>' + escHtml(a.City || '—') + '</td>' +
       '<td class="' + (a.AuditMode === 'Online' ? 'mode-online' : 'mode-onsite') + '">' + (a.AuditMode === 'Online' ? '💻' : '📍') + ' ' + (a.AuditMode || '—') + '</td>' +
@@ -724,7 +735,7 @@ async function renderDayBusy(boxId, dateStr) {
   try { if (window.OpiekaModule && OpiekaModule.dayInfo) { const i = OpiekaModule.dayInfo(d); if (i.father) custody = i.reason; } } catch {}
   if (custody) rows.push(`<div class="db-row db-custody">👨‍👦 Opieka nad Szymonem <span class="db-sub">${escHtml(custody)}</span></div>`);
   sameDayAudits(dateStr).forEach(a => {
-    rows.push(`<div class="db-row db-audit ${bodyCls(a)}">📋 ${escHtml(a.Title || "Audyt")} <span class="db-sub">${bodyLabel(a)} · ${escHtml(a.Program || "?")}</span></div>`);
+    rows.push(`<div class="db-row db-audit ${bodyCls(a)}">📋 ${a.StartTime ? escHtml(a.StartTime) + " " : ""}${escHtml(a.Title || "Audyt")} <span class="db-sub">${bodyLabel(a)} · ${escHtml(a.Program || "?")}</span></div>`);
   });
   const staticHtml = rows.join("");
   box.classList.remove("hidden");
@@ -818,6 +829,7 @@ function setupModal() {
     if (e.target === document.getElementById("modal-overlay") && !isEditMode) closeModal();
   };
   document.getElementById("btn-edit-audit").onclick = enterEditMode;
+  document.getElementById("e-site-same").addEventListener("change", e => document.getElementById("e-site-fields").classList.toggle("hidden", e.target.checked));
   document.getElementById("e-certbody").addEventListener("change", e => { if (currentAudit) document.getElementById("row-eudr-role").classList.toggle("hidden", !isEudrCU(Object.assign({}, currentAudit, { CertBody: e.target.value }))); });
   document.getElementById("btn-cancel-edit").onclick = cancelEditMode;
 
@@ -971,8 +983,10 @@ function openModal(id) {
   document.getElementById("m-city").textContent      = cityFull || "—";
 
   // Link do trasy w mapach
+  { const ms = document.getElementById("m-site"); if (ms) ms.textContent = hasSite(a) ? siteText(a) : "jak adres rejestrowy";
+    const mt = document.getElementById("m-time"); if (mt) mt.textContent = timeLabel(a) ? timeLabel(a) + (a.EndTime ? "" : " (koniec: " + addHours(a.StartTime, DEFAULT_AUDIT_HOURS) + ")") : "—"; }
   const mapsLink = document.getElementById("m-maps-link");
-  const addrParts = [a.Address, a.City, a.PostalCode].filter(Boolean);
+  const addrParts = siteParts(a).filter(Boolean);   // trasa prowadzi do miejsca audytu
   if (addrParts.length) {
     const q = encodeURIComponent(addrParts.join(", "));
     const isApple = /iPad|iPhone|Macintosh/.test(navigator.userAgent) && !window.MSStream;
@@ -1034,6 +1048,11 @@ function enterEditMode() {
   originalAuditDate = a.AuditDateStart ? a.AuditDateStart.substring(0, 10) : "";
   document.getElementById("e-address").value = a.Address || "";
   document.getElementById("e-city").value    = a.City || "";
+  { const same = !hasSite(a); document.getElementById("e-site-same").checked = same;
+    document.getElementById("e-site-address").value = a.SiteAddress || ""; document.getElementById("e-site-city").value = a.SiteCity || ""; document.getElementById("e-site-postal").value = a.SitePostal || "";
+    document.getElementById("e-site-fields").classList.toggle("hidden", same);
+    document.getElementById("e-start").value = a.StartTime || ""; document.getElementById("e-end").value = a.EndTime || "";
+    originalPlanKey = planKeyOf(a); }
   document.getElementById("e-postal").value  = a.PostalCode || "";
   document.getElementById("e-email").value   = a.ClientEmail || "";
   document.getElementById("e-phone").value   = a.Phone || "";
@@ -1209,6 +1228,14 @@ async function saveChanges() {
       fields.Phone         = document.getElementById("e-phone").value.trim()   || null;
       fields.Mobile        = document.getElementById("e-mobile").value.trim()  || null;
       fields.AuditDateStart = dateVal ? safeDate(dateVal) : null;
+      if (!window.settleRateFieldMissing) {
+        const gv = id => document.getElementById(id).value.trim();
+        fields.StartTime = gv("e-start") || null; fields.EndTime = gv("e-end") || null;
+        const same = document.getElementById("e-site-same").checked;
+        fields.SiteAddress = same ? null : (gv("e-site-address") || null);
+        fields.SiteCity    = same ? null : (gv("e-site-city") || null);
+        fields.SitePostal  = same ? null : (gv("e-site-postal") || null);
+      }
       const daysVal = document.getElementById("e-days").value;
       fields.AuditDays     = daysVal !== "" ? parseFloat(daysVal) : null;
       { const ek = document.getElementById("e-kind"), et = document.getElementById("e-type");
@@ -1259,6 +1286,13 @@ async function saveChanges() {
           else showToast(`📅 Odwołano ${n} ${n === 1 ? "wydarzenie" : "wydarzenia"} z ${formatDate(dateBefore)}`, "success");
         } catch (e) { showToast("⚠️ Zapisano, ale Outlook: " + String(e.message || e).substring(0, 80), "warn"); }
       }
+    }
+
+    // Ta sama data, ale zmieniona godzina albo miejsce audytu → pytanie o aktualizację wydarzenia w Outlooku
+    if (wasEditMode && dateBefore && dateBefore === dateAfter && !planAuditRequested && planKeyOf(currentAudit) !== originalPlanKey
+        && currentAudit.AuditStatus !== "REJECTED" && confirm("Zmieniono godzinę albo miejsce audytu.\n\nZaktualizować wydarzenie w Outlooku? (stare zostanie odwołane, nowe zaproszenie wysłane)")) {
+      try { const n = await cancelAuditCalendarEvents(currentAudit); await createAuditCalendarEvents(currentAudit); showToast(`📅 Zaktualizowano wydarzenie w Outlooku (odwołano ${n}, wysłano nowe)`, "success"); }
+      catch (e) { showToast("⚠️ Zapisano, ale Outlook: " + String(e.message || e).substring(0, 80), "warn"); }
     }
 
     // ── Integracja kalendarza: gdy użytkownik kliknął "Zaplanuj audyt" (niezależnie od statusu końcowego) ──
@@ -1381,9 +1415,13 @@ async function createAuditCalendarEvents(audit) {
   lastDate.setDate(lastDate.getDate() + days - 1);
   const lastStr  = lastDate.toISOString().substring(0, 10);
 
-  const loc  = [audit.Address, audit.City, audit.PostalCode].filter(Boolean).join(", ");
-  const rangeLabel = days > 1 ? `${formatDate(dateStr)}–${formatDate(lastStr)}` : formatDate(dateStr);
-  const subj = `📅 Audyt ${audit.Program || ""}: ${audit.Title || ""}${audit.City ? " — " + audit.City : ""}${days > 1 ? ` (${days} dni)` : ""}`.trim();
+  const loc  = siteText(audit);   // miejsce audytu (albo adres rejestrowy, gdy to samo)
+  const regAddr = [audit.Address, audit.City, audit.PostalCode].filter(Boolean).join(", ");
+  const sp = siteParts(audit);
+  const start = audit.StartTime || "", end = audit.EndTime || (start ? addHours(start, DEFAULT_AUDIT_HOURS) : "");
+  const rangeLabel = (days > 1 ? `${formatDate(dateStr)}–${formatDate(lastStr)}` : formatDate(dateStr)) + (start ? `, ${start}–${end}` : "");
+  const subj = `📅 ${start ? start + " " : ""}Audyt ${audit.Program || ""}: ${audit.Title || ""}${sp[1] ? " — " + sp[1] : ""}${days > 1 ? ` (${days} dni)` : ""}`.trim();
+  const route = routeUrl(audit);
 
   const bodyText = [
     `Jednostka: ${certBodyOf(audit)}`,
@@ -1392,18 +1430,24 @@ async function createAuditCalendarEvents(audit) {
     `Typ: ${audit.AuditType || "—"}`,
     `Audytor: ${audit.AuditorName || "—"}`,
     `Termin: ${rangeLabel}${days > 1 ? ` (${days} dni)` : ""}`,
-    `Adres: ${loc || "—"}`,
+    `Miejsce audytu: ${loc || "—"}`,
+    ...(hasSite(audit) && regAddr ? [`Adres rejestrowy: ${regAddr}`] : []),
     ``,
     `Zaplanowano przez LFA CRM System`,
   ].join("\n");
+  // Treść HTML: te same linie + klikalny link do trasy (Mapy Google, nawigacja od bieżącego miejsca)
+  const bodyHtml = bodyText.split("\n").map(l => escHtml(l)).join("<br>") +
+    (route ? `<br><br><a href="${route}">🚗 Trasa do miejsca audytu</a>` : "");
 
   const event = {
     subject: subj,
-    isAllDay: true,
-    start: { dateTime: `${dateStr}T00:00:00`, timeZone: "Europe/Warsaw" },
-    end:   { dateTime: `${nextStr}T00:00:00`, timeZone: "Europe/Warsaw" },
+    // Z godziną rozpoczęcia: wydarzenie od godziny startu pierwszego dnia do godziny końca ostatniego dnia; bez godziny: całodniowe jak dotąd
+    isAllDay: !start,
+    start: { dateTime: start ? `${dateStr}T${start}:00` : `${dateStr}T00:00:00`, timeZone: "Europe/Warsaw" },
+    end:   { dateTime: start ? `${lastStr}T${end}:00` : `${nextStr}T00:00:00`, timeZone: "Europe/Warsaw" },
     showAs: "busy",
-    body:  { contentType: "text", content: bodyText },
+    location: loc ? { displayName: loc, address: { street: sp[0] || "", city: sp[1] || "", postalCode: sp[2] || "", countryOrRegion: "Polska" } } : undefined,
+    body:  { contentType: "html", content: bodyHtml },
     categories: ["Audyt LogisticFit"],
     attendees: [
       {

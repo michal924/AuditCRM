@@ -75,9 +75,15 @@ const SETTLE_FIELDS = [
   { name: "DelegReturn",   label: "Delegacja: powrót (data i godzina)",  type: "Text" },
   { name: "DelegNo",       label: "Nr oświadczenia o delegacji",         type: "Text" },   // OD/RRRR/MM/nnn — nadany przy pierwszym wydruku
   { name: "SettleMonth",   label: "Rozlicz w miesiącu",                  type: "Text" },
-  { name: "EudrRole",      label: "Podmiot EUDR (Operator / DO)",        type: "Text" },   // "DO" = podmiot w łańcuchu dostaw → stała opłata za usługę (Michał 2026-11-05)   // "2026-11" — rozliczenie w innym miesiącu niż data audytu (Michał 2026-11-04)
+  { name: "EudrRole",      label: "Podmiot EUDR (Operator / DO)",        type: "Text" },
+  // Planowanie (Michał 2026-11-14): godziny audytu i miejsce audytu, gdy inne niż adres rejestrowy. Trzymane tu, bo ta grupa ma bezpieczny odczyt bez kolumn.
+  { name: "StartTime",     label: "Godzina rozpoczęcia",                 type: "Text" },   // "09:00"
+  { name: "EndTime",       label: "Godzina zakończenia",                 type: "Text" },
+  { name: "SiteAddress",   label: "Miejsce audytu: adres",               type: "Text" },
+  { name: "SiteCity",      label: "Miejsce audytu: miasto",              type: "Text" },
+  { name: "SitePostal",    label: "Miejsce audytu: kod",                 type: "Text" },   // "DO" = podmiot w łańcuchu dostaw → stała opłata za usługę (Michał 2026-11-05)   // "2026-11" — rozliczenie w innym miesiącu niż data audytu (Michał 2026-11-04)
 ];
-const SETTLE_NEWER_FIELDS = ["SettleDayRate", "SettleTravelDays", "DelegDepart", "DelegReturn", "DelegNo", "SettleMonth", "EudrRole"];   // pola dodane później: gdy ich brak, reszta rozliczeń nadal działa
+const SETTLE_NEWER_FIELDS = ["SettleDayRate", "SettleTravelDays", "DelegDepart", "DelegReturn", "DelegNo", "SettleMonth", "EudrRole", "StartTime", "EndTime", "SiteAddress", "SiteCity", "SitePostal"];   // pola dodane później: gdy ich brak, reszta rozliczeń nadal działa
 window.settleRateFieldMissing = false;
 const SETTLE_FIELD_NAMES = SETTLE_FIELDS.map(f => f.name);
 // true gdy lista nie ma jeszcze kolumn rozliczeń → UI pokaże przycisk konfiguracji, zapis pomija te pola

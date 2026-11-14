@@ -546,6 +546,17 @@ tbody td.date-col {
 .edit-city-wrap .field-input { flex: 1; }
 
 .modal-section { min-width: 0; }
+/* Planowanie: godziny i miejsce audytu (2026-11-14) */
+.modal-overlay.edit-mode .time-edit.edit-val, .modal-overlay.edit-mode .site-edit.edit-val { display: flex; }
+.time-edit { align-items: center; gap: 6px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.time-edit .field-input { flex: 0 1 120px; min-height: 36px; }
+.time-dash { color: var(--text2); font-size: 12px; }
+.site-edit { flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.site-same { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text2); min-height: 32px; cursor: pointer; }
+.site-fields { display: flex; flex-direction: column; gap: 6px; }
+.site-fields.hidden { display: none; }
+.site-city-row { display: flex; }
+.time-sub { display: block; color: var(--text2); font-size: 11.5px; margin-top: 2px; }
 /* Kolumna edycji daty: [pole daty + Zaplanuj audyt] nad listą zajętości dnia */
 .modal-overlay.edit-mode .date-plan-col.edit-val { display: flex; }
 .date-plan-col { flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
