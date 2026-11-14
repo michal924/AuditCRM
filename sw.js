@@ -5,8 +5,8 @@ const VERSION = "lfa-v1";
 const SHELL = ["/", "/index.html", "/style.css", "/app.js", "/api.js", "/auth.js",
   "/design/tokens/tokens.css", "/design/tokens/app.css", "/design/components.css", "/fonts/lfa/lfa-fonts.css",
   "/leaflet.css", "/leaflet.js", "/msal-browser.min.js", "/xlsx.full.min.js", "/jspdf.umd.min.js", "/jspdf.plugin.autotable.min.js",
-  "/favicon.svg", "/favicon-192.png", "/auditcrm-icon-512.png", "/manifest.webmanifest"];
-const APP_FILES = new Set(["/", "/index.html", "/style.css", "/app.js", "/api.js", "/auth.js",
+  "/pdf.min.js", "/pdf.worker.min.js", "/plan.js", "/favicon.svg", "/favicon-192.png", "/auditcrm-icon-512.png", "/manifest.webmanifest"];
+const APP_FILES = new Set(["/", "/index.html", "/style.css", "/app.js", "/api.js", "/auth.js", "/plan.js",
   "/design/tokens/tokens.css", "/design/tokens/app.css", "/design/components.css", "/manifest.webmanifest"]);
 
 self.addEventListener("install", e => {

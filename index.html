@@ -702,6 +702,8 @@
               <div class="date-plan-row">
                 <input id="e-date" type="date" class="field-input" aria-label="Data audytu LF">
                 <button id="btn-plan-audit" type="button" class="btn-plan-audit" title="Przy zapisaniu daty — wyślij zaproszenie do kalendarzy office@logisticfit.com i michal@logisticfit.com">📅 Zaplanuj audyt</button>
+                <button id="btn-read-plan" type="button" class="btn-plan-audit" title="Odczytaj datę, godziny i miejsce audytu z planu audytu (PDF). Plik zostaje na Twoim komputerze.">📄 Wczytaj plan (PDF)</button>
+                <input id="plan-file" type="file" accept="application/pdf,.pdf" class="hidden" aria-label="Plik planu audytu PDF">
               </div>
               <div id="e-daybusy" class="daybusy hidden"></div>
             </div>
@@ -923,6 +925,24 @@
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ODCZYT PLANU AUDYTU (PDF) — potwierdzenie przed wstawieniem do formularza -->
+<div id="plan-read-overlay" class="modal-overlay hidden">
+  <div class="modal plan-read-modal">
+    <div class="modal-header">
+      <h2>📄 Odczytano z planu audytu</h2>
+      <button id="pr-close" class="btn-ghost" aria-label="Zamknij">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="pr-info" class="pr-info"></div>
+      <div id="pr-fields" class="pr-fields"></div>
+      <div class="modal-actions cert-form-actions">
+        <button id="pr-cancel" class="btn-ghost" type="button">Anuluj</button>
+        <button id="pr-apply" class="btn-primary" type="button" style="width:auto">Wstaw do formularza</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1279,6 +1299,8 @@
 
 <script src="auth.js"></script>
 <script src="api.js"></script>
+<script src="pdf.min.js"></script>
+<script src="plan.js"></script>
 <script src="app.js"></script>
 <script>if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {})); }</script>
 </body>

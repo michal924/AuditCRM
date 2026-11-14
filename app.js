@@ -829,6 +829,7 @@ function setupModal() {
     if (e.target === document.getElementById("modal-overlay") && !isEditMode) closeModal();
   };
   document.getElementById("btn-edit-audit").onclick = enterEditMode;
+  setupPlanReader();
   document.getElementById("e-site-same").addEventListener("change", e => document.getElementById("e-site-fields").classList.toggle("hidden", e.target.checked));
   document.getElementById("e-certbody").addEventListener("change", e => { if (currentAudit) document.getElementById("row-eudr-role").classList.toggle("hidden", !isEudrCU(Object.assign({}, currentAudit, { CertBody: e.target.value }))); });
   document.getElementById("btn-cancel-edit").onclick = cancelEditMode;
@@ -2006,6 +2007,62 @@ async function startImport() {
   } finally {
     document.getElementById("btn-do-import").disabled = false;
   }
+}
+
+// ============================================================
+// WCZYTANIE PLANU AUDYTU (PDF) → formularz edycji (Michał 2026-11-14)
+// Odczyt lokalny (plan.js + pdf.js). Wynik do potwierdzenia, wstawiany do pól; zapis dopiero „Zapisz zmiany”.
+// ============================================================
+let planRead = null;
+function setupPlanReader() {
+  const btn = document.getElementById("btn-read-plan"), inp = document.getElementById("plan-file");
+  btn.onclick = () => { inp.value = ""; inp.click(); };
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0]; if (!f || !currentAudit) return;
+    btn.disabled = true; const old = btn.textContent; btn.textContent = "Czytam plan…";
+    try { const text = await PlanReader.pdfText(await f.arrayBuffer()); showPlanRead(PlanReader.parse(text, f.name), f.name); }
+    catch (e) { showToast("Nie udało się odczytać PDF: " + String(e.message || e).substring(0, 90), "error"); }
+    finally { btn.disabled = false; btn.textContent = old; }
+  };
+  const close = () => hide("plan-read-overlay");
+  document.getElementById("pr-close").onclick = close; document.getElementById("pr-cancel").onclick = close;
+  document.getElementById("pr-apply").onclick = applyPlanRead;
+}
+function showPlanRead(r, fileName) {
+  planRead = r; const a = currentAudit || {};
+  const prj = String(a.ProjectID || "").replace(/\D/g, ""), notes = String(a.Notes || "");
+  const idOk = !r.id ? null : (/^\d+$/.test(r.id) ? (prj ? prj === r.id : null) : notes.includes(r.id));
+  const norm = s => String(s || "").toLowerCase().replace(/[^a-ząęółśżźćń0-9]/g, "");
+  const regAudit = norm([a.Address, a.City].join(" ")), siteNorm = r.site ? norm(r.site.street + r.site.city) : "";
+  const siteDiffers = !!r.site && !(regAudit.includes(norm(r.site.street)) && regAudit.includes(norm(r.site.city)));
+  const warn = idOk === false ? `<div class="pr-warn">⚠ Numer w planie (${escHtml(r.id)}) nie zgadza się z tym audytem${prj ? " (PRJ " + escHtml(prj) + ")" : ""}. Sprawdź, czy to właściwy plik.</div>` : "";
+  document.getElementById("pr-info").innerHTML =
+    `<div><b>${escHtml(fileName)}</b></div><div class="pr-sub">Szablon: ${escHtml(r.tpl)}${r.id ? " · nr: " + escHtml(r.id) + (idOk ? " ✓ pasuje do audytu" : "") : ""}${r.name ? " · " + escHtml(r.name) : ""}</div>` + warn +
+    (r.tpl === "nierozpoznany" ? `<div class="pr-warn">⚠ Nie rozpoznałem szablonu planu. Sprawdź odczytane wartości.</div>` : "");
+  const row = (key, label, val, note, on = true) => `<label class="pr-row"><input type="checkbox" data-k="${key}" ${val && on ? "checked" : ""} ${val ? "" : "disabled"}><span class="pr-label">${label}</span><span class="pr-val">${val ? escHtml(val) : "nie znaleziono"}${note ? `<small>${escHtml(note)}</small>` : ""}</span></label>`;
+  document.getElementById("pr-fields").innerHTML =
+    row("date", "Data audytu", r.date ? formatDate(r.date) : "", a.AuditDateStart && String(a.AuditDateStart).slice(0, 10) !== r.date ? "teraz: " + formatDate(a.AuditDateStart) : "") +
+    row("start", "Godzina rozpoczęcia", r.start, "") +
+    row("end", "Godzina zakończenia", r.end, r.notes.join("; ")) +
+    row("site", "Miejsce audytu", r.siteText, r.site ? (siteDiffers ? "inne niż adres rejestrowy w aplikacji" : "takie samo jak adres rejestrowy") : "");
+  planRead.siteDiffers = siteDiffers;
+  show("plan-read-overlay");
+}
+function applyPlanRead() {
+  const r = planRead; if (!r) return;
+  const on = k => { const c = document.querySelector(`#pr-fields input[data-k="${k}"]`); return c && c.checked; };
+  const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); };
+  if (on("date") && r.date) set("e-date", r.date);
+  if (on("start") && r.start) set("e-start", r.start);
+  if (on("end") && r.end) set("e-end", r.end);
+  if (on("site") && r.site) {
+    const same = document.getElementById("e-site-same");
+    if (r.siteDiffers) { same.checked = false; document.getElementById("e-site-fields").classList.remove("hidden");
+      set("e-site-address", r.site.street); set("e-site-city", r.site.city); set("e-site-postal", r.site.postal); }
+    else { same.checked = true; document.getElementById("e-site-fields").classList.add("hidden"); }
+  }
+  hide("plan-read-overlay");
+  showToast("Wstawiono dane z planu. Sprawdź i kliknij „Zapisz zmiany”.", "success");
 }
 
 // ============================================================
