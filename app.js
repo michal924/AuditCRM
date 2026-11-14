@@ -449,7 +449,17 @@ function hasProgram(a, key) { return programsOf(a).some(q => normProgramKey(q) =
 function isCombinedAudit(a) { return hasProgram(a, "FSC") && hasProgram(a, "PEFC"); }
 const COMBINED_PROGRAM = "FSC CoC + PEFC CoC";
 
+// Czy audyt trwa w dniu k („RRRR-MM-DD”): od daty LF przez wszystkie dni audytowe — tak samo liczy boczny kalendarz
+function auditCoversDay(a, k) {
+  const s0 = String(a.AuditDateStart || "").substring(0, 10); if (!s0 || s0 > k) return false;
+  const e = new Date(s0 + "T12:00:00"); e.setDate(e.getDate() + Math.max(1, Math.ceil(parseFloat(a.AuditDays) || 1)) - 1);
+  const ek = e.getFullYear() + "-" + String(e.getMonth() + 1).padStart(2, "0") + "-" + String(e.getDate()).padStart(2, "0");
+  return k <= ek;
+}
 function applyFilters(audits) {
+  // Wybrany dzień w kalendarzyku: pokaż DOKŁADNIE to, co kalendarz (wszystkie moje audyty w tym dniu, bez odwołanych),
+  // niezależnie od wyszukiwarki i filtrów — inaczej tabela pisała „brak audytów”, a kalendarz pokazywał audyt (Michał 2026-11-14)
+  if (calDayFilter) return audits.filter(a => a.AuditStatus !== "REJECTED" && auditCoversDay(a, calDayFilter));
   const f = getFilters();
   return audits.filter(a => {
     if (f.search       && !((a.Title || "").toLowerCase().includes(f.search))) return false;
@@ -467,7 +477,6 @@ function applyFilters(audits) {
       if (!ok) return false;
     }
     if (f.settles.length > 0 && !f.settles.includes(settleStatusOf(a))) return false;
-    if (calDayFilter && String(a.AuditDateStart || "").substring(0,10) !== calDayFilter) return false;
     return true;
   });
 }
@@ -522,8 +531,11 @@ function renderTable() {
   const tbody = document.getElementById("audits-tbody");
 
   // Wiersz informacyjny: pozycje spoza audytów dla wybranego dnia (opieka + Outlook)
-  let extrasRow = "";
+  let extrasRow = "", dayNote = "";
   if (calDayFilter) {
+    const f = getFilters();
+    const active = f.search || ["quarters", "months", "years", "programs", "statuses", "certbodies", "plans", "settles"].some(k => f[k].length);
+    if (active) dayNote = `<tr class="day-info-row"><td colspan="14"><div class="day-info"><span class="day-info-title">📅 ${new Date(calDayFilter + "T12:00:00").toLocaleDateString("pl-PL")}: pokazuję wszystkie audyty z tego dnia. Wyszukiwarka i filtry nie działają, dopóki wybrany jest dzień.</span></div></td></tr>`;
     let ex = null; try { ex = SideCalModule.dayExtras(calDayFilter); } catch {}
     if (ex && (ex.custody || (ex.outlook && ex.outlook.length))) {
       const items = [];
@@ -535,14 +547,14 @@ function renderTable() {
   }
 
   if (!filtered.length) {
-    tbody.innerHTML = extrasRow
+    tbody.innerHTML = dayNote + (extrasRow
       ? '<tr><td colspan="14" class="loading" style="padding:10px 0 2px">Brak audytów tego dnia — ale masz zaplanowane:</td></tr>' + extrasRow
-      : '<tr><td colspan="14" class="loading">Brak wyników</td></tr>';
+      : '<tr><td colspan="14" class="loading">' + (calDayFilter ? "Brak audytów tego dnia" : "Brak wyników") + '</td></tr>');
     return;
   }
 
   const NCOLS = 14; // liczba kolumn tabeli
-  tbody.innerHTML = filtered.map(a => {
+  tbody.innerHTML = dayNote + filtered.map(a => {
     // Barwa wiersza = jednostka (CUC niebieski / SGS pomarańcz), jasność = status
     const bodyCls = "row-body-" + window.bodyCls(a);
     const stCls   = "row-st-" + statusKey(a.AuditStatus);
