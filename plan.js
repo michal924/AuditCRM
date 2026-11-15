@@ -37,6 +37,8 @@ const PlanReader = (function () {
   // Adres: kotwicą jest kod pocztowy. Układ „ulica nr, 00-000 Miasto” albo „00-000 Miasto, ulica nr”.
   // Próbuje pierwszej linii, potem dwóch złączonych (adres bywa złamany na dwie linie).
   const STOP = /\s+(?:POLAND|Polska|Przedstawiciel|Organizacja|Norma|Data|Spotkanie|Przegl|System|Tartak|Weryfikacja|Siedziba|Rodzaj|Planowana|Tel|E-mail|\(|\d{1,2}\.\d{1,2}\.\d{4}).*$/i;
+  // Tekst z sąsiednich kolumn, który wkleja się w adres (godziny, daty, nazwy czynności)
+  const NOISE = /\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}|\b\d{1,2}\.\d{1,2}\.\d{2,4}\b|Spotkanie (?:otwierające|zamykające)|System KZR INiG:?|Czas dla audit\S*/gi;
   function addrFrom(seg) {
     const t = seg.replace(/\s+/g, " ").trim(); const m = t.match(/(\d{2})\s?[-–]\s?(\d{3})\s+([^,;\n]+)/); if (!m) return null;
     const postal = `${m[1]}-${m[2]}`; let city = m[3].replace(STOP, "").replace(/[.,;\s]+$/, "").trim();
@@ -48,14 +50,41 @@ const PlanReader = (function () {
     const parts = street.split(",").map(x => x.trim()).filter(x => /\d/.test(x));
     if (parts.length) street = parts[parts.length - 1];
     street = street.replace(/^(?:[a-ząęółśżźćń]{3,}\s+)+/, "").trim();
-    if (!street || !city) return null;
+    street = street.replace(NOISE, " ").replace(/^[,;\s]+|[,;\s]+$/g, "").replace(/\s+/g, " ").trim();
+    // ulica musi mieć litery i numer; miasto złamane na myślniku („Busko-”) zostawiam ścieżce luźnej
+    if (!street || !city || !/^[A-ZŁŚŻŹĆÓ]/.test(city) || /-$/.test(city) || !/[A-Za-ząęółśżźćńĄĘÓŁŚŻŹĆŃ]{2}/.test(street) || !/\d/.test(street)) return null;
     return { street, postal, city };
   }
-  function parseAddr(s) {
+  // Adres rozbity w komórce tabeli na kilka linii, przeplatany tekstem z sąsiednich kolumn (np. plan SGS):
+  // „ul. Przemysłowa” / „35A, 24-200” / „10:00 - 10:15 Spotkanie…” / „Bełżyce”
+  const CITY_LINE = /^[A-ZŁŚŻŹĆÓ][a-ząęółśżźćń]+(?:[ -][A-ZŁŚŻŹĆÓa-ząęółśżźćń][a-ząęółśżźćń]+){0,3}$/;
+  function addrLoose(s) {
+    const lines = String(s).split("\n").map(x => x.trim()).filter(Boolean);
+    for (let k = 0; k < lines.length; k++) {
+      const m = lines[k].match(/(\d{2})\s?[-–]\s?(\d{3})(?!\d)/); if (!m) continue;
+      let street = lines[k].slice(0, m.index).replace(NOISE, " ").replace(/[,;\s]+$/, "").replace(/\s+/g, " ").trim();
+      // przed kodem brak nazwy ulicy (np. sam „6” z rozbitej daty) → ulica z linii wyżej
+      for (let up = 1; up <= 3 && k - up >= 0 && !/[A-Za-ząęółśżźćńĄĘÓŁŚŻŹĆŃ]{3}/.test(street); up++)
+        street = lines[k - up].replace(NOISE, " ").replace(/[,;\s]+$/, "").replace(/\s+/g, " ").trim();
+      let city = lines[k].slice(m.index + m[0].length).replace(/^[,;\s]+/, "").replace(STOP, "").trim();
+      { const hy = city.match(/^([A-ZŁŚŻŹĆÓ][a-ząęółśżźćń]+-)(?:\s|$)/); if (hy) city = hy[1]; }   // „Busko- 1 …” → „Busko-”
+      if (!/^[A-ZŁŚŻŹĆÓ][a-ząęółśżźćń]/.test(city)) { city = ""; for (let j = k + 1; j <= k + 4 && j < lines.length; j++) {
+        const L = lines[j].replace(NOISE, "").trim();
+        if (/^[A-ZŁŚŻŹĆÓ][a-ząęółśżźćń]+-$/.test(L) && j + 1 < lines.length) { city = L + lines[j + 1].trim().split(/\s+/)[0]; break; }   // „Busko-” / „Zdrój”
+        if (CITY_LINE.test(L)) { city = L; break; } } }
+      if (/-$/.test(city)) { const nx = lines.slice(k + 1).find(x => /^[A-ZŁŚŻŹĆÓ][a-ząęółśżźćń]+/.test(x)); if (nx) city += nx.split(/\s+/)[0]; }
+      const parts = street.split(",").map(x => x.trim()).filter(x => /\d/.test(x)); if (parts.length) street = parts[parts.length - 1];
+      street = street.replace(/^.*?(?:Adres(?: rejestrowy)?:?|lokalizacja\/e|do odwiedzenia)\s*/i, "").replace(/^\d+\s+(?=[A-ZŁŚŻŹĆÓa-z])/, "").replace(/^(?:[a-ząęółśżźćń]{3,}\s+)+/, "").trim();
+      if (street && city && /[A-Za-ząęółśżźćń]{2}/.test(street) && /\d/.test(street)) return { street, postal: `${m[1]}-${m[2]}`, city: city.split(" ").slice(0, 3).join(" ") };
+    }
+    return null;
+  }
+  function parseAddr(s, looseFirst) {
     if (!s) return null;
+    if (looseFirst) { const a = addrLoose(s); if (a) return a; }
     const lines = String(s).split("\n").map(x => x.trim()).filter(Boolean);
     for (let n = 1; n <= Math.min(3, lines.length); n++) { const a = addrFrom(lines.slice(0, n).join(" ")); if (a) return a; }
-    return null;
+    return addrLoose(s);
   }
   const addrText = a => a ? `${a.street}, ${a.postal} ${a.city}` : "";
   // Tekst po etykiecie (do n znaków), z liniami złączonymi spacją
@@ -88,7 +117,9 @@ const PlanReader = (function () {
       if (ranges.length) { r.start = hm(ranges[0][1], ranges[0][2]); const l = ranges[ranges.length - 1]; r.end = hm(l[3], l[4]); }
       r.registered = parseAddr(after(t, /Adres rejestrowy:?/i, 160));
       // miejsce: kolumna „Miejsce auditu” w harmonogramie (pierwszy wiersz), awaryjnie tabela lokalizacji
-      r.site = parseAddr(after(sched, /\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}/, 160)) || parseAddr(after(t, /Adres lokalizacji\s*Data auditu\s*\n?\s*\d+\s+/i, 200));
+      // harmonogram SGS: adres złamany w komórce i przeplatany innymi kolumnami → najpierw odczyt „luźny”
+      r.site = parseAddr(after(sched, /Miejsce auditu[^\n]*\n/i, 260), true) || parseAddr(after(t, /Adres lokalizacji\s*Data auditu\s*\n?/i, 220), true) || null;
+      if (r.registered && !r.site) r.site = r.registered;
     } else if (r.tpl.includes("F-03")) {
       m = after(t, /Rozpoczęcie/i, 60).match(DATETIME);
       if (m) { r.date = iso(m[1], m[2], m[3]); r.start = hm(m[4], m[5]); }
