@@ -4529,10 +4529,33 @@ const SettleModule = (function () {
     if (!m) return [];
     return rowsByBody().filter(a => settleMonthMoved(a) && String(a.AuditDateStart).substring(0, 7) === m);
   }
+  // ── Okres zestawienia (Michał 2026-11-16): cały miesiąc albo półmiesięcznie (CU fakturuje klientów co pół miesiąca, wg umowy) ──
+  function periodKey() { const el = $("settle-period"); return el ? el.value : "all"; }
+  function doneOnly() { const el = $("settle-done-only"); return !!(el && el.checked); }
+  // Zakres dni wybranego okresu i opis do nazw plików / PDF
+  function periodInfo(m) {
+    const p = periodKey(), [yy, mm] = String(m || "").split("-").map(Number), last = new Date(yy, mm, 0).getDate();
+    const from = p === "h2" ? 16 : 1, to = p === "h1" ? 15 : last;
+    return { p, from, to, suffix: p === "all" ? "" : (p === "h1" ? "_01-15" : "_16-" + last),
+      label: p === "all" ? "" : `${pad(from)}–${pad(to)}.${pad(mm)}.${yy}`, range: `${pad(from)}.${pad(mm)} – ${pad(to)}.${pad(mm)}.${yy}` };
+  }
+  // Dzień audytu w okresie; audyt przeniesiony z innego miesiąca (SettleMonth) liczy się w pierwszej połowie
+  function inPeriod(a, m) {
+    const pi = periodInfo(m); if (pi.p === "all") return true;
+    if (settleMonthMoved(a)) return pi.p === "h1";
+    const d = parseInt(String(a.AuditDateStart || "").substring(8, 10), 10); return d >= pi.from && d <= pi.to;
+  }
+  // Wszystkie pozycje okresu (bez filtra wykonania) — do informacji o pominiętych niewykonanych
+  function periodRowsAll() {
+    const m = $("settle-month").value; if (!m) return [];
+    return rowsByBody().filter(a => monthKeyOf(a) === m && inPeriod(a, m));
+  }
   function monthRows() {
     const m = $("settle-month").value; if (!m) return [];
-    return rowsByBody().filter(a => monthKeyOf(a) === m).sort((x, y) => String(x.AuditDateStart).localeCompare(String(y.AuditDateStart)));
+    return periodRowsAll().filter(a => !doneOnly() || a.AuditStatus === "DONE")
+      .sort((x, y) => String(x.AuditDateStart).localeCompare(String(y.AuditDateStart)));
   }
+  function notDoneInPeriod() { return doneOnly() ? periodRowsAll().filter(a => a.AuditStatus !== "DONE") : []; }
   function openRows() {
     return rowsByBody().filter(a => a.AuditDateStart && settleStatusOf(a) !== "Rozliczony")
       .sort((x, y) => String(x.AuditDateStart).localeCompare(String(y.AuditDateStart)));
@@ -4580,11 +4603,11 @@ const SettleModule = (function () {
   function exportMonth() {
     const m = $("settle-month").value;
     if (!m) { showToast("Wybierz miesiąc", "warn"); return; }
-    const rows = monthRows();
-    if (!rows.length) { showToast("Brak audytów w tym miesiącu dla wybranej jednostki", "warn"); return; }
-    const wb = buildWorkbook(rows, "Audyty " + m);
-    saveWorkbook(wb, `Rozliczenie_${bodyFilter()}_${m}.xlsx`);
-    showToast(`⬇ Wyeksportowano ${rows.length} audytów (${m})`, "success");
+    const rows = monthRows(), pi = periodInfo(m);
+    if (!rows.length) { showToast("Brak " + (doneOnly() ? "wykonanych " : "") + "audytów w wybranym okresie dla wybranej jednostki", "warn"); return; }
+    const wb = buildWorkbook(rows, "Audyty " + m + pi.suffix);
+    saveWorkbook(wb, `Rozliczenie_${bodyFilter()}_${m}${pi.suffix}${doneOnly() ? "_wykonane" : ""}.xlsx`);
+    showToast(`⬇ Wyeksportowano ${rows.length} audytów (${pi.label || m})`, "success");
   }
   function exportOpen() {
     const rows = openRows();
@@ -4619,7 +4642,9 @@ const SettleModule = (function () {
     if (multi) { const present = BODY_KEYS.filter(k => rows.some(a => bodyKey(a) === k)); bd.short = present.map(k => PDF_BODIES[k].short).join("-"); bd.full = present.map(k => PDF_BODIES[k].full).join(" + "); }
     if (multi) rows = rows.slice().sort((x, y) => (BODY_KEYS.indexOf(bodyKey(x)) - BODY_KEYS.indexOf(bodyKey(y))) || String(x.AuditDateStart).localeCompare(String(y.AuditDateStart)));
     const now = new Date(); const issued = pad(now.getDate()) + "." + pad(now.getMonth() + 1) + "." + now.getFullYear();
-    const nr = "R/" + yy + "/" + mm + "/" + bd.short + "-001";
+    const pi = periodInfo(month);   // okres: cały miesiąc albo połowa (1–15 / 16–koniec)
+    const nr = "R/" + yy + "/" + mm + "/" + bd.short + (pi.p === "h1" ? "-H1" : pi.p === "h2" ? "-H2" : "-001");
+    const periodTitle = MIES_FULL[parseInt(mm) - 1] + " " + yy + (pi.p === "all" ? "" : " (" + pi.label + ")");
     const auditor = String(MY_AUDITOR || "").split(" ").reverse().join(" ");
     const has = v => v != null && v !== "";
 
@@ -4683,8 +4708,8 @@ const SettleModule = (function () {
     if (layout === "A") {
       // ── A · Zestawienie tabelaryczne (układ jak Excel) ──
       header("RAPORT ROZLICZENIA");
-      title("Rozliczenie audytów — " + MIES_FULL[parseInt(mm) - 1] + " " + yy, bd.full + " · audytor: " + auditor);
-      const meta = [["Jednostka", bd.full + " (" + bd.short + ")"], ["Okres", "01." + mm + " – " + pad(new Date(+yy, +mm, 0).getDate()) + "." + mm + "." + yy], ["Audyty", audits.length + " · " + daysTxt + (meetings.length ? " · spotkania: " + meetings.length : "")], ["Stawka km", rateTxt]];
+      title("Rozliczenie audytów — " + periodTitle, bd.full + " · audytor: " + auditor);
+      const meta = [["Jednostka", bd.full + " (" + bd.short + ")"], ["Okres", pi.range], ["Audyty", audits.length + " · " + daysTxt + (meetings.length ? " · spotkania: " + meetings.length : "")], ["Stawka km", rateTxt]];
       doc.setFillColor(...PAPIER); doc.roundedRect(MX, 48, W - 2 * MX, 12, 1.5, 1.5, "F");
       const cw = (W - 2 * MX) / meta.length;
       meta.forEach((mt, i) => { const x = MX + 4 + i * cw;
@@ -4703,7 +4728,7 @@ const SettleModule = (function () {
     } else {
       // ── C · Załącznik do faktury (pozycja 1: wynagrodzenie, pozycja 2: koszty) ──
       header(multi ? "RAPORT ROZLICZENIA — WSZYSCY ZLECENIODAWCY" : "SPECYFIKACJA DO FAKTURY");
-      title("Rozliczenie usług audytowych — " + MIES_FULL[parseInt(mm) - 1] + " " + yy, (multi ? "Jednostki: " : "Zleceniodawca: ") + bd.full + " · Wykonawca: LF Assurance, " + auditor);
+      title("Rozliczenie usług audytowych — " + periodTitle, (multi ? "Jednostki: " : "Zleceniodawca: ") + bd.full + " · Wykonawca: LF Assurance, " + auditor);
       const secTitle = (n, t, yy2) => { doc.setFont(F, "bold"); doc.setFontSize(8); doc.setTextColor(...GRANAT); doc.text(n + "   " + t.toUpperCase(), MX, yy2, { charSpace: 0.35 });
         doc.setDrawColor(...MOS); doc.setLineWidth(0.25); doc.line(MX + doc.getTextWidth(n + "   " + t.toUpperCase()) + t.length * 0.35 + 6, yy2 - 1, W - MX, yy2 - 1); };
       secTitle("1", "Wynagrodzenie za dni audytowe", 52);
@@ -4766,14 +4791,14 @@ const SettleModule = (function () {
       doc.setFont(F, "normal"); doc.setFontSize(6.3); doc.setTextColor(...MUTED);
       doc.text(LF_COMPANY, MX, H - 9);
       doc.text("Wygenerowano z LFA CRM System · " + issued + " · strona " + p + " / " + pages, W - MX, H - 9, { align: "right" }); }
-    return { doc, fee, costs, filename: "Raport_rozliczenia_" + bd.short + "_" + month + (layout === "A" ? "_zestawienie" : "_do_faktury") + ".pdf" };
+    return { doc, fee, costs, filename: "Raport_rozliczenia_" + bd.short + "_" + month + pi.suffix + (layout === "A" ? "_zestawienie" : "_do_faktury") + ".pdf" };
   }
 
   async function exportPdf() {
     const m = $("settle-month").value, b = bodyFilter();
     if (!m) { showToast("Wybierz miesiąc", "warn"); return; }
     const rows = monthRows();
-    if (!rows.length) { showToast("Brak audytów w tym miesiącu dla wybranej jednostki", "warn"); return; }
+    if (!rows.length) { showToast("Brak " + (doneOnly() ? "wykonanych " : "") + "audytów w wybranym okresie dla wybranej jednostki", "warn"); return; }
     const btn = $("settle-pdf-btn"); btn.disabled = true; const old = btn.textContent; btn.textContent = "Generuję PDF…";
     try {
       const out = await buildPdf(rows, $("settle-pdf-layout").value, m, b);
@@ -4786,12 +4811,15 @@ const SettleModule = (function () {
   // ── Podsumowanie wybranego miesiąca ──
   function renderMonthSummary() {
     const box = $("settle-month-summary"); if (!box) return;
-    const rows = monthRows();
-    if (!rows.length) { box.innerHTML = '<div class="settle-empty">Brak audytów w wybranym miesiącu.</div>'; return; }
+    const rows = monthRows(), nd = notDoneInPeriod(), pi = periodInfo($("settle-month").value);
+    // Pominięte niewykonane (zaplanowane w tym okresie) — żeby było widać, czego NIE ma w zestawieniu
+    const ndHint = nd.length ? '<div class="settle-import-hint">Pominięto niewykonane (bez statusu DONE): <b>' + nd.length + '</b> — ' + nd.map(a => escHtml(a.Title || "—") + " (" + (formatDate(a.AuditDateStart) || "bez daty") + ", " + escHtml(a.AuditStatus || "") + ")").join("; ") + '. Odznacz „tylko wykonane”, jeśli mają być w zestawieniu.</div>' : '';
+    const periodHint = pi.p !== "all" ? '<div class="settle-import-hint">Okres: <b>' + pi.range + '</b>' + (doneOnly() ? ', tylko audyty wykonane (DONE)' : '') + '.</div>' : '';
+    if (!rows.length) { box.innerHTML = periodHint + ndHint + '<div class="settle-empty">Brak ' + (doneOnly() ? 'wykonanych ' : '') + 'audytów w wybranym okresie.</div>'; return; }
     let costs = 0, fee = 0, total = 0; const byStatus = {};
     rows.forEach(a => { const c = settleCalc(a); costs += c.costs; fee += c.fee; total += c.total; const s = settleStatusOf(a); byStatus[s] = (byStatus[s] || 0) + 1; });
     const rej = rejectedInMonth(), moved = movedOutOfMonth();
-    box.innerHTML =
+    box.innerHTML = periodHint + ndHint +
       (moved.length ? '<div class="settle-import-hint">Przeniesione do rozliczenia w innym miesiącu: <b>' + moved.length + '</b> — ' + moved.map(a => escHtml(a.Title || "—") + " (" + formatDate(a.AuditDateStart) + " → " + escHtml(monthLabel(a.SettleMonth)) + ")").join("; ") + '.</div>' : '') +
       (rej.length ? '<div class="settle-import-hint">Pominięto odwołane (REJECTED): <b>' + rej.length + '</b> — ' + rej.map(a => escHtml(a.Title || "—") + " (" + formatDate(a.AuditDateStart) + ")").join("; ") + '. Zaznacz „uwzględnij odwołane”, jeśli mają być w rozliczeniu.</div>' : '') +
       '<div class="settle-kpis">' +
@@ -4987,6 +5015,7 @@ const SettleModule = (function () {
     BODY_KEYS.concat(["CUC_COMBO", "CUC_EUDR", "CUC_EUDR_DO"]).forEach(bk => { const inp = $("settle-rate-" + bk); if (!inp) return; const r = getDayRates()[bk]; inp.value = r == null ? "" : r;
       inp.onchange = () => { setDayRate(bk, inp.value); renderMonthSummary(); renderReports(); renderTable(); showToast("Stawka dzienna " + (bk === "CUC_COMBO" ? "CU łączony FSC+PEFC" : bk === "CUC_EUDR" ? "EUDR (CU)" : bk === "CUC_EUDR_DO" ? "EUDR DO (CU, za usługę)" : BODY_INFO[bk].label) + " zapisana (na tym urządzeniu)", "success"); }; });
     const mo = $("settle-month"); if (mo) mo.onchange = renderMonthSummary;
+    ["settle-period", "settle-done-only"].forEach(id => { const el = $(id); if (el) el.onchange = renderMonthSummary; });
     const bd = $("settle-body-select"); if (bd) bd.onchange = () => { renderMonthSummary(); renderReports(); };
     const ir = $("settle-incl-rejected"); if (ir) ir.onchange = () => { renderMonthSummary(); renderReports(); };
     const yr = $("settle-year"); if (yr) yr.onchange = renderReports;

@@ -1182,6 +1182,17 @@
           <input type="month" id="settle-month" class="form-input">
         </div>
         <div class="form-row">
+          <label for="settle-period">Okres</label>
+          <select id="settle-period" class="form-input" title="Zestawienie półmiesięczne: 1–15 albo 16–koniec miesiąca (np. dla Control Union, wg umowy)">
+            <option value="all" selected>Cały miesiąc</option>
+            <option value="h1">1–15 (pierwsza połowa)</option>
+            <option value="h2">16–koniec (druga połowa)</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="settle-import-opt"><input type="checkbox" id="settle-done-only" checked> tylko wykonane (DONE)</label>
+        </div>
+        <div class="form-row">
           <label>Jednostka</label>
           <select id="settle-body-select" class="form-input">
             <option value="all" selected>Wszyscy (CU + SGS + LogisticFit)</option>
