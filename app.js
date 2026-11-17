@@ -4561,13 +4561,14 @@ const SettleModule = (function () {
       .sort((x, y) => String(x.AuditDateStart).localeCompare(String(y.AuditDateStart)));
   }
 
-  // ── Arkusz w układzie pliku "Rozliczenie audytów" (kolumny A–O jak w oryginale + P–R) ──
+  // ── Arkusz w układzie pliku "Rozliczenie audytów" (kolumny A–O jak w oryginale + P: status rozliczenia) ──
+  // Bez wynagrodzenia i „Razem”: Excel idzie do księgowości CU do fakturowania klientów; moje kwoty są tylko w raporcie PDF (Michał 2026-11-17)
   function buildWorkbook(rows, sheetName) {
     const hdr1 = ["DATA AUDYTU", "Klient", "PRJ", "SYSTEM", "liczba dni audytowych", "Obrót AAF / inny rodzaj opłat",
-      "Typ audytu / uwagi", "KOSZTY AUDYTU", "", "", "", "", "", "", "", "Wynagrodzenie", "Razem", "Status rozliczenia"];
-    const hdr2 = ["", "", "", "", "", "", "", "Trasa", "Km", "KM calc (km*stawka)", "KM calc office", "Hotel", "Highway", "other costs", "Bilety PKP, LOT", "", "", ""];
+      "Typ audytu / uwagi", "KOSZTY AUDYTU", "", "", "", "", "", "", "", "Status rozliczenia"];
+    const hdr2 = ["", "", "", "", "", "", "", "Trasa", "Km", "KM calc (km*stawka)", "KM calc office", "Hotel", "Highway", "other costs", "Bilety PKP, LOT", ""];
     const aoa = [hdr1, hdr2];
-    const sums = { I: 0, J: 0, L: 0, M: 0, N: 0, O: 0, P: 0, Q: 0 };
+    const sums = { I: 0, J: 0, L: 0, M: 0, N: 0, O: 0 };
     rows.forEach(a => {
       const c = settleCalc(a);
       const d = a.AuditDateStart ? new Date(String(a.AuditDateStart).substring(0, 10) + "T12:00:00") : null;
@@ -4577,23 +4578,23 @@ const SettleModule = (function () {
       aoa.push([d, a.Title || "", a.ProjectID || "", a.Program || "", a.AuditDays != null ? a.AuditDays : "",
         a.SettleFeeBasis || "", typ, a.SettleRoute || "", km, km != null ? c.kmCost : null, "",
         n(a.SettleHotel), n(a.SettleHighway), n(a.SettleOther), n(a.SettleTickets),
-        c.fee || null, c.total, settleStatusLabel(a)]);
+        settleStatusLabel(a)]);
       sums.I += km || 0; sums.J += km != null ? c.kmCost : 0; sums.L += settleNum(a.SettleHotel); sums.M += settleNum(a.SettleHighway);
-      sums.N += settleNum(a.SettleOther); sums.O += settleNum(a.SettleTickets); sums.P += c.fee; sums.Q += c.total;
+      sums.N += settleNum(a.SettleOther); sums.O += settleNum(a.SettleTickets);
     });
-    aoa.push(["SUMA", "", "", "", "", "", "", "", r2(sums.I), r2(sums.J), "", r2(sums.L), r2(sums.M), r2(sums.N), r2(sums.O), r2(sums.P), r2(sums.Q), ""]);
+    aoa.push(["SUMA", "", "", "", "", "", "", "", r2(sums.I), r2(sums.J), "", r2(sums.L), r2(sums.M), r2(sums.N), r2(sums.O), ""]);
 
     const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true });
     ws["!merges"] = [
       { s: { r: 0, c: 7 }, e: { r: 0, c: 14 } }, // KOSZTY AUDYTU H1:O1
-      ...[0, 1, 2, 3, 4, 5, 6, 15, 16, 17].map(c => ({ s: { r: 0, c }, e: { r: 1, c } })),
+      ...[0, 1, 2, 3, 4, 5, 6, 15].map(c => ({ s: { r: 0, c }, e: { r: 1, c } })),
     ];
-    ws["!cols"] = [12, 34, 10, 10, 8, 16, 34, 34, 7, 12, 10, 9, 9, 10, 12, 13, 11, 16].map(w => ({ wch: w }));
+    ws["!cols"] = [12, 34, 10, 10, 8, 16, 34, 34, 7, 12, 10, 9, 9, 10, 12, 16].map(w => ({ wch: w }));
     // Formaty: daty i kwoty
     const range = XLSX.utils.decode_range(ws["!ref"]);
     for (let R = 2; R <= range.e.r; R++) {
       const dc = ws[XLSX.utils.encode_cell({ r: R, c: 0 })]; if (dc && dc.v instanceof Date) dc.z = "dd.mm.yyyy";
-      [9, 11, 12, 13, 14, 15, 16].forEach(C => { const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })]; if (cell && typeof cell.v === "number") cell.z = "#,##0.00"; });
+      [9, 11, 12, 13, 14].forEach(C => { const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })]; if (cell && typeof cell.v === "number") cell.z = "#,##0.00"; });
     }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
