@@ -66,7 +66,7 @@ Reguły twarde (blokada bezstronności, rozdział CU i SGS, termin jednostki) ni
 * `odleglosc(z, do)` przez `TravelCache`, a gdy brak, usługa map
 * `terminy_jednostki(audyt)` (raport, wysyłka planu, dokumentacja SGS)
 * `pobierz_klienta(pseudonim)` bez danych osobowych
-* `poczta_sgs(okres)` (etap 3): tylko nagłówki i załączniki, po anonimizacji
+* `poczta_sgs(okres)` (etap 4): tylko nagłówki i załączniki, po anonimizacji
 
 **Zapis (wyłącznie szkice w `PlanDrafts`):**
 
@@ -83,9 +83,9 @@ Zatwierdzenie szkicu to osobna funkcja backendu wywoływana kliknięciem w aplik
 |---|---|---|---|---|
 | 1. Wspólny kalendarz i odległości | Backend Functions, odczyt obu kalendarzy, listy `Clients`, `ClientSites`, `TravelCache`, `PlanningRules`, czasy dojazdu z baz, widok tygodnia ze wszystkimi zajętościami. Tylko podgląd | `api/` (Functions), `planning.js`, `api.js`, `index.html`, `style.css`, `tests/` | 5 do 7 dni | mapy w darmowym progu, model 0 zł (bez modelu) |
 | 2. Warianty planu, konflikty, bloki na raporty | Agent z narzędziami odczytu, 2 do 3 warianty z uzasadnieniem, wykrywanie konfliktów, blokady czasu raportu, flaga bezstronności, `PlanDrafts`, `ChangeLog` | `api/agent/`, `planning.js`, `tests/` | 8 do 10 dni | około 70 do 110 zł |
-| 3. Maile | Szkice maili do klientów i jednostek, ostrzeżenia o brakującej dokumentacji SGS z poczty, anonimizacja | `api/mail/`, `anon.js` | 6 do 8 dni | plus około 15 do 30 zł |
-| 4. Hotele i rozliczenia | Propozycje noclegów (linki wyszukiwania z datą i miejscem, bez rezerwacji), koszty podróży do rozliczenia | `api/travel/`, `app.js` (rozliczenia) | 5 do 7 dni | plus około 5 zł |
-| 5. Głos z iPhone | Skrót iOS lub PWA z dyktowaniem, polecenie trafia do agenta jako tekst, wynik jako szkic | `api/voice/`, skrót iOS | 4 do 6 dni | plus około 5 do 10 zł |
+| 3. Głos z iPhone (priorytet) | „Hej Siri, LFA Hub” bez dotykania telefonu, działa w CarPlay. Dyktowanie iPhone po polsku, odpowiedź czytana na głos. Nazwy klientów i miast dopasowane do bazy. Pytania dostają odpowiedź od razu, zmiany idą jako szkic do zatwierdzenia jednym dotknięciem. LFA Hub jako ikona na ekranie głównym z mikrofonem i listą szkiców. Bez aplikacji w App Store | `api/voice/`, Skróty iOS, `manifest.webmanifest`, `index.html`, `tests/` | 5 do 7 dni | plus około 5 do 10 zł |
+| 4. Maile (do przemyślenia przez właściciela) | Szkice maili do klientów i jednostek, ostrzeżenia o brakującej dokumentacji SGS z poczty, anonimizacja | `api/mail/`, `anon.js` | 6 do 8 dni | plus około 15 do 30 zł |
+| 5. Hotele i rozliczenia | Propozycje noclegów (linki wyszukiwania z datą i miejscem, bez rezerwacji), koszty podróży do rozliczenia | `api/travel/`, `app.js` (rozliczenia) | 5 do 7 dni | plus około 5 zł |
 
 Każdy etap: testy na danych syntetycznych, wdrożenie na podgląd PR z listami `_TEST`, krótki raport i jedno zatwierdzenie właściciela.
 
