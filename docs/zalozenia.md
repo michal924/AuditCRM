@@ -15,7 +15,7 @@ Każde założenie przyjęte bez pytania właściciela. Kolumna „Jak łatwo zm
 | Kartoteka `Clients` i `ClientSites` jako nowe listy, audyty dostają `ClientId` stopniowo | Anonimizacja, bezstronność i wiele lokalizacji wymagają jednego rekordu klienta | Średnio |
 | Pseudonim klienta w formacie KL-0000 | Prosty, stały, bez danych osobowych | Łatwo |
 | Mapy: Azure Maps z pamięcią `TravelCache` | Ten sam dzierżawca i faktura, mieści się w darmowym progu | Łatwo: jedno narzędzie `odleglosc` |
-| Adresy baz (Trzemeszno potwierdzone przez właściciela, Warszawa do potwierdzenia) trzymane tylko w `PlanningRules`, nie w repozytorium | Adres prywatny, repozytorium jest w GitHub | Łatwo |
+| Adresy baz (Trzemeszno i Warszawa potwierdzone przez właściciela) trzymane tylko w `PlanningRules`, nie w repozytorium | Adres prywatny, repozytorium jest w GitHub | Łatwo |
 | Zajętość liczona z czterech skrzynek: dwóch LogisticFit i dwóch LF Assurance | Decyzja właściciela, zaproszenia trafiają na wszystkie cztery i blokują kalendarze | Łatwo: lista skrzynek w `PlanningRules` |
 | Odczyt zajętości przez Graph `getSchedule` w tym samym dzierżawcy | Nie wymaga pełnego dostępu do cudzej skrzynki | Średnio: możliwa zgoda administratora |
 | Azure Maps tylko liczy odległości w planowaniu. Nawigacja w samochodzie idzie przez Google Maps na iPhone i CarPlay | Azure Maps nie ma aplikacji do nawigacji. Właściciel uznał Mapy Apple za niedokładne, link trasy otwiera Google Maps | Łatwo |
@@ -23,3 +23,6 @@ Każde założenie przyjęte bez pytania właściciela. Kolumna „Jak łatwo zm
 | Hotele: linki wyszukiwania z datą i miejscem, bez rezerwacji | Brak otwartego API rezerwacji, rezerwacja wymaga zgody | Łatwo |
 | Głos z iPhone: dyktowanie iOS zamienione na tekst przed agentem | Bez nowej płatnej usługi mowy | Łatwo |
 | Koszty w zł przeliczone po około 4 zł za USD | Szacunek | Łatwo |
+| Przetwarzanie modelu bez wymogu „tylko UE”, wystarcza anonimizacja przed wysłaniem | Decyzja właściciela | Łatwo: później można przejść na Foundry w UE |
+| Brak osobnej umowy z Anthropic. Konto API zakładane na warunkach komercyjnych Anthropic (zawierają umowę powierzenia danych, do sprawdzenia przy zakładaniu konta) | Decyzja właściciela | Łatwo |
+| Skanowanie dokumentów z iPhone liczone osobno, około 200 stron miesięcznie | Nie było w pierwotnym szacunku | Łatwo: koszt rośnie liniowo ze stronami |

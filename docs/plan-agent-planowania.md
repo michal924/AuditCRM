@@ -96,6 +96,8 @@ Założenie: około 20 audytów i 40 spotkań miesięcznie, czyli około 30 sesj
 * Claude Opus 5.5 (4 USD za milion wejścia, 20 USD za milion wyjścia, odczyt z pamięci 0,20 USD): około 0,54 USD na sesję, około 16 do 20 USD miesięcznie za planowanie. Z codzienną odprawą i przeglądem poczty (tańszy model Haiku) łącznie około 20 do 40 USD, czyli około 80 do 160 zł.
 * Claude Sonnet 5.5: mniej więcej połowa tej kwoty.
 * Azure Functions w planie zużycia i Key Vault: kilka złotych lub zero.
+* Skanowanie dokumentów z iPhone (zdjęcie lub PDF, odczyt pól przez model): strona to około 1600 tokenów wejścia i około 600 wyjścia. Na Opus 5.5 około 0,02 USD za stronę, czyli przy 200 stronach miesięcznie około 15 zł, przy 1000 stronach około 75 zł. Skan dokumentu ze zdjęcia nie da się zanonimizować przed odczytem, więc trafia do modelu w całości.
+* Łącznie z planowaniem, pocztą, głosem i skanowaniem 200 stron: około 100 do 180 zł miesięcznie na Opus 5.5.
 
 ## 7. Prywatność i dane w UE
 
