@@ -57,6 +57,10 @@ function runPlanningTests(P) {
   has("plan po terminie", P.checkAudit({ date: "2026-11-27", body: "CU", scheme: "KZR INiG", today: "2026-11-24" }, R), "plan_po_terminie");
   has("audyt w przeszłości bez ostrzeżenia o planie", P.checkAudit({ date: "2026-10-27", body: "SGS", scheme: "KZR INiG", today: "2026-11-24" }, R), "plan_po_terminie", false);
   has("audyt w przeszłości: raport nadal widoczny", P.checkAudit({ date: "2026-10-27", body: "SGS", scheme: "KZR INiG", today: "2026-11-24" }, R), "raport");
+  var fs = P.checkAudit({ date: "2026-11-27", body: "CU", scheme: "KZR INiG", today: "2026-11-24", planSent: "2026-11-16T00:00:00Z" }, R);
+  has("plan wysłany: bez ostrzeżenia", fs, "plan_po_terminie", false);
+  has("plan wysłany: informacja", fs, "plan_wyslany");
+  has("audyt wykonany: bez terminów przed audytem", P.checkAudit({ date: "2026-11-27", body: "CU", scheme: "KZR INiG", today: "2026-11-24", done: true }, R), "plan_po_terminie", false);
   has("drugi audyt daleko", P.checkAudit({ date: "2026-12-02", body: "CU", point: WAW, sameDay: [{ point: MIELEC }] }, R), "drugi_daleko");
   has("drugi audyt blisko", P.checkAudit({ date: "2026-12-02", body: "CU", point: WAW, sameDay: [{ point: NEAR }] }, R), "drugi_daleko", false);
   has("trzy audyty dziennie", P.checkAudit({ date: "2026-12-02", body: "CU", sameDay: [{}, {}] }, R), "limit_dnia");

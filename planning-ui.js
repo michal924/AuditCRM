@@ -121,7 +121,7 @@ const PlanningModule = (function () {
         const text = siteText(a), city = a.SiteCity || a.City;
         const meeting = /spotkan|szkoleni/i.test((a.AuditType || "") + " " + (a.Program || ""));
         out.push({ id: a.Id, audit: a, date: k, start: a.StartTime || "", end: a.EndTime || (a.StartTime ? addHours(a.StartTime, DEFAULT_AUDIT_HOURS) : ""),
-          body: certBodyOf(a) === "SGS" ? "SGS" : "CU", scheme: a.Program || "", meeting, title: a.Title || "", place: text, point: text ? pointOf(text, city) : null });
+          body: certBodyOf(a) === "SGS" ? "SGS" : "CU", scheme: a.Program || "", meeting, planSent: a.PlanSentDate || "", done: a.AuditStatus === "DONE", title: a.Title || "", place: text, point: text ? pointOf(text, city) : null });
       });
     }
     return out;

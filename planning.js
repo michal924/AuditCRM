@@ -152,7 +152,9 @@ var PlanningCore = (function () {
     var d = deadlines(ctx.date, ctx.body, ctx.scheme, rules), today = ctx.today || "";
     add("info", "raport", "Raport do " + d.report + " (" + (ctx.body || "CU") + ")");
     if (today && ctx.date < today) return f;                // audyt w przeszłości: terminy przed audytem już nieistotne
-    if (d.planSend) {
+    if (ctx.done) return f;                                 // audyt wykonany
+    if (ctx.planSent) add("info", "plan_wyslany", "✓ Plan audytu wysłany " + String(ctx.planSent).slice(0, 10));
+    else if (d.planSend) {
       if (today && today > (d.planSendMin || d.planSend)) add("warn", "plan_po_terminie", "Plan audytu: termin wysyłki minął (" + (d.planSendMin || d.planSend) + ")");
       else add("info", "plan_wysylka", "Plan audytu wyślij do " + d.planSend + (d.planSendMin ? " (minimum " + d.planSendMin + ")" : ""));
     }
@@ -178,7 +180,7 @@ var PlanningCore = (function () {
           var travel = travelOf ? travelOf(x) : null;
           var others = dayItems.filter(function (o) { return o !== x; });
           return { item: x, travel: travel, findings: checkAudit({
-            date: date, start: x.start, end: x.end, body: x.body, scheme: x.scheme, travel: travel, meeting: x.meeting,
+            date: date, start: x.start, end: x.end, body: x.body, scheme: x.scheme, travel: travel, meeting: x.meeting, planSent: x.planSent, done: x.done,
             custody: custody, busy: busy, sameDay: others, point: x.point, today: today,
           }, rules) };
         }),
