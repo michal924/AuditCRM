@@ -90,7 +90,7 @@ const PlanningModule = (function () {
         if (s.error) { problems.push(label + ": " + (s.error.message || s.error.responseCode || "brak dostępu")); return; }
         (s.scheduleItems || []).forEach(it => {
           if (!it || it.status === "free" || it.status === "workingElsewhere") return;
-          if (/Audyt LFA CRM/.test(it.subject || "")) return;            // nasze zaproszenia: audyt jest już w widoku
+          if (/Audyt LFA CRM|^\s*📅\s*Audyt/.test(it.subject || "")) return;   // nasze zaproszenia (nowy i stary format): audyt jest już w widoku
           splitDays(it, label);
         });
       });

@@ -55,6 +55,8 @@ function runPlanningTests(P) {
   n++; var dep = f3.filter(function (x) { return x.code === "wyjazd"; })[0];
   if (!dep || dep.text.indexOf("08:05") < 0) fails.push("godzina wyjazdu: oczekiwano 08:05, jest " + (dep && dep.text));
   has("plan po terminie", P.checkAudit({ date: "2026-11-27", body: "CU", scheme: "KZR INiG", today: "2026-11-24" }, R), "plan_po_terminie");
+  has("audyt w przeszłości bez ostrzeżenia o planie", P.checkAudit({ date: "2026-10-27", body: "SGS", scheme: "KZR INiG", today: "2026-11-24" }, R), "plan_po_terminie", false);
+  has("audyt w przeszłości: raport nadal widoczny", P.checkAudit({ date: "2026-10-27", body: "SGS", scheme: "KZR INiG", today: "2026-11-24" }, R), "raport");
   has("drugi audyt daleko", P.checkAudit({ date: "2026-12-02", body: "CU", point: WAW, sameDay: [{ point: MIELEC }] }, R), "drugi_daleko");
   has("drugi audyt blisko", P.checkAudit({ date: "2026-12-02", body: "CU", point: WAW, sameDay: [{ point: NEAR }] }, R), "drugi_daleko", false);
   has("trzy audyty dziennie", P.checkAudit({ date: "2026-12-02", body: "CU", sameDay: [{}, {}] }, R), "limit_dnia");

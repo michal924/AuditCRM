@@ -151,6 +151,7 @@ var PlanningCore = (function () {
     if (ctx.meeting) return f;                              // spotkanie lub szkolenie: bez terminów jednostki
     var d = deadlines(ctx.date, ctx.body, ctx.scheme, rules), today = ctx.today || "";
     add("info", "raport", "Raport do " + d.report + " (" + (ctx.body || "CU") + ")");
+    if (today && ctx.date < today) return f;                // audyt w przeszłości: terminy przed audytem już nieistotne
     if (d.planSend) {
       if (today && today > (d.planSendMin || d.planSend)) add("warn", "plan_po_terminie", "Plan audytu: termin wysyłki minął (" + (d.planSendMin || d.planSend) + ")");
       else add("info", "plan_wysylka", "Plan audytu wyślij do " + d.planSend + (d.planSendMin ? " (minimum " + d.planSendMin + ")" : ""));
