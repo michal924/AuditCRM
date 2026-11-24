@@ -117,4 +117,6 @@ Założenie: około 20 audytów i 40 spotkań miesięcznie, czyli około 30 sesj
 
 Szacunek zużycia: 2 bazy i około 60 lokalizacji miesięcznie. Pełna macierz to około 3800 komórek raz, czyli około 950 transakcji Azure, potem prawie wszystko z `TravelCache`. W obu usługach mieści się w darmowym progu.
 
+**Nawigacja i CarPlay.** Usługa map w backendzie tylko liczy kilometry i czasy dojazdu do planu. Do jazdy służy aplikacja na iPhone: link trasy w aplikacji i miejsce w zaproszeniu otwierają Mapy Apple, a te same wyświetlają się w CarPlay. Kalendarz iPhone przy zaproszeniu z adresem podpowiada też, kiedy wyjechać. Wybór Azure czy Google nie zmienia więc nic w samochodzie.
+
 **Rekomendacja: Azure Maps.** Ten sam dzierżawca i faktura, logowanie Entra ID bez klucza, zasób w UE. Google zostaje opcją, gdyby czasy dojazdu Azure okazały się wyraźnie niedokładne (łatwa zamiana, bo dostęp idzie przez jedno narzędzie `odleglosc`).

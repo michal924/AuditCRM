@@ -15,9 +15,11 @@ Każde założenie przyjęte bez pytania właściciela. Kolumna „Jak łatwo zm
 | Kartoteka `Clients` i `ClientSites` jako nowe listy, audyty dostają `ClientId` stopniowo | Anonimizacja, bezstronność i wiele lokalizacji wymagają jednego rekordu klienta | Średnio |
 | Pseudonim klienta w formacie KL-0000 | Prosty, stały, bez danych osobowych | Łatwo |
 | Mapy: Azure Maps z pamięcią `TravelCache` | Ten sam dzierżawca i faktura, mieści się w darmowym progu | Łatwo: jedno narzędzie `odleglosc` |
-| Bazy startowe: centrum Trzemeszna i adres biura w Warszawie | Brak dokładnych adresów w wytycznych | Łatwo: wartość w `PlanningRules` |
-| Kalendarz LF Assurance to skrzynka, na którą logujesz się do aplikacji | Tak działa dziś odczyt zajętości | Łatwo |
-| Kalendarz LogisticFit czytany przez uprawnienie do drugiej skrzynki w tym samym dzierżawcy | Jeden dzierżawca M365, dwie skrzynki | Średnio: wymaga zgody administratora |
+| Adresy baz (Trzemeszno potwierdzone przez właściciela, Warszawa do potwierdzenia) trzymane tylko w `PlanningRules`, nie w repozytorium | Adres prywatny, repozytorium jest w GitHub | Łatwo |
+| Zajętość liczona z czterech skrzynek: dwóch LogisticFit i dwóch LF Assurance | Decyzja właściciela, zaproszenia trafiają na wszystkie cztery i blokują kalendarze | Łatwo: lista skrzynek w `PlanningRules` |
+| Odczyt zajętości przez Graph `getSchedule` w tym samym dzierżawcy | Nie wymaga pełnego dostępu do cudzej skrzynki | Średnio: możliwa zgoda administratora |
+| Azure Maps tylko liczy odległości w planowaniu. Nawigacja w samochodzie idzie przez Mapy Apple na iPhone i CarPlay | Azure Maps nie ma aplikacji do nawigacji. Link w zaproszeniu i w aplikacji otwiera Mapy Apple | Łatwo |
+| Agent budowany na podglądzie PR z listami `_TEST`, na produkcję dopiero po zatwierdzeniu etapu. Gałąź `staging` nieużywana | Produkcja to prawdziwe dane | Łatwo |
 | Hotele: linki wyszukiwania z datą i miejscem, bez rezerwacji | Brak otwartego API rezerwacji, rezerwacja wymaga zgody | Łatwo |
 | Głos z iPhone: dyktowanie iOS zamienione na tekst przed agentem | Bez nowej płatnej usługi mowy | Łatwo |
 | Koszty w zł przeliczone po około 4 zł za USD | Szacunek | Łatwo |

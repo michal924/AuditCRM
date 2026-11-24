@@ -239,7 +239,16 @@ function hasSite(a) { return !!(a && (a.SiteAddress || a.SiteCity)); }
 // Miejsce audytu: osobny adres, a gdy brak — adres rejestrowy
 function siteParts(a) { return hasSite(a) ? [a.SiteAddress, a.SiteCity, a.SitePostal] : [a.Address, a.City, a.PostalCode]; }
 function siteText(a) { return siteParts(a).filter(Boolean).join(", "); }
-function routeUrl(a) { const t = siteText(a); return t ? "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(t) : ""; }
+// Trasa w Mapach Apple: na iPhone otwiera aplikację Mapy (i CarPlay), na komputerze wersję w przeglądarce
+function routeUrl(a) { const t = siteText(a); return t ? "https://maps.apple.com/?dirflg=d&daddr=" + encodeURIComponent(t) : ""; }
+// Skrzynki, do których idzie zaproszenie na audyt (blokują się wszystkie kalendarze). Organizator jest pomijany.
+const INVITE_ATTENDEES = [
+  { address: "michal@logisticfit.com",   name: "LogisticFit" },
+  { address: "office@logisticfit.com",   name: "LogisticFit Office" },
+  { address: "michal@lfassurance.com",   name: "LF Assurance" },
+  { address: "office@lfassurance.com",   name: "LF Assurance Office" },
+];
+function organizerEmail() { try { return (msalInstance.getAllAccounts()[0] || {}).username || ""; } catch { return ""; } }
 function addHours(hhmm, h) { const [H, M] = String(hhmm).split(":").map(Number); const t = (H * 60 + (M || 0) + h * 60) % (24 * 60); return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); }
 function timeLabel(a) { return a && a.StartTime ? a.StartTime + (a.EndTime ? "–" + a.EndTime : "") : ""; }
 function settleStatusOf(a) { return (a && a.SettleStatus) ? a.SettleStatus : "Nierozliczony"; }
@@ -941,7 +950,7 @@ function setupModal() {
     const btn = document.getElementById("btn-plan-audit");
     btn.classList.add("scheduled");
     btn.textContent = "📅 Zaplanowano — wyślij zaproszenie";
-    btn.title = `Przy zapisaniu wyślij zaproszenie (${formatDate(dateVal)}) do office@logisticfit.com i michal@logisticfit.com`;
+    btn.title = `Przy zapisaniu wyślij zaproszenie (${formatDate(dateVal)}) do kalendarzy: ${INVITE_ATTENDEES.map(m => m.address).join(", ")}`;
     showToast("📅 Gotowe — kliknij Zapisz aby wysłać zaproszenie do kalendarzy", "success");
   });
 }
@@ -952,9 +961,9 @@ function updatePlanAuditBtn(dateVal) {
   // Nie zmieniamy wyglądu przycisku automatycznie — tylko po świadomym kliknięciu.
   // Aktualizujemy tylko tytuł (tooltip) z nową datą.
   if (dateVal) {
-    btn.title = `Kliknij aby zaplanować audyt (${formatDate(dateVal)}) i wysłać zaproszenie do office@logisticfit.com`;
+    btn.title = `Kliknij aby zaplanować audyt (${formatDate(dateVal)}) i wysłać zaproszenie do kalendarzy: ${INVITE_ATTENDEES.map(m => m.address).join(", ")}`;
   } else {
-    btn.title = "Przy zapisaniu daty — wyślij zaproszenie do kalendarzy office@logisticfit.com i michal@logisticfit.com";
+    btn.title = `Przy zapisaniu daty wyślij zaproszenie do kalendarzy: ${INVITE_ATTENDEES.map(m => m.address).join(", ")}`;
   }
 }
 
@@ -1451,12 +1460,10 @@ async function createAuditCalendarEvents(audit) {
     location: loc ? { displayName: loc, address: { street: sp[0] || "", city: sp[1] || "", postalCode: sp[2] || "", countryOrRegion: "Polska" } } : undefined,
     body:  { contentType: "html", content: bodyHtml },
     categories: ["Audyt LFA CRM"],
-    attendees: [
-      {
-        emailAddress: { address: "office@logisticfit.com", name: "LogisticFit Office" },
-        type: "required",
-      },
-    ],
+    // Organizator (zalogowana skrzynka) ma wpis od razu; pozostałe skrzynki dostają zaproszenie, żeby kalendarze się blokowały.
+    attendees: INVITE_ATTENDEES
+      .filter(m => m.address.toLowerCase() !== organizerEmail().toLowerCase())
+      .map(m => ({ emailAddress: { address: m.address, name: m.name }, type: "required" })),
   };
 
   console.log("[Calendar] Tworzę event:", subj, `${dateStr} → ${lastStr} (${days} dni, end exclusive ${nextStr})`);
