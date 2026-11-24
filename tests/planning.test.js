@@ -61,6 +61,10 @@ function runPlanningTests(P) {
   has("plan wysłany: bez ostrzeżenia", fs, "plan_po_terminie", false);
   has("plan wysłany: informacja", fs, "plan_wyslany");
   has("audyt wykonany: bez terminów przed audytem", P.checkAudit({ date: "2026-11-27", body: "CU", scheme: "KZR INiG", today: "2026-11-24", done: true }, R), "plan_po_terminie", false);
+  var fe = P.checkAudit({ date: "2026-11-25", body: "CU", travel: { km: 237, min: 190, base: "Warszawa", source: "szacunek" } }, R);
+  has("szacunek: 237 km bez ostrzeżenia", fe, "dojazd", false);
+  has("szacunek: czas jako informacja", fe, "dojazd_czas_szacunek");
+  has("czas z map ponad limit: ostrzeżenie", P.checkAudit({ date: "2026-11-25", body: "CU", travel: { km: 237, min: 190, base: "Warszawa", source: "Azure Maps" } }, R), "dojazd_czas");
   has("drugi audyt daleko", P.checkAudit({ date: "2026-12-02", body: "CU", point: WAW, sameDay: [{ point: MIELEC }] }, R), "drugi_daleko");
   has("drugi audyt blisko", P.checkAudit({ date: "2026-12-02", body: "CU", point: WAW, sameDay: [{ point: NEAR }] }, R), "drugi_daleko", false);
   has("trzy audyty dziennie", P.checkAudit({ date: "2026-12-02", body: "CU", sameDay: [{}, {}] }, R), "limit_dnia");

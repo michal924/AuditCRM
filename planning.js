@@ -118,8 +118,14 @@ var PlanningCore = (function () {
 
     var t = ctx.travel;
     if (t) {
-      if (t.min > rules.dojazd_max_min || t.km > rules.dojazd_max_km)
-        add("warn", "dojazd", "Dojazd ponad limit: " + t.km + " km, " + fmtDur(t.min) + " (limit " + rules.dojazd_max_km + " km, " + fmtDur(rules.dojazd_max_min) + ")");
+      var est = /^szacunek/.test(t.source || "");
+      if (t.km > rules.dojazd_max_km)
+        add("warn", "dojazd", "Dojazd ponad limit odległości: " + t.km + " km w jedną stronę (limit " + rules.dojazd_max_km + " km)");
+      else if (t.min > rules.dojazd_max_min) {
+        // Szacunek czasu z linii prostej bywa zawyżony: wtedy tylko informacja, ostrzeżenie dopiero przy czasie z usługi map
+        if (est) add("info", "dojazd_czas_szacunek", "Szacowany czas " + fmtDur(t.min) + " ponad limit " + fmtDur(rules.dojazd_max_min) + ", ale " + t.km + " km mieści się w limicie " + rules.dojazd_max_km + " km. Dokładny czas po podłączeniu map");
+        else add("warn", "dojazd_czas", "Dojazd ponad limit czasu: " + fmtDur(t.min) + " w jedną stronę (limit " + fmtDur(rules.dojazd_max_min) + ")");
+      }
       if (t.km > rules.nocleg_od_km) {
         if (ctx.custody && rules.opieka_bez_noclegu)
           add("block", "opieka_nocleg", "Tydzień opieki: nocleg niemożliwy przy " + t.km + " km. " + (rules.opieka_preferuj_przeniesienie ? "Przenieś audyt na inny tydzień" : "Powrót tego samego dnia"));
