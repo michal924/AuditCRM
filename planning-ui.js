@@ -11,6 +11,10 @@ const PlanningModule = (function () {
   const DAYS = ["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nd"];
   let inited = false, monday = null, rules = P.parseRules([]), ruleItems = {}, rulesState = "";
   let busyByDay = {}, busyState = "", geo = {}, geoQueue = [], geoBusy = false;
+  // Azure Maps (konto lfa-hub-maps, logowanie Entra ID, bez klucza): macierz tras, wyniki w liście TravelCache
+  const MAPS_CLIENT_ID = "b9273047-cde9-433e-8fb5-36f8ba9c51a7";
+  const MAPS_SCOPE = "https://atlas.microsoft.com/user_impersonation";
+  let travel = {}, travelLoaded = false, pending = new Map(), failed = new Set(), mapsBusy = false, mapsState = "";   // mapsState: "" | "brak zgody" | błąd
 
   const todayISO = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
   const dmy = s => s.slice(8, 10) + "." + s.slice(5, 7);
@@ -126,11 +130,59 @@ const PlanningModule = (function () {
     }
     return out;
   }
+  // Odległość: najpierw pamięć tras (Azure Maps), a gdy jej brak, szacunek i zlecenie trasy w tle
+  function drive(a, b) {
+    const k = P.cacheKey(a, b);
+    if (travel[k]) return travel[k];
+    if (!mapsState && !failed.has(k)) pending.set(k, { a, b });
+    return P.estimateDrive(a, b, rules);
+  }
   function travelOf(x) {
     if (!x.point) return null;
-    const t = P.bestBase(x.point, bases(), (a, b) => P.estimateDrive(a, b, rules));
-    if (t && x.point.approx) t.source = "szacunek do miasta";
+    const t = P.bestBase(x.point, bases(), drive);
+    if (t && x.point.approx) t.source = t.source === "szacunek" ? "szacunek do miasta" : t.source + ", do miasta";
     return t;
+  }
+  async function loadTravel() {
+    if (travelLoaded) return; travelLoaded = true;
+    try {
+      await ensureTravelCacheList();
+      (await fetchTravelCache()).forEach(it => { if (it.Title && it.Km != null) travel[it.Title] = { km: Math.round(it.Km), min: Math.round(it.Minutes), source: it.Source || "Azure Maps" }; });
+    } catch (e) { mapsState = "Pamięć tras niedostępna (" + e.message + ")"; }
+  }
+  async function mapsToken(interactive) {
+    const account = msalInstance.getAllAccounts()[0]; if (!account) return null;
+    try { return (await msalInstance.acquireTokenSilent({ scopes: [MAPS_SCOPE], account })).accessToken; }
+    catch { if (interactive) await msalInstance.acquireTokenRedirect({ scopes: [MAPS_SCOPE], account }); return null; }
+  }
+  // Jedno zapytanie Route Matrix: bazy × lokalizacje (do 100 komórek), wyniki do pamięci i do TravelCache
+  async function fetchRoutes() {
+    if (mapsBusy || !pending.size || mapsState) return;
+    mapsBusy = true;
+    try {
+      const token = await mapsToken(false);
+      if (!token) { mapsState = "brak zgody"; pending.clear(); return; }
+      const jobs = [...pending.values()].slice(0, 100); pending.clear();
+      const uniq = pts => { const m = new Map(); pts.forEach(p => m.set(p.lat.toFixed(3) + "," + p.lon.toFixed(3), p)); return [...m.values()]; };
+      const origins = uniq(jobs.map(j => j.a)), dests = uniq(jobs.map(j => j.b)).slice(0, Math.max(1, Math.floor(100 / origins.length)));
+      const mp = pts => ({ type: "MultiPoint", coordinates: pts.map(p => [p.lon, p.lat]) });
+      const r = await fetch("https://atlas.microsoft.com/route/matrix/sync/json?api-version=1.0&travelMode=car&routeType=fastest", {
+        method: "POST", headers: { Authorization: "Bearer " + token, "x-ms-client-id": MAPS_CLIENT_ID, "Content-Type": "application/json" },
+        body: JSON.stringify({ origins: mp(origins), destinations: mp(dests) }),
+      });
+      if (!r.ok) { mapsState = "Azure Maps: błąd " + r.status; return; }
+      const j = await r.json();
+      for (let i = 0; i < origins.length; i++) for (let d = 0; d < dests.length; d++) {
+        const cell = j.matrix && j.matrix[i] && j.matrix[i][d];
+        const s = cell && cell.statusCode === 200 && cell.response && cell.response.routeSummary;
+        const k = P.cacheKey(origins[i], dests[d]);
+        if (!s) { failed.add(k); continue; }
+        travel[k] = { km: Math.round(s.lengthInMeters / 1000), min: Math.round(s.travelTimeInSeconds / 60), source: "Azure Maps" };
+        addTravelCache(k, travel[k].km, travel[k].min, "Azure Maps").catch(() => {});
+      }
+    } catch (e) { mapsState = "Azure Maps: " + e.message; }
+    finally { mapsBusy = false; }
+    renderWeek();
   }
   // Zajętość, która jest naszym własnym audytem (zaproszenie w innej skrzynce bez tematu): pomijamy, gdy pasuje co do minuty
   function busyFor(items) {
@@ -152,8 +204,10 @@ const PlanningModule = (function () {
     const items = weekItems();
     const wk = P.buildWeek(monday, items, busyFor(items), d => { try { return OpiekaModule.dayInfo(d).father; } catch { return false; } }, travelOf, rules, todayISO());
     $("plan-title").textContent = `Tydzień ${wk.week} · ${dmy(monday)}–${dmy(P.addDays(monday, 6))}.${P.addDays(monday, 6).slice(0, 4)}`;
-    const notes = [rulesState, busyState, geoQueue.length || geoBusy ? "Szukam współrzędnych adresów, odległości uzupełnią się same" : ""].filter(Boolean);
-    $("plan-status").innerHTML = notes.map(n => `<div class="lfa-alert" data-kind="warning">${esc(n)}</div>`).join("");
+    const notes = [rulesState, busyState, mapsState && mapsState !== "brak zgody" ? mapsState : "", geoQueue.length || geoBusy ? "Szukam współrzędnych adresów, odległości uzupełnią się same" : ""].filter(Boolean);
+    $("plan-status").innerHTML = notes.map(n => `<div class="lfa-alert" data-kind="warning">${esc(n)}</div>`).join("") +
+      (mapsState === "brak zgody" ? `<div class="lfa-alert">Dojazd to szacunek. Dokładne trasy wymagają jednorazowej zgody na Azure Maps.&nbsp;<button class="lfa-btn secondary sm" id="plan-maps-consent">🗺️ Włącz dokładne trasy</button></div>` : "");
+    const cb = $("plan-maps-consent"); if (cb) cb.onclick = () => mapsToken(true);
     const today = todayISO();
     box.innerHTML = wk.days.map(d => {
       const tags = [d.custody ? "👨‍👦 Opieka" : "", d.weekday === 5 ? "Sobota" : "", d.weekday === 6 ? "Niedziela" : "", d.date === today ? "Dziś" : ""].filter(Boolean);
@@ -177,6 +231,7 @@ const PlanningModule = (function () {
         <div class="lfa-card-body">${busy}${audits}${empty}</div>
       </section>`;
     }).join("");
+    if (pending.size && !mapsBusy) setTimeout(fetchRoutes, 0);
   }
   async function refresh() {
     $("plan-week").innerHTML = `<div class="lfa-muted">Wczytuję kalendarze…</div>`;
@@ -227,7 +282,7 @@ const PlanningModule = (function () {
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("plan-rules-overlay").classList.contains("hidden")) closeRules(); });
   }
   async function render() {
-    if (!inited) { setup(); inited = true; monday = P.mondayOf(todayISO()); await loadRules(); }
+    if (!inited) { setup(); inited = true; monday = P.mondayOf(todayISO()); await loadRules(); await loadTravel(); }
     refresh();
   }
   return { render };

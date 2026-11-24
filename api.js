@@ -364,6 +364,22 @@ async function savePlanningRule(id, key, value, desc) {
   return spAddItem(RULES_LIST, { Title: key, RuleValue: String(value), RuleDesc: desc || "" });
 }
 
+// ── Pamięć odległości: lista TravelCache, Title = klucz "lat,lon|lat,lon" (3 miejsca po przecinku) ──
+const TRAVEL_LIST = IS_TEST ? "TravelCache_TEST" : "TravelCache";
+const TRAVEL_FIELDS = [
+  { name: "Km",      label: "Km",       type: "Number" },
+  { name: "Minutes", label: "Minuty",   type: "Number" },
+  { name: "Source",  label: "Źródło",   type: "Text" },
+];
+async function ensureTravelCacheList() {
+  if (!(await spListExists(TRAVEL_LIST))) await spCreateList(TRAVEL_LIST, "Pamięć odległości i czasów dojazdu — LFA Hub");
+  const d = await spGet(`/_api/lists/getbytitle('${TRAVEL_LIST}')/fields?$select=InternalName&$top=1000`);
+  const have = new Set((d.value || []).map(f => f.InternalName));
+  for (const f of TRAVEL_FIELDS) if (!have.has(f.name)) await spCreateFieldXml(TRAVEL_LIST, settleFieldSchemaXml(f));
+}
+async function fetchTravelCache() { return spAllItems(TRAVEL_LIST, "Id,Title,Km,Minutes,Source"); }
+async function addTravelCache(key, km, min, source) { return spAddItem(TRAVEL_LIST, { Title: key, Km: km, Minutes: min, Source: source }); }
+
 // ============================================================
 // ŚRODOWISKO TESTOWE — listy *_TEST jako kopia schematu produkcji i (opcjonalnie) kopia danych. Produkcja tylko do odczytu.
 // ============================================================
