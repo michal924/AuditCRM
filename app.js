@@ -239,8 +239,8 @@ function hasSite(a) { return !!(a && (a.SiteAddress || a.SiteCity)); }
 // Miejsce audytu: osobny adres, a gdy brak — adres rejestrowy
 function siteParts(a) { return hasSite(a) ? [a.SiteAddress, a.SiteCity, a.SitePostal] : [a.Address, a.City, a.PostalCode]; }
 function siteText(a) { return siteParts(a).filter(Boolean).join(", "); }
-// Trasa w Mapach Apple: na iPhone otwiera aplikację Mapy (i CarPlay), na komputerze wersję w przeglądarce
-function routeUrl(a) { const t = siteText(a); return t ? "https://maps.apple.com/?dirflg=d&daddr=" + encodeURIComponent(t) : ""; }
+// Trasa w Mapach Google: na iPhone otwiera aplikację Google Maps (i CarPlay), na komputerze wersję w przeglądarce
+function routeUrl(a) { const t = siteText(a); return t ? "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + encodeURIComponent(t) : ""; }
 // Skrzynki, do których idzie zaproszenie na audyt (blokują się wszystkie kalendarze). Organizator jest pomijany.
 const INVITE_ATTENDEES = [
   { address: "michal@logisticfit.com",   name: "LogisticFit" },

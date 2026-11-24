@@ -18,7 +18,7 @@ Każde założenie przyjęte bez pytania właściciela. Kolumna „Jak łatwo zm
 | Adresy baz (Trzemeszno potwierdzone przez właściciela, Warszawa do potwierdzenia) trzymane tylko w `PlanningRules`, nie w repozytorium | Adres prywatny, repozytorium jest w GitHub | Łatwo |
 | Zajętość liczona z czterech skrzynek: dwóch LogisticFit i dwóch LF Assurance | Decyzja właściciela, zaproszenia trafiają na wszystkie cztery i blokują kalendarze | Łatwo: lista skrzynek w `PlanningRules` |
 | Odczyt zajętości przez Graph `getSchedule` w tym samym dzierżawcy | Nie wymaga pełnego dostępu do cudzej skrzynki | Średnio: możliwa zgoda administratora |
-| Azure Maps tylko liczy odległości w planowaniu. Nawigacja w samochodzie idzie przez Mapy Apple na iPhone i CarPlay | Azure Maps nie ma aplikacji do nawigacji. Link w zaproszeniu i w aplikacji otwiera Mapy Apple | Łatwo |
+| Azure Maps tylko liczy odległości w planowaniu. Nawigacja w samochodzie idzie przez Google Maps na iPhone i CarPlay | Azure Maps nie ma aplikacji do nawigacji. Właściciel uznał Mapy Apple za niedokładne, link trasy otwiera Google Maps | Łatwo |
 | Agent budowany na podglądzie PR z listami `_TEST`, na produkcję dopiero po zatwierdzeniu etapu. Gałąź `staging` nieużywana | Produkcja to prawdziwe dane | Łatwo |
 | Hotele: linki wyszukiwania z datą i miejscem, bez rezerwacji | Brak otwartego API rezerwacji, rezerwacja wymaga zgody | Łatwo |
 | Głos z iPhone: dyktowanie iOS zamienione na tekst przed agentem | Bez nowej płatnej usługi mowy | Łatwo |
