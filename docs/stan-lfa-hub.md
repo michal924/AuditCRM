@@ -31,7 +31,9 @@ Dokument tylko opisuje stan obecny. Nic w aplikacji nie zostało zmienione. Stat
 | Moduł raportów AI | brak | | Poza zakresem tego etapu |
 | Agent planowania | brak | | Plan w `docs/plan-agent-planowania.md` |
 | Testy | częściowo | `scripts/test.sh`, `tests/` | Składnia, czytnik planów, style. Brak testów logiki `app.js` |
-| Środowisko testowe | częściowo | `IS_TEST` w `api.js`, listy `*_TEST` | Podgląd PR i localhost działają. Gałąź `staging` jest 27 commitów za `main` |
+| Środowisko testowe | działa | `IS_TEST` w `api.js`, listy `*_TEST`, gałęzie `hub-*` | Stały adres testowy …-staging i 127.0.0.1:8080. Kopia `Audits_TEST` jest z października |
+| Niescalona praca na gałęzi `staging` | częściowo | gałąź `staging`, 12 commitów z 11 do 30.10.2026 | Zakładka Klienci i lista Clients, biblioteka dokumentów LFA-CU i LFA-SGS, import z Laury, migracja folderów. Nie ma jej na produkcji |
+| Planowanie (etap 1) | częściowo | `planning.js`, `planning-ui.js`, lista `PlanningRules` | Na stagingu. Dojazd to szacunek, usługa map czeka na zgodę |
 
 ## Ryzyka i dług techniczny
 
