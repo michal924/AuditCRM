@@ -2004,3 +2004,19 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .btn-cancel-audit:hover { background: var(--lfa-warning-bg); }
 .btn-reschedule-audit { color: var(--lfa-primary); border-color: var(--lfa-primary); }
 .btn-reschedule-audit:hover { background: var(--lfa-info-bg); }
+
+/* ── Planowanie (etap 1, podgląd tygodnia) ── */
+.plan-note { margin-bottom: var(--lfa-space-2); }
+.plan-status { display: grid; gap: var(--lfa-space-1); margin-bottom: var(--lfa-space-2); }
+.plan-week { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: var(--lfa-space-2); align-items: start; }
+.plan-day { min-width: 0; }
+.plan-day.is-today { outline: 2px solid var(--lfa-primary); }
+.plan-day .lfa-card-body { display: grid; gap: var(--lfa-space-2); }
+.plan-item { display: grid; gap: var(--lfa-space-1); padding-top: var(--lfa-space-2); border-top: 1px solid var(--lfa-border); min-width: 0; overflow-wrap: anywhere; }
+.plan-item:first-child { border-top: 0; padding-top: 0; }
+.plan-item-title { font-weight: 600; }
+.plan-travel { font-size: var(--lfa-text-sm); }
+.plan-infos { margin: 0; padding-left: var(--lfa-space-3); font-size: var(--lfa-text-sm); color: var(--lfa-text-muted); }
+.plan-rules-modal { max-width: var(--lfa-modal-w-form); width: 100%; max-height: 94vh; overflow: auto; }
+.plan-rules-modal .lfa-input, .plan-rules-modal .lfa-select { width: 100%; min-width: 0; }
+.plan-rules-actions { display: flex; justify-content: flex-end; gap: var(--lfa-space-2); margin-top: var(--lfa-space-3); flex-wrap: wrap; }

@@ -345,6 +345,26 @@ async function deleteCertificate(id) {
 }
 
 // ============================================================
+// REGUŁY PLANOWANIA — lista PlanningRules: Title = klucz reguły, RuleValue = wartość (tekst). Domyślne w planning.js.
+// ============================================================
+const RULES_LIST = IS_TEST ? "PlanningRules_TEST" : "PlanningRules";
+const RULE_FIELDS = [
+  { name: "RuleValue", label: "Wartość", type: "Text" },
+  { name: "RuleDesc",  label: "Opis",    type: "Note" },
+];
+async function ensurePlanningRulesList() {
+  if (!(await spListExists(RULES_LIST))) await spCreateList(RULES_LIST, "Reguły planowania audytów — LFA Hub");
+  const d = await spGet(`/_api/lists/getbytitle('${RULES_LIST}')/fields?$select=InternalName&$top=1000`);
+  const have = new Set((d.value || []).map(f => f.InternalName));
+  for (const f of RULE_FIELDS) if (!have.has(f.name)) await spCreateFieldXml(RULES_LIST, settleFieldSchemaXml(f));
+}
+async function fetchPlanningRules() { return spAllItems(RULES_LIST, "Id,Title,RuleValue,RuleDesc"); }
+async function savePlanningRule(id, key, value, desc) {
+  if (id) return spPatch(`/_api/lists/getbytitle('${RULES_LIST}')/items(${id})`, { RuleValue: String(value) });
+  return spAddItem(RULES_LIST, { Title: key, RuleValue: String(value), RuleDesc: desc || "" });
+}
+
+// ============================================================
 // ŚRODOWISKO TESTOWE — listy *_TEST jako kopia schematu produkcji i (opcjonalnie) kopia danych. Produkcja tylko do odczytu.
 // ============================================================
 async function spListExists(title) {

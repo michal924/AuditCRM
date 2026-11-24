@@ -32,7 +32,7 @@ Wymagania: macOS lub dowolny system z Pythonem 3, przeglądarka, konto w dzierż
 python3 -m http.server 8080 --bind 127.0.0.1
 ```
 
-Otwórz `http://127.0.0.1:8080`. Adres lokalny automatycznie używa list `*_TEST`, więc praca lokalna nie dotyka danych produkcyjnych. Adres przekierowania `http://127.0.0.1:8080` musi być dopisany w rejestracji aplikacji w Entra ID (jeśli logowanie zwraca błąd przekierowania, dopisz go tam).
+Otwórz `http://127.0.0.1:8080`. Adres lokalny automatycznie używa list `*_TEST`, więc praca lokalna nie dotyka danych produkcyjnych. Adres `http://127.0.0.1:8080/` jest dopisany w rejestracji aplikacji w Entra ID. Inny port lub `localhost` da błąd AADSTS50011, dopóki nie dopiszesz go tam.
 
 Po zmianie plików odśwież z pominięciem pamięci podręcznej (service worker potrafi trzymać starą wersję). W razie wątpliwości wyrejestruj go w narzędziach przeglądarki.
 
@@ -41,12 +41,15 @@ Po zmianie plików odśwież z pominięciem pamięci podręcznej (service worker
 | Środowisko | Adres | Listy |
 |---|---|---|
 | Produkcja | auditcrm.logisticfit.com | `Audits`, `DevRequests`, `Certificates` |
-| Podgląd PR | `…-<nr PR>.<region>.azurestaticapps.net` | `*_TEST` |
+| Staging | `…-staging.centralus.7.azurestaticapps.net` (gałęzie `hub-*`) | `*_TEST` |
+| Podgląd PR | `…-<nr PR>.<region>.azurestaticapps.net` (logowanie wymaga dopisania adresu w Entra) | `*_TEST` |
 | Lokalnie | 127.0.0.1 lub localhost | `*_TEST` |
 
 Rozpoznanie środowiska: `IS_TEST` w `api.js`. Listy testowe można odtworzyć jako kopię schematu produkcji (funkcje w sekcji „ŚRODOWISKO TESTOWE” w `api.js`). Czyszczenie działa tylko na listach `*_TEST`.
 
-Uwaga: gałąź `staging` jest 27 commitów za `main`, a workflow nie wdraża jej samej. Staging działa przez pull request do `main`, który dostaje własny adres podglądu.
+Stały adres testowy: `https://green-flower-047f17c10-staging.centralus.7.azurestaticapps.net/`. Wdraża się na niego każdy push do gałęzi `hub-*` (etapy LFA Hub). Produkcja wdraża się tylko z `main`.
+
+Uwaga: stara gałąź `staging` ma 12 niescalonych commitów z października (między innymi zakładka Klienci, biblioteka dokumentów, import z Laury). Workflow jej nie wdraża. Przed scaleniem trzeba ją przejrzeć.
 
 ## Testy
 

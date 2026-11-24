@@ -81,6 +81,7 @@
       <button class="nav-btn active" data-view="pulpit"><span class="nav-ico">🏠</span><span class="nav-lbl">Pulpit</span></button>
       <button class="nav-btn" data-view="myaudits"><span class="nav-ico">📋</span><span class="nav-lbl">Audyty</span></button>
       <button class="nav-btn" data-view="kalendarz"><span class="nav-ico">📅</span><span class="nav-lbl">Kalendarz</span></button>
+      <button class="nav-btn" data-view="planowanie"><span class="nav-ico">🧭</span><span class="nav-lbl">Planowanie</span></button>
       <button class="nav-btn" data-view="checkaudit"><span class="nav-ico">✅</span><span class="nav-lbl">Check Audyt</span></button>
       <button class="nav-btn" data-view="changes"><span class="nav-ico">🔄</span><span class="nav-lbl">Zmiany Audytora</span></button>
       <button class="nav-btn" data-view="opieka"><span class="nav-ico">👨‍👦</span><span class="nav-lbl">Opieka — Szymon</span></button>
@@ -590,6 +591,35 @@
     <div class="fin-card" id="fin-month-card">
       <div class="fin-card-head"><h3 id="fin-month-title">Audyty w miesiącu</h3><span class="fin-hint">kliknij wiersz, aby otworzyć audyt</span></div>
       <div id="fin-month-list" class="settle-empty">Wybierz miesiąc na wykresie lub w tabeli.</div>
+    </div>
+  </div>
+
+  <!-- PLANOWANIE (etap 1: tylko podgląd) -->
+  <div id="view-planowanie" class="view hidden">
+    <div class="view-header">
+      <h2 id="plan-title">Planowanie</h2>
+      <div class="header-filters">
+        <button class="lfa-btn secondary sm" id="plan-prev">‹ Poprzedni</button>
+        <button class="lfa-btn ghost sm" id="plan-today">Ten tydzień</button>
+        <button class="lfa-btn secondary sm" id="plan-next">Następny ›</button>
+        <button class="lfa-btn ghost sm" id="plan-rules-btn">⚙️ Reguły</button>
+      </div>
+    </div>
+    <div class="lfa-alert plan-note">Podgląd planu. Ten ekran nic nie zmienia w audytach ani w kalendarzach. Dojazd to szacunek z linii prostej, dokładne trasy dojdą z usługą map.</div>
+    <div id="plan-status" class="plan-status"></div>
+    <div id="plan-week" class="plan-week"></div>
+  </div>
+  <div id="plan-rules-overlay" class="lfa-modal-overlay hidden">
+    <div class="lfa-modal plan-rules-modal" role="dialog" aria-modal="true" aria-labelledby="plan-rules-h">
+      <div class="lfa-modal-header"><h3 id="plan-rules-h">Reguły planowania</h3><button class="lfa-btn ghost sm" id="plan-rules-close" aria-label="Zamknij">✕</button></div>
+      <div class="lfa-modal-body">
+        <p class="lfa-muted">Adres bazy możesz podać jako adres albo jako współrzędne (szerokość, długość). Tak/nie wybierasz z listy.</p>
+        <div id="plan-rules-body"></div>
+        <div class="plan-rules-actions">
+          <button class="lfa-btn ghost" id="plan-rules-cancel">Anuluj</button>
+          <button class="lfa-btn primary" id="plan-rules-save">💾 Zapisz reguły</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1313,6 +1343,8 @@
 <script src="pdf.min.js"></script>
 <script src="plan.js"></script>
 <script src="app.js"></script>
+<script src="planning.js"></script>
+<script src="planning-ui.js"></script>
 <script>if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {})); }</script>
 </body>
 </html>

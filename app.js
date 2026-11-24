@@ -175,6 +175,7 @@ function setupNav() {
       if (view === "opieka")     OpiekaModule.render();
       if (view === "mapa")       MapModule.render();
       if (view === "kalendarz")  AuditCalModule.render();
+      if (view === "planowanie" && window.PlanningModule) PlanningModule.render();
       if (view === "finanse")    { FinanceModule.render(); DelegModule.render(); }
       if (view === "pulpit")     DashboardModule.render();
     };
