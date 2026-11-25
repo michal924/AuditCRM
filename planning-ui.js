@@ -68,7 +68,7 @@ const PlanningModule = (function () {
     { name: "Trzemeszno", text: rules.baza_trzemeszno },
   ].map(b => ({ name: b.name, point: pointOf(b.text, b.name) }));
 
-  // ── zajętość: cztery skrzynki przez getSchedule ──
+  // ── zajętość: skrzynki z INVITE_ATTENDEES (lub z reguły) przez getSchedule ──
   function mailboxes() {
     const fromRule = String(rules.skrzynki_zajetosc || "").split(/[,;\s]+/).filter(x => x.includes("@"));
     if (fromRule.length) return fromRule.map(a => ({ address: a, name: a.split("@")[0] + " · " + a.split("@")[1].split(".")[0] }));

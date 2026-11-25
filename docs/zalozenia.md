@@ -26,3 +26,4 @@ Każde założenie przyjęte bez pytania właściciela. Kolumna „Jak łatwo zm
 | Przetwarzanie modelu bez wymogu „tylko UE”, wystarcza anonimizacja przed wysłaniem | Decyzja właściciela | Łatwo: później można przejść na Foundry w UE |
 | Brak osobnej umowy z Anthropic. Konto API zakładane na warunkach komercyjnych Anthropic (zawierają umowę powierzenia danych, do sprawdzenia przy zakładaniu konta) | Decyzja właściciela | Łatwo |
 | Skanowanie dokumentów z iPhone liczone osobno, około 200 stron miesięcznie | Nie było w pierwotnym szacunku | Łatwo: koszt rośnie liniowo ze stronami |
+| Zajętość i zaproszenia na 3 skrzynki. Skrzynka office w domenie lfassurance.com jeszcze nie istnieje, powstanie jako alias i wtedy wraca do listy w app.js | Decyzja właściciela z 25.11.2026 | Łatwo: jedna linia w app.js |

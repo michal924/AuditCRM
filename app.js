@@ -247,7 +247,7 @@ const INVITE_ATTENDEES = [
   { address: "michal@logisticfit.com",   name: "LogisticFit" },
   { address: "office@logisticfit.com",   name: "LogisticFit Office" },
   { address: "michal@lfassurance.com",   name: "LF Assurance" },
-  { address: "office@lfassurance.com",   name: "LF Assurance Office" },
+  // office@lfassurance.com jeszcze nie istnieje. Powstanie jako alias, wtedy dopisać tutaj.
 ];
 function organizerEmail() { try { return (msalInstance.getAllAccounts()[0] || {}).username || ""; } catch { return ""; } }
 function addHours(hhmm, h) { const [H, M] = String(hhmm).split(":").map(Number); const t = (H * 60 + (M || 0) + h * 60) % (24 * 60); return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); }
