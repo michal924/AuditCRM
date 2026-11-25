@@ -94,7 +94,7 @@ const PlanningAgent = (function () {
   function log(html) { const box = $("plan-agent-log"); box.insertAdjacentHTML("beforeend", html); box.scrollTop = box.scrollHeight; }
   function addProposal(a, input) {
     const when = input.nowa_data.split("-").reverse().join(".") + (input.nowa_godzina ? " o " + input.nowa_godzina : "");
-    log(`<div class="lfa-alert plan-agent-prop"><div><strong>Propozycja:</strong>&nbsp;${esc(a.Title)} na ${esc(when)}</div>
+    log(`<div class="lfa-alert plan-agent-prop"><div><strong>Propozycja:</strong> ${esc(a.Title)} na ${esc(when)}</div>
       <div class="lfa-muted">${esc(deanonymize(input.uzasadnienie))}</div>
       <div><button class="lfa-btn secondary sm" data-open-audit="${a.Id}">Otwórz kartę audytu</button></div></div>`);
   }
@@ -141,7 +141,7 @@ const PlanningAgent = (function () {
         if (step === MAX_STEPS - 1) log(`<div class="lfa-alert" data-kind="warning">Asystent przerwał po ${MAX_STEPS} krokach. Zadaj węższe pytanie.</div>`);
       }
     } catch (e) {
-      log(`<div class="lfa-alert" data-kind="danger"><strong>Błąd:</strong>&nbsp;${esc(e.message)}</div>`);
+      log(`<div class="lfa-alert" data-kind="danger"><span><strong>Błąd:</strong> ${esc(e.message)}</span></div>`);
       // ostatnia wiadomość bez odpowiedzi psuje kolejne pytania: wracamy do stanu sprzed pytania
       while (messages.length && !(messages[messages.length - 1].role === "assistant" && !(messages[messages.length - 1].content || []).some(b => b.type === "tool_use"))) messages.pop();
     }
