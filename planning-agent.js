@@ -13,8 +13,9 @@ const PlanningAgent = (function () {
   // ── pseudonimy ──
   const byPseudo = {}, byName = {};
   let seq = 0;
-  const LEGAL = /\b(sp\.?\s*z\s*o\.?\s*o\.?|spółka|spolka|z ograniczoną|z ograniczona|odpowiedzialnością|odpowiedzialnoscia|komandytowa|akcyjna|s\.?\s*a\.?|sp\.?\s*k\.?|sp\.?\s*j\.?|p\.?\s*h\.?\s*u\.?)\b/gi;
-  const core = t => String(t || "").replace(LEGAL, " ").replace(/[„”"]/g, " ").replace(/\s+/g, " ").trim();
+  // nazwa bez formy prawnej: „Tanne Sp. z o.o.” → „Tanne”
+  const LEGAL = new Set(["sp", "z", "o", "spółka", "spolka", "ograniczoną", "ograniczona", "odpowiedzialnością", "odpowiedzialnoscia", "komandytowa", "akcyjna", "jawna", "cywilna", "s", "a", "k", "j", "p", "h", "u", "phu", "ppuh", "fhu", "ltd", "gmbh"]);
+  const core = t => String(t || "").replace(/[.,„”"()]/g, " ").split(/\s+/).filter(w => w && !LEGAL.has(w.toLowerCase())).join(" ").trim();
   function pseudoOf(a) {
     const name = String(a.Title || "").trim();
     let c = null; try { c = window.ClientsModule && ClientsModule.clientOfAudit(a); } catch {}
@@ -109,7 +110,7 @@ const PlanningAgent = (function () {
     return r.idToken;
   }
   async function callModel() {
-    const r = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + await idToken() },
+    const r = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json", "X-LFA-Token": await idToken() },
       body: JSON.stringify({ messages, today: H().today() }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || ("błąd " + r.status));

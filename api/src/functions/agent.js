@@ -38,12 +38,12 @@ let client = null;
 const json = (status, body) => ({ status, jsonBody: body, headers: { "Cache-Control": "no-store" } });
 
 async function verify(req) {
-  const h = req.headers.get("authorization") || "";
-  const token = h.startsWith("Bearer ") ? h.slice(7) : "";
-  if (!token) return null;
+  // Static Web Apps zastrzega nagłówek Authorization dla siebie, więc token idzie we własnym nagłówku
+  const token = (req.headers.get("x-lfa-token") || "").trim();
+  if (!token) throw new Error("brak tokenu");
   const { payload } = await jwtVerify(token, JWKS, { issuer: `https://login.microsoftonline.com/${TENANT_ID}/v2.0`, audience: CLIENT_ID });
-  if (payload.tid !== TENANT_ID) return null;
-  if (ALLOWED_OIDS.length && !ALLOWED_OIDS.includes(payload.oid)) return null;
+  if (payload.tid !== TENANT_ID) throw new Error("inny dzierżawca");
+  if (ALLOWED_OIDS.length && !ALLOWED_OIDS.includes(payload.oid)) throw new Error("użytkownik spoza listy");
   return payload;
 }
 
@@ -60,8 +60,7 @@ app.http("agent", {
   route: "agent",
   handler: async (req, ctx) => {
     let user;
-    try { user = await verify(req); } catch (e) { return json(401, { error: "Brak uprawnień" }); }
-    if (!user) return json(401, { error: "Brak uprawnień" });
+    try { user = await verify(req); } catch (e) { return json(401, { error: "Brak uprawnień (" + String((e && (e.code || e.message)) || "token").slice(0, 60) + ")" }); }
     if (!process.env.ANTHROPIC_API_KEY) return json(503, { error: "Brak klucza API Anthropic w ustawieniach aplikacji" });
     const raw = await req.text();
     if (raw.length > MAX_BODY) return json(413, { error: "Rozmowa za długa, zacznij nową" });
