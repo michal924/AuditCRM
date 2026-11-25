@@ -81,9 +81,10 @@ const SETTLE_FIELDS = [
   { name: "EndTime",       label: "Godzina zakończenia",                 type: "Text" },
   { name: "SiteAddress",   label: "Miejsce audytu: adres",               type: "Text" },
   { name: "SiteCity",      label: "Miejsce audytu: miasto",              type: "Text" },
-  { name: "SitePostal",    label: "Miejsce audytu: kod",                 type: "Text" },   // "DO" = podmiot w łańcuchu dostaw → stała opłata za usługę (Michał 2026-11-05)   // "2026-11" — rozliczenie w innym miesiącu niż data audytu (Michał 2026-11-04)
+  { name: "SitePostal",    label: "Miejsce audytu: kod",                 type: "Text" },
+  { name: "ReportSentDate", label: "Raport wysłany do jednostki",        type: "DateTime" },  // 2026-11-25: bloki na raporty w planowaniu   // "DO" = podmiot w łańcuchu dostaw → stała opłata za usługę (Michał 2026-11-05)   // "2026-11" — rozliczenie w innym miesiącu niż data audytu (Michał 2026-11-04)
 ];
-const SETTLE_NEWER_FIELDS = ["SettleDayRate", "SettleTravelDays", "DelegDepart", "DelegReturn", "DelegNo", "SettleMonth", "EudrRole", "StartTime", "EndTime", "SiteAddress", "SiteCity", "SitePostal"];   // pola dodane później: gdy ich brak, reszta rozliczeń nadal działa
+const SETTLE_NEWER_FIELDS = ["SettleDayRate", "SettleTravelDays", "DelegDepart", "DelegReturn", "DelegNo", "SettleMonth", "EudrRole", "StartTime", "EndTime", "SiteAddress", "SiteCity", "SitePostal", "ReportSentDate"];   // pola dodane później: gdy ich brak, reszta rozliczeń nadal działa
 window.settleRateFieldMissing = false;
 const SETTLE_FIELD_NAMES = SETTLE_FIELDS.map(f => f.name);
 // true gdy lista nie ma jeszcze kolumn rozliczeń → UI pokaże przycisk konfiguracji, zapis pomija te pola

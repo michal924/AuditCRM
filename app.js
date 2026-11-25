@@ -1048,6 +1048,10 @@ function openModal(id) {
   planDateEl.value = psDate;
   planDateEl.classList.toggle("hidden", !a.PlanSentDate);
   currentPlanSentDate = a.PlanSentDate ? psDate : null;
+  // Raport wysłany do jednostki (puste = jeszcze nie); pole niedostępne, gdy brak nowszych kolumn
+  const rsEl = document.getElementById("report-sent-date");
+  rsEl.value = a.ReportSentDate ? String(a.ReportSentDate).substring(0, 10) : "";
+  rsEl.disabled = !!window.settleRateFieldMissing;
 
   show("modal-overlay");
 }
@@ -1221,6 +1225,11 @@ async function saveChanges() {
     fields.PlanSentDate = currentPlanSent
       ? safeDate(currentPlanSentDate || new Date().toISOString().substring(0,10))
       : null;
+    // Raport wysłany do jednostki (puste = jeszcze nie) — tylko gdy nowsze kolumny istnieją
+    if (!window.settleRateFieldMissing) {
+      const rs = document.getElementById("report-sent-date").value;
+      fields.ReportSentDate = rs ? safeDate(rs) : null;
+    }
     // Status rozliczenia + data (gdy Rozliczony) — tylko gdy kolumny istnieją
     if (!window.settleFieldsMissing) {
       fields.SettleStatus = currentSettleStatus || "Nierozliczony";

@@ -201,8 +201,8 @@ const PlanningModule = (function () {
     const items = itemsBetween(P.addDays(monday, -21), P.addDays(monday, 6));
     const auditDays = new Set(itemsBetween(P.addDays(monday, -21), P.addDays(monday, 35)).map(x => x.date));
     const seen = new Set();
-    // Raport uznajemy za gotowy, gdy rozliczenie jest wysłane do jednostki albo zamknięte (brak osobnego pola „raport wysłany”)
-    const reportDone = x => { const st = x.audit && x.audit.SettleStatus; return !!st && st !== "Nierozliczony"; };
+    // Raport gotowy: data „Raport wysłany do jednostki”, a dla starszych wpisów rozliczenie wysłane lub zamknięte
+    const reportDone = x => { const a = x.audit || {}; return !!a.ReportSentDate || (!!a.SettleStatus && a.SettleStatus !== "Nierozliczony"); };
     items.filter(x => !x.meeting && !reportDone(x)).sort((a, b) => a.date < b.date ? -1 : 1).forEach(x => {
       if (seen.has(x.id)) return;                                     // audyt wielodniowy: raport po ostatnim dniu
       const last = items.filter(o => o.id === x.id).map(o => o.date).sort().pop();

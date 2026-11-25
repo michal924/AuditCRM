@@ -30,4 +30,4 @@ Każde założenie przyjęte bez pytania właściciela. Kolumna „Jak łatwo zm
 | Raport zajmuje 4 godziny pracy (CU i SGS osobno w regułach), dzień pracy 8:30 do 16:30, raport nie w dniu innego audytu ani w weekend | Brak danych o realnym czasie raportu | Łatwo: reguły w aplikacji |
 | Warianty terminu w promieniu 21 dni od obecnej daty, nie wcześniej niż minimum wysyłki planu (FSC i PEFC 7 dni, KZR i SURE 7 dni) | Plan audytu musi zdążyć dojść do klienta | Łatwo: reguła `wariant_okno_dni` |
 | Tydzień opieki nie obniża oceny wariantu, gdy nocleg nie jest potrzebny. Przy noclegu taki dzień jest odrzucony | Reguła opieki dotyczy noclegów | Łatwo |
-| Raport uznany za gotowy, gdy rozliczenie audytu jest „Wysłany do CU/SGS” albo „Rozliczony”. Brak osobnego pola „raport wysłany” | Lista Audits nie ma takiego pola | Łatwo: po dodaniu pola `ReportSentDate` zamiana jednej linii |
+| Raport uznany za gotowy, gdy w karcie audytu jest data „Raport wysłany do jednostki” (pole `ReportSentDate`, od 25.11.2026). Dla starszych wpisów bez daty: rozliczenie „Wysłany do CU/SGS” albo „Rozliczony” | Pole dodane za zgodą właściciela | Łatwo |
