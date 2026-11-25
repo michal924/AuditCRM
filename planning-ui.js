@@ -201,7 +201,9 @@ const PlanningModule = (function () {
     const items = itemsBetween(P.addDays(monday, -21), P.addDays(monday, 6));
     const auditDays = new Set(itemsBetween(P.addDays(monday, -21), P.addDays(monday, 35)).map(x => x.date));
     const seen = new Set();
-    items.filter(x => !x.meeting).sort((a, b) => a.date < b.date ? -1 : 1).forEach(x => {
+    // Raport uznajemy za gotowy, gdy rozliczenie jest wysłane do jednostki albo zamknięte (brak osobnego pola „raport wysłany”)
+    const reportDone = x => { const st = x.audit && x.audit.SettleStatus; return !!st && st !== "Nierozliczony"; };
+    items.filter(x => !x.meeting && !reportDone(x)).sort((a, b) => a.date < b.date ? -1 : 1).forEach(x => {
       if (seen.has(x.id)) return;                                     // audyt wielodniowy: raport po ostatnim dniu
       const last = items.filter(o => o.id === x.id).map(o => o.date).sort().pop();
       seen.add(x.id);
@@ -211,7 +213,8 @@ const PlanningModule = (function () {
       }), rules, today);
       if (plan.deadline < today) return;
       plan.blocks.forEach(b => (byDay[b.date] = byDay[b.date] || []).push({ start: b.start, end: b.end, body: x.body, title: x.title, deadline: plan.deadline }));
-      if (plan.short) short.push(`Za mało wolnego czasu na raport: ${x.title} (${x.body}). Brakuje ${P.fmtDur(plan.short)} przed ${plan.deadline}`);
+      const weekEnd = P.addDays(monday, 6), inWeek = d => d >= monday && d <= weekEnd;
+      if (plan.short && (inWeek(last) || inWeek(plan.deadline))) short.push(`Za mało wolnego czasu na raport: ${x.title} (${x.body}). Brakuje ${P.fmtDur(plan.short)} przed ${plan.deadline}`);
     });
     return { byDay, short };
   }
