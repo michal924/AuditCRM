@@ -2022,6 +2022,16 @@ tbody tr.audit-row.row-body-lf.row-st-rejected { background: color-mix(in srgb, 
 .plan-infos { margin: 0; padding-left: var(--lfa-space-3); font-size: var(--lfa-text-sm); color: var(--lfa-text-muted); }
 .plan-rules-modal { max-width: var(--lfa-modal-w-form); width: 100%; max-height: 94vh; overflow: auto; }
 .plan-rules-modal .lfa-input, .plan-rules-modal .lfa-select { width: 100%; min-width: 0; }
+.plan-agent { margin-bottom: var(--lfa-space-2); }
+.plan-agent .lfa-card-body { display: grid; gap: var(--lfa-space-2); }
+.plan-agent-log { display: grid; gap: var(--lfa-space-2); max-height: 50vh; overflow-y: auto; overflow-wrap: anywhere; }
+.plan-agent-log:empty { display: none; }
+.plan-agent-msg p { margin: 0 0 var(--lfa-space-1); }
+.plan-agent-msg.is-user { color: var(--lfa-text-muted); }
+.plan-agent-prop { display: grid; gap: var(--lfa-space-1); }
+.plan-agent .lfa-textarea { width: 100%; min-width: 0; }
+.plan-agent .plan-rules-actions { margin-top: 0; }
+.plan-agent-hint { margin: 0; font-size: var(--lfa-text-xs); }
 .plan-rules-actions { display: flex; justify-content: flex-end; gap: var(--lfa-space-2); margin-top: var(--lfa-space-3); flex-wrap: wrap; }
 
 /* ============================================================

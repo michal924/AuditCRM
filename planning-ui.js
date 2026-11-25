@@ -295,6 +295,34 @@ const PlanningModule = (function () {
   }
   function go(deltaWeeks) { monday = deltaWeeks === 0 ? P.mondayOf(todayISO()) : P.addDays(monday, 7 * deltaWeeks); refresh(); }
 
+  // ── dane dla agenta (planning-agent.js): te same funkcje co ekran, ekran idzie za agentem ──
+  async function showWeekOf(date) {
+    const m = P.mondayOf(date);
+    if (m !== monday) { monday = m; await refresh(); }
+  }
+  function agentApi() {
+    return {
+      today: todayISO,
+      rules: () => Object.assign({}, rules),
+      itemsBetween: (a, b) => { const end = b > P.addDays(a, 120) ? P.addDays(a, 120) : b; return itemsBetween(a, end); },
+      week: async date => {
+        await showWeekOf(date);
+        const items = weekItems();
+        const wk = P.buildWeek(monday, items, busyFor(items), d => { try { return OpiekaModule.dayInfo(d).father; } catch { return false; } }, travelOf, rules, todayISO());
+        const rp = reportPlan();
+        return Object.assign(wk, { reports: rp.byDay, short: rp.short });
+      },
+      variants: async id => {
+        const a = (typeof allAudits !== "undefined" ? allAudits : []).find(x => x.Id === id);
+        if (!a || !a.AuditDateStart) return null;
+        const date = String(a.AuditDateStart).slice(0, 10);
+        await showWeekOf(date);
+        const x = itemsBetween(date, P.addDays(date, 6)).find(o => o.id === id); if (!x) return null;
+        return { date: x.date, variants: P.variants({ date: x.date, start: x.start, end: x.end, body: x.body, scheme: x.scheme, travel: travelOf(x), point: x.point, planSent: x.planSent, advisory: x.advisory }, dayCtx(x), rules, todayISO(), 3) };
+      },
+    };
+  }
+
   // ── edytor reguł ──
   function openRules() {
     $("plan-rules-body").innerHTML = `<div class="lfa-table-wrap"><table class="lfa-table"><thead><tr><th>Reguła</th><th>Wartość</th></tr></thead><tbody>` +
@@ -337,6 +365,7 @@ const PlanningModule = (function () {
     $("plan-rules-save").addEventListener("click", saveRules);
     $("plan-var-close").addEventListener("click", closeVariants);
     $("plan-var-ok").addEventListener("click", closeVariants);
+    if (window.PlanningAgent) PlanningAgent.setup();
     document.addEventListener("keydown", e => {
       if (e.key !== "Escape") return;
       if (!$("plan-rules-overlay").classList.contains("hidden")) closeRules();
@@ -347,6 +376,6 @@ const PlanningModule = (function () {
     if (!inited) { setup(); inited = true; monday = P.mondayOf(todayISO()); await loadRules(); await loadTravel(); }
     refresh();
   }
-  return { render };
+  return { render, agentApi };
 })();
 window.PlanningModule = PlanningModule;

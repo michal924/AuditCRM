@@ -632,6 +632,19 @@
     </div>
     <div class="lfa-alert plan-note">Podgląd planu. Ten ekran nic nie zmienia w audytach ani w kalendarzach. Dojazd liczy Azure Maps, a przy braku trasy pokazuje szacunek.</div>
     <div id="plan-status" class="plan-status"></div>
+    <section class="lfa-card plan-agent" aria-labelledby="plan-agent-h">
+      <div class="lfa-card-header"><span id="plan-agent-h">💬 Asystent planowania</span><span class="lfa-muted" id="plan-agent-state" role="status" aria-live="polite"></span></div>
+      <div class="lfa-card-body">
+        <div id="plan-agent-log" class="plan-agent-log" aria-live="polite"></div>
+        <label class="lfa-label" for="plan-agent-input">Pytanie lub prośba</label>
+        <textarea id="plan-agent-input" class="lfa-textarea" rows="2" placeholder="np. Przesuń audyt w Grajewie na przyszły tydzień"></textarea>
+        <div class="plan-rules-actions">
+          <button class="lfa-btn ghost sm" id="plan-agent-reset">Nowa rozmowa</button>
+          <button class="lfa-btn primary" id="plan-agent-send">Zapytaj</button>
+        </div>
+        <p class="lfa-muted plan-agent-hint">Asystent tylko proponuje. Terminy zmieniasz sam w karcie audytu. Nazwy klientów trafiają do modelu jako pseudonimy.</p>
+      </div>
+    </section>
     <div id="plan-week" class="plan-week"></div>
   </div>
   <div id="plan-rules-overlay" class="lfa-modal-overlay hidden">
@@ -1383,6 +1396,7 @@
 <script src="app.js"></script>
 <script src="planning.js"></script>
 <script src="planning-ui.js"></script>
+<script src="planning-agent.js"></script>
 <script>if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {})); }</script>
 </body>
 </html>

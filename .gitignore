@@ -1,2 +1,6 @@
 # Wytyczne właściciela obejmują też inne projekty, trzymane tylko lokalnie
 docs/lfa-hub-wytyczne.md
+
+# Backend agenta: zależności instaluje wdrożenie
+api/node_modules/
+api/local.settings.json

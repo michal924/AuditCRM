@@ -6,10 +6,14 @@ cd "$(dirname "$0")/.."
 fail=0
 
 # 1) Składnia własnych plików (bez bibliotek *.min.js, leaflet, msal)
-for f in app.js api.js auth.js plan.js planning.js planning-ui.js sw.js tests/*.js; do
+for f in app.js api.js auth.js plan.js planning.js planning-ui.js planning-agent.js sw.js tests/*.js; do
   res=$(osascript -l JavaScript -e "ObjC.import('Foundation'); var s=\$.NSString.stringWithContentsOfFileEncodingError('$PWD/$f',4,null); if (!s || !s.js) 'PUSTY PLIK'; else { try { new Function(s.js); 'OK' } catch (e) { '' + e } }")
   if [[ "$res" == "OK" ]]; then echo "✔ składnia  $f"; else echo "✘ składnia  $f: $res"; fail=1; fi
 done
+# Backend agenta (moduł ES): składnia przez Node, gdy jest zainstalowany
+if command -v node >/dev/null; then
+  for f in api/src/functions/*.js; do node --check "$f" 2>/dev/null && echo "✔ składnia  $f" || { echo "✘ składnia  $f"; fail=1; }; done
+else echo "… składnia  api/ pominięta (brak Node)"; fi
 
 # 2) app.js nie może być pusty ani obcięty (ochrona przed przypadkowym nadpisaniem)
 lines=$(wc -l < app.js | tr -d ' ')
