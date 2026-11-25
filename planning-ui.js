@@ -1,6 +1,6 @@
 // ============================================================
-// PlanningModule: zakładka „Planowanie” (etap 1, tylko podgląd).
-// Tydzień: audyty, zajętość z czterech skrzynek (Graph getSchedule), tygodnie opieki, dojazd z baz, terminy jednostek.
+// PlanningModule: zakładka „Planowanie” (etapy 1 i 2, tylko podgląd: tydzień, warianty terminu, bloki na raporty).
+// Tydzień: audyty, zajętość ze skrzynek (Graph getSchedule), tygodnie opieki, dojazd z baz, terminy jednostek.
 // Jedyny zapis: reguły planowania w liście PlanningRules (na podglądzie i lokalnie PlanningRules_TEST).
 // Logika w planning.js (PlanningCore), tu tylko dane i widok.
 // ============================================================
@@ -79,12 +79,13 @@ const PlanningModule = (function () {
     const boxes = mailboxes(); if (!boxes.length) { busyState = "Brak skrzynek do sprawdzenia"; return; }
     let token; try { token = await getGraphToken(); } catch { token = null; }
     if (!token) { busyState = "Brak dostępu do kalendarzy (zaloguj się ponownie)"; return; }
-    const end = P.addDays(monday, 7);
+    // zakres szerszy niż tydzień: warianty terminu (±21 dni) i bloki na raporty po audytach z poprzednich tygodni
+    const from = P.addDays(monday, -21), end = P.addDays(monday, 35);
     try {
       const r = await fetch("https://graph.microsoft.com/v1.0/me/calendar/getSchedule", {
         method: "POST",
         headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", Prefer: 'outlook.timezone="Europe/Warsaw"' },
-        body: JSON.stringify({ schedules: boxes.map(b => b.address), startTime: { dateTime: monday + "T00:00:00", timeZone: "Europe/Warsaw" }, endTime: { dateTime: end + "T00:00:00", timeZone: "Europe/Warsaw" }, availabilityViewInterval: 60 }),
+        body: JSON.stringify({ schedules: boxes.map(b => b.address), startTime: { dateTime: from + "T00:00:00", timeZone: "Europe/Warsaw" }, endTime: { dateTime: end + "T00:00:00", timeZone: "Europe/Warsaw" }, availabilityViewInterval: 60 }),
       });
       if (!r.ok) { busyState = "Kalendarze: błąd " + r.status; return; }
       const j = await r.json(); const problems = [];
@@ -113,13 +114,13 @@ const PlanningModule = (function () {
     }
   }
 
-  // ── audyty tygodnia ──
-  function weekItems() {
+  // ── audyty w zakresie dni ──
+  function weekItems() { return itemsBetween(monday, P.addDays(monday, 6)); }
+  function itemsBetween(fromDate, toDate) {
     const list = (typeof allAudits !== "undefined" ? allAudits : []).filter(a =>
       (typeof MY_AUDITOR === "undefined" || a.AuditorName === MY_AUDITOR) && a.AuditStatus !== "REJECTED" && a.AuditDateStart);
     const out = [];
-    for (let i = 0; i < 7; i++) {
-      const k = P.addDays(monday, i);
+    for (let k = fromDate; k <= toDate; k = P.addDays(k, 1)) {
       list.forEach(a => {
         if (!auditCoversDay(a, k)) return;
         const text = siteText(a), city = a.SiteCity || a.City;
@@ -193,6 +194,49 @@ const PlanningModule = (function () {
     return out;
   }
 
+  // ── bloki na raporty (propozycja, nic nie trafia do kalendarza) ──
+  // Audyty od 3 tygodni przed tym tygodniem do jego końca, po kolei; każdy blok zajmuje czas dla następnych.
+  function reportPlan() {
+    const today = todayISO(), byDay = {}, short = [];
+    const items = itemsBetween(P.addDays(monday, -21), P.addDays(monday, 6));
+    const auditDays = new Set(itemsBetween(P.addDays(monday, -21), P.addDays(monday, 35)).map(x => x.date));
+    const seen = new Set();
+    items.filter(x => !x.meeting).sort((a, b) => a.date < b.date ? -1 : 1).forEach(x => {
+      if (seen.has(x.id)) return;                                     // audyt wielodniowy: raport po ostatnim dniu
+      const last = items.filter(o => o.id === x.id).map(o => o.date).sort().pop();
+      seen.add(x.id);
+      const plan = P.reportBlocks({ date: last, body: x.body, scheme: x.scheme }, d => ({
+        audit: auditDays.has(d),
+        busy: (busyByDay[d] || []).concat(byDay[d] || []),
+      }), rules, today);
+      if (plan.deadline < today) return;
+      plan.blocks.forEach(b => (byDay[b.date] = byDay[b.date] || []).push({ start: b.start, end: b.end, body: x.body, title: x.title, deadline: plan.deadline }));
+      if (plan.short) short.push(`Za mało wolnego czasu na raport: ${x.title} (${x.body}). Brakuje ${P.fmtDur(plan.short)} przed ${plan.deadline}`);
+    });
+    return { byDay, short };
+  }
+
+  // ── inne terminy dla audytu (warianty, tylko podgląd) ──
+  function dayCtx(x) {
+    return d => ({
+      custody: (() => { try { return OpiekaModule.dayInfo(d).father; } catch { return false; } })(),
+      busy: busyByDay[d] || [],
+      sameDay: itemsBetween(d, d).filter(o => o.id !== x.id),
+    });
+  }
+  function openVariants(x) {
+    const vs = P.variants({ date: x.date, start: x.start, end: x.end, body: x.body, scheme: x.scheme, travel: travelOf(x), point: x.point, planSent: x.planSent }, dayCtx(x), rules, todayISO(), 3);
+    $("plan-var-h").textContent = "Inne terminy: " + (x.title || "audyt");
+    $("plan-var-body").innerHTML = `<p class="lfa-muted">Obecny termin <span class="lfa-data">${DAYS[P.weekday(x.date)]} ${dmy(x.date)}</span>. Propozycje w promieniu ${rules.wariant_okno_dni} dni, z regułami, opieką i kalendarzami. Nic się nie zmienia, dopóki nie przełożysz audytu w jego karcie.</p>` +
+      (vs.length ? vs.map((v, i) => `<section class="lfa-card plan-var">
+          <div class="lfa-card-header"><span>Wariant ${i + 1}: <span class="lfa-data">${DAYS[P.weekday(v.date)]} ${dmy(v.date)}.${v.date.slice(0, 4)}</span></span></div>
+          <div class="lfa-card-body"><ul class="plan-infos">${v.reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>
+        </section>`).join("") : `<div class="lfa-alert" data-kind="warning">Brak dnia bez blokady w tym zakresie. Zmień reguły albo zakres w ustawieniach.</div>`);
+    $("plan-var-overlay").classList.remove("hidden");
+    $("plan-var-close").focus();
+  }
+  function closeVariants() { $("plan-var-overlay").classList.add("hidden"); }
+
   // ── widok ──
   function findingHtml(f) {
     if (f.level === "block") return `<div class="lfa-alert" data-kind="danger"><strong>Blokada:</strong>&nbsp;${esc(f.text)}</div>`;
@@ -204,7 +248,8 @@ const PlanningModule = (function () {
     const items = weekItems();
     const wk = P.buildWeek(monday, items, busyFor(items), d => { try { return OpiekaModule.dayInfo(d).father; } catch { return false; } }, travelOf, rules, todayISO());
     $("plan-title").textContent = `Tydzień ${wk.week} · ${dmy(monday)}–${dmy(P.addDays(monday, 6))}.${P.addDays(monday, 6).slice(0, 4)}`;
-    const notes = [rulesState, busyState, mapsState && mapsState !== "brak zgody" ? mapsState : "", geoQueue.length || geoBusy ? "Szukam współrzędnych adresów, odległości uzupełnią się same" : ""].filter(Boolean);
+    const rp = reportPlan();
+    const notes = [rulesState, busyState, ...rp.short,mapsState && mapsState !== "brak zgody" ? mapsState : "", geoQueue.length || geoBusy ? "Szukam współrzędnych adresów, odległości uzupełnią się same" : ""].filter(Boolean);
     $("plan-status").innerHTML = notes.map(n => `<div class="lfa-alert" data-kind="warning">${esc(n)}</div>`).join("") +
       (mapsState === "brak zgody" ? `<div class="lfa-alert">Dojazd to szacunek. Dokładne trasy wymagają jednorazowej zgody na Azure Maps.&nbsp;<button class="lfa-btn secondary sm" id="plan-maps-consent">🗺️ Włącz dokładne trasy</button></div>` : "");
     const cb = $("plan-maps-consent"); if (cb) cb.onclick = () => mapsToken(true);
@@ -223,14 +268,20 @@ const PlanningModule = (function () {
           <div class="plan-item-title">${esc(it.title)}</div>
           ${it.place ? `<div class="lfa-muted">${esc(it.place)}</div>` : ""}
           ${travel}${blocks}${infos ? `<ul class="plan-infos">${infos}</ul>` : ""}
+          ${!it.done && it.date >= today ? `<button class="lfa-btn ghost sm plan-var-btn" data-var="${esc(it.id + "|" + it.date)}">🔀 Inne terminy</button>` : ""}
         </article>`;
       }).join("");
-      const empty = !d.items.length && !d.busy.length ? `<div class="lfa-muted">Wolny</div>` : "";
+      const reports = (rp.byDay[d.date] || []).map(b => `<div class="lfa-cal-chip" data-body="${b.body === "SGS" ? "sgs" : "cu"}"><span class="lfa-data">${esc(b.start)}–${esc(b.end)}</span> 📝 Raport ${esc(b.body)} (propozycja): ${esc(b.title)}, termin ${esc(b.deadline)}</div>`).join("");
+      const empty = !d.items.length && !d.busy.length && !reports ? `<div class="lfa-muted">Wolny</div>` : "";
       return `<section class="lfa-card plan-day${d.date === today ? " is-today" : ""}">
         <div class="lfa-card-header"><span><span class="lfa-data">${DAYS[d.weekday]} ${dmy(d.date)}</span></span><span class="lfa-muted">${esc(tags.join(" · "))}</span></div>
-        <div class="lfa-card-body">${busy}${audits}${empty}</div>
+        <div class="lfa-card-body">${busy}${audits}${reports}${empty}</div>
       </section>`;
     }).join("");
+    box.querySelectorAll(".plan-var-btn").forEach(b => b.addEventListener("click", () => {
+      const [id, date] = b.dataset.var.split("|");
+      const x = items.find(o => String(o.id) === id && o.date === date); if (x) openVariants(x);
+    }));
     if (pending.size && !mapsBusy) setTimeout(fetchRoutes, 0);
   }
   async function refresh() {
@@ -279,7 +330,13 @@ const PlanningModule = (function () {
     $("plan-rules-close").addEventListener("click", closeRules);
     $("plan-rules-cancel").addEventListener("click", closeRules);
     $("plan-rules-save").addEventListener("click", saveRules);
-    document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("plan-rules-overlay").classList.contains("hidden")) closeRules(); });
+    $("plan-var-close").addEventListener("click", closeVariants);
+    $("plan-var-ok").addEventListener("click", closeVariants);
+    document.addEventListener("keydown", e => {
+      if (e.key !== "Escape") return;
+      if (!$("plan-rules-overlay").classList.contains("hidden")) closeRules();
+      if (!$("plan-var-overlay").classList.contains("hidden")) closeVariants();
+    });
   }
   async function render() {
     if (!inited) { setup(); inited = true; monday = P.mondayOf(todayISO()); await loadRules(); await loadTravel(); }

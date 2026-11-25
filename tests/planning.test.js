@@ -77,5 +77,25 @@ function runPlanningTests(P) {
   eq("audyt spoza tygodnia pominięty", wk.days.reduce(function (s, d) { return s + d.items.length; }, 0), 1);
   eq("opieka we wtorek", wk.days[1].custody, true);
   eq("zajętość w środę", wk.days[2].busy.length, 1);
+
+  // wolne okna i bloki na raporty
+  eq("wolne okna dnia", P.freeWindows([{ start: "10:00", end: "12:00" }], R), [[510, 600], [720, 990]]);
+  eq("krótkie okno pominięte", P.freeWindows([{ start: "08:40", end: "16:30" }], R), []);
+  var rb = P.reportBlocks({ date: "2026-12-04", body: "SGS" }, function (d) { return d === "2026-12-07" ? { audit: true } : { busy: d === "2026-12-08" ? [{ start: "08:30", end: "14:30" }] : [] }; }, R, "2026-11-24");
+  eq("raport SGS: termin", rb.deadline, "2026-12-11");
+  eq("raport: bez weekendu i dnia z audytem, reszta dnia z zajętością", rb.blocks.map(function (b) { return b.date + " " + b.start + "-" + b.end; }), ["2026-12-08 14:30-16:30", "2026-12-09 08:30-10:30"]);
+  eq("raport: czas wystarcza", rb.short, 0);
+  var rs = P.reportBlocks({ date: "2026-12-04", body: "SGS" }, function () { return { audit: true }; }, R, "2026-11-24");
+  eq("raport: brak czasu przed terminem", rs.short, 240);
+
+  // warianty terminu
+  var va = P.variants({ date: "2026-12-16", start: "09:00", body: "CU", scheme: "FSC", travel: { km: 320, min: 200, base: "Warszawa", source: "Azure Maps" } },
+    function (d) { return { custody: d >= "2026-12-14" && d <= "2026-12-20", busy: d === "2026-12-09" ? [{ start: "08:00", end: "10:00" }] : [] }; }, R, "2026-12-01", 3);
+  eq("warianty: trzy propozycje", va.length, 3);
+  n++; if (va.some(function (v) { return v.date >= "2026-12-14" && v.date <= "2026-12-20"; })) fails.push("wariant w tygodniu opieki mimo noclegu");
+  n++; if (va.some(function (v) { return P.weekday(v.date) >= 5; })) fails.push("wariant w weekend");
+  n++; if (va.some(function (v) { return v.date < "2026-12-08"; })) fails.push("wariant przed minimum wysyłki planu FSC (7 dni)");
+  n++; if (va.some(function (v) { return v.date === "2026-12-09"; })) fails.push("wariant z kolizją przed lepszymi dniami");
+  eq("warianty: najbliższy wolny dzień pierwszy", va[0].date, "2026-12-11");
   return { checks: n, fails: fails };
 }

@@ -27,6 +27,11 @@ var PlanningCore = (function () {
     { key: "srednia_predkosc_kmh",       type: "number", value: 75,               desc: "Średnia prędkość do szacunku bez usługi map (km/h)" },
     { key: "wspolczynnik_drogi",         type: "number", value: 1.3,              desc: "Droga względem linii prostej do szacunku" },
     { key: "skrzynki_zajetosc",          type: "text",   value: "",               desc: "Skrzynki liczone jako zajęte (adresy po przecinku)" },
+    { key: "raport_godziny_CU",          type: "number", value: 4,                desc: "Czas na raport CU (godziny pracy)" },
+    { key: "raport_godziny_SGS",         type: "number", value: 4,                desc: "Czas na raport SGS (godziny pracy)" },
+    { key: "dzien_pracy_od",             type: "time",   value: "08:30",          desc: "Początek dnia pracy (bloki na raporty)" },
+    { key: "dzien_pracy_do",             type: "time",   value: "16:30",          desc: "Koniec dnia pracy (bloki na raporty)" },
+    { key: "wariant_okno_dni",           type: "number", value: 21,               desc: "Szukanie innego terminu: ile dni przed i po obecnej dacie" },
   ];
 
   function coerce(type, raw) {
@@ -195,11 +200,78 @@ var PlanningCore = (function () {
     return { monday: monday, week: isoWeek(monday), days: days };
   }
 
+  // ── wolne okna dnia: dzień pracy minus zajętość (busy i audyty) ──
+  function freeWindows(busy, rules) {
+    var from = toMin(rules.dzien_pracy_od), to = toMin(rules.dzien_pracy_do);
+    var taken = (busy || []).map(function (b) { return [toMin(b.start), toMin(b.end)]; })
+      .filter(function (x) { return x[0] != null && x[1] != null && x[1] > x[0]; })
+      .sort(function (a, b) { return a[0] - b[0]; });
+    var out = [], cur = from;
+    taken.forEach(function (x) { if (x[0] > cur) out.push([cur, Math.min(x[0], to)]); cur = Math.max(cur, x[1]); });
+    if (cur < to) out.push([cur, to]);
+    return out.filter(function (w) { return w[1] - w[0] >= 30; });
+  }
+
+  // ── bloki na raporty ──
+  // Propozycja czasu na raport: pierwsze wolne okna w dni robocze po audycie, przed terminem jednostki.
+  // dayInfo(date) → { busy: [{start,end}], audit: bool } ; wynik: { deadline, need, blocks: [{date,start,end}], short (minuty brakujące) }
+  function reportBlocks(audit, dayInfo, rules, today) {
+    var d = deadlines(audit.date, audit.body, audit.scheme, rules);
+    var need = Math.round((audit.body === "SGS" ? rules.raport_godziny_SGS : rules.raport_godziny_CU) * 60);
+    var left = need, blocks = [], date = addDays(audit.date, 1);
+    if (today && date < today) date = today;
+    while (left > 0 && date <= d.report) {
+      var wd = weekday(date), info = (dayInfo && dayInfo(date)) || {};
+      if (wd < 5 && !info.audit) {
+        freeWindows(info.busy, rules).forEach(function (w) {
+          if (left <= 0) return;
+          var len = Math.min(left, w[1] - w[0]);
+          blocks.push({ date: date, start: fromMin(w[0]), end: fromMin(w[0] + len) });
+          left -= len;
+        });
+      }
+      date = addDays(date, 1);
+    }
+    return { deadline: d.report, need: need, blocks: blocks, short: Math.max(0, left) };
+  }
+
+  // ── warianty terminu ──
+  // Szuka innych dni dla audytu. Reguły twarde odrzucają dzień, miękkie obniżają ocenę i dają uzasadnienie.
+  // a: { date, start, end, body, scheme, travel, point }
+  // dayCtx(date) → { custody, busy, sameDay } ; wynik: do `limit` wariantów { date, score, findings, reasons }
+  function variants(a, dayCtx, rules, today, limit) {
+    var win = rules.wariant_okno_dni || 21, out = [];
+    var g = schemeGroup(a.scheme);
+    // najwcześniejszy termin: plan audytu musi zdążyć dojść (minimum jednostki), nie wcześniej niż jutro
+    var lead = g === "FSC_PEFC" ? rules.plan_wysylka_min_FSC_PEFC : g === "KZR_SURE" ? rules.plan_wysylka_dni_KZR_SURE : 1;
+    if (a.planSent) lead = 1;
+    var earliest = addDays(today, Math.max(1, lead));
+    for (var i = -win; i <= win; i++) {
+      var date = addDays(a.date, i);
+      if (i === 0 || date < earliest) continue;
+      var c = (dayCtx && dayCtx(date)) || {};
+      var fs = checkAudit({ date: date, start: a.start, end: a.end, body: a.body, scheme: a.scheme, travel: a.travel, point: a.point,
+        custody: c.custody, busy: c.busy, sameDay: c.sameDay, today: today, planSent: a.planSent }, rules);
+      if (fs.some(function (f) { return f.level === "block"; })) continue;
+      var warns = fs.filter(function (f) { return f.level === "warn" && f.code !== "dojazd" && f.code !== "dojazd_czas"; });
+      var score = 100 - warns.length * 30 - Math.abs(i) - (c.custody ? 5 : 0) - ((c.busy || []).length ? 3 : 0);
+      var reasons = [];
+      if (!warns.length) reasons.push("Bez konfliktów");
+      warns.forEach(function (w) { reasons.push(w.text); });
+      reasons.push((i > 0 ? "Później o " : "Wcześniej o ") + Math.abs(i) + " dni");
+      if (c.custody) reasons.push("Tydzień opieki, powrót tego samego dnia");
+      out.push({ date: date, score: score, findings: fs, reasons: reasons });
+    }
+    out.sort(function (x, y) { return y.score - x.score || (x.date < y.date ? -1 : 1); });
+    return out.slice(0, limit || 3);
+  }
+
   return {
     DEFAULT_RULES: DEFAULT_RULES, parseRules: parseRules, coerce: coerce,
     toMin: toMin, fromMin: fromMin, addDays: addDays, weekday: weekday, mondayOf: mondayOf, isoWeek: isoWeek,
     haversineKm: haversineKm, estimateDrive: estimateDrive, cacheKey: cacheKey, bestBase: bestBase,
     schemeGroup: schemeGroup, deadlines: deadlines, checkAudit: checkAudit, buildWeek: buildWeek, fmtDur: fmtDur,
+    freeWindows: freeWindows, reportBlocks: reportBlocks, variants: variants,
   };
 })();
 if (typeof window !== "undefined") window.PlanningCore = PlanningCore;
