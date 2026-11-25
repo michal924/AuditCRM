@@ -27,3 +27,6 @@ Każde założenie przyjęte bez pytania właściciela. Kolumna „Jak łatwo zm
 | Brak osobnej umowy z Anthropic. Konto API zakładane na warunkach komercyjnych Anthropic (zawierają umowę powierzenia danych, do sprawdzenia przy zakładaniu konta) | Decyzja właściciela | Łatwo |
 | Skanowanie dokumentów z iPhone liczone osobno, około 200 stron miesięcznie | Nie było w pierwotnym szacunku | Łatwo: koszt rośnie liniowo ze stronami |
 | Zajętość i zaproszenia na 3 skrzynki. Skrzynka office w domenie lfassurance.com jeszcze nie istnieje, powstanie jako alias i wtedy wraca do listy w app.js | Decyzja właściciela z 25.11.2026 | Łatwo: jedna linia w app.js |
+| Raport zajmuje 4 godziny pracy (CU i SGS osobno w regułach), dzień pracy 8:30 do 16:30, raport nie w dniu innego audytu ani w weekend | Brak danych o realnym czasie raportu | Łatwo: reguły w aplikacji |
+| Warianty terminu w promieniu 21 dni od obecnej daty, nie wcześniej niż minimum wysyłki planu (FSC i PEFC 7 dni, KZR i SURE 7 dni) | Plan audytu musi zdążyć dojść do klienta | Łatwo: reguła `wariant_okno_dni` |
+| Tydzień opieki nie obniża oceny wariantu, gdy nocleg nie jest potrzebny. Przy noclegu taki dzień jest odrzucony | Reguła opieki dotyczy noclegów | Łatwo |

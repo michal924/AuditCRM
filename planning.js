@@ -254,11 +254,11 @@ var PlanningCore = (function () {
         custody: c.custody, busy: c.busy, sameDay: c.sameDay, today: today, planSent: a.planSent }, rules);
       if (fs.some(function (f) { return f.level === "block"; })) continue;
       var warns = fs.filter(function (f) { return f.level === "warn" && f.code !== "dojazd" && f.code !== "dojazd_czas"; });
-      var score = 100 - warns.length * 30 - Math.abs(i) - (c.custody ? 5 : 0) - ((c.busy || []).length ? 3 : 0);
+      var score = 100 - warns.length * 30 - Math.abs(i) - ((c.busy || []).length ? 3 : 0);
       var reasons = [];
       if (!warns.length) reasons.push("Bez konfliktów");
       warns.forEach(function (w) { reasons.push(w.text); });
-      reasons.push((i > 0 ? "Później o " : "Wcześniej o ") + Math.abs(i) + " dni");
+      reasons.push((i > 0 ? "Później o " : "Wcześniej o ") + Math.abs(i) + (Math.abs(i) === 1 ? " dzień" : " dni"));
       if (c.custody) reasons.push("Tydzień opieki, powrót tego samego dnia");
       out.push({ date: date, score: score, findings: fs, reasons: reasons });
     }

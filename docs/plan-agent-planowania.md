@@ -89,6 +89,12 @@ Zatwierdzenie szkicu to osobna funkcja backendu wywoływana kliknięciem w aplik
 
 Każdy etap: testy na danych syntetycznych, wdrożenie na podgląd PR z listami `_TEST`, krótki raport i jedno zatwierdzenie właściciela.
 
+**Etap 2 w dwóch częściach (25.11.2026).**
+
+* **2a, bez modelu (zbudowane, staging):** przycisk „Inne terminy” liczy 3 warianty w kodzie (`PlanningCore.variants`). Reguły twarde odrzucają dzień: niedziela, nocleg w tygodniu opieki, minimum wysyłki planu. Miękkie obniżają ocenę i trafiają do uzasadnienia. Bloki na raporty (`PlanningCore.reportBlocks`) wypełniają wolne okna dnia pracy po audycie, przed terminem jednostki, a brak czasu daje ostrzeżenie. Koszt 0 zł.
+* **2b, z modelem:** rozmowa z agentem („przesuń Grajewo na przyszły tydzień”), który korzysta z tych samych funkcji jako narzędzi, oraz szkice w `PlanDrafts` i `ChangeLog`. Wymaga Azure Functions, Key Vault i klucza API Anthropic. Klucz zakłada właściciel w konsoli Anthropic i sam wpisuje go do Key Vault.
+* **Blokada bezstronności** wymaga kartoteki klientów (lista `Clients` z polem DoradczyLF). Ta kartoteka jest gotowa na starej gałęzi `staging` (commit 058c54c), ale nie jest scalona z produkcją.
+
 ### Szacunek kosztu modelu
 
 Założenie: około 20 audytów i 40 spotkań miesięcznie, czyli około 30 sesji planowania po około 10 kroków. Krok to około 25 tysięcy tokenów wejścia (w tym około 20 tysięcy z pamięci podręcznej promptu) i około 1,5 tysiąca tokenów wyjścia.
