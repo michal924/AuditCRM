@@ -1665,8 +1665,8 @@ tr.imp-write td { background: var(--lfa-success-bg); }
   #nav-user, #btn-import { display: none; }
   #btn-theme  { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 9px); right: 90px; z-index: 101; padding: 5px 9px; }
   #btn-logout { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 9px); right: 12px; z-index: 101; padding: 6px 10px; font-size: 12.5px; }
-  /* Dolny pasek: 6 zakładek + Rozliczenie */
-  .nav-links { position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; display: grid; grid-template-columns: repeat(9, 1fr);
+  /* Dolny pasek: 9 zakładek + Rozliczenie. Liczba slotów w --nav-slots */
+  .nav-links { --nav-slots: 10; position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; display: grid; grid-template-columns: repeat(var(--nav-slots), 1fr);
     padding: 4px 0 calc(4px + env(safe-area-inset-bottom, 0px)); background: var(--bg2); border-top: 1px solid var(--border); }
   .nav-links::after { content: ""; }                          /* ostatni slot zajmuje przycisk Rozliczenie (fixed) */
   .nav-btn, #btn-settle { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 52px; padding: 4px 2px;
@@ -1674,7 +1674,7 @@ tr.imp-write td { background: var(--lfa-success-bg); }
   .nav-btn .nav-ico, #btn-settle .nav-ico { font-size: 19px; line-height: 1; }
   .nav-btn .nav-lbl, #btn-settle .nav-lbl { display: block; width: 100%; margin: 0; font-size: 9.5px; line-height: 1.1; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nav-btn.active { background: var(--lfa-info-bg); color: var(--lfa-primary); border-left: 0; }
-  #btn-settle { position: fixed; bottom: calc(4px + env(safe-area-inset-bottom, 0px)); right: 0; width: calc(100% / 9); z-index: 101; color: var(--lfa-accent); }
+  #btn-settle { position: fixed; bottom: calc(4px + env(safe-area-inset-bottom, 0px)); right: 0; width: calc(100% / 10); z-index: 101; color: var(--lfa-accent); }
   #btn-add-audit { position: fixed; right: 14px; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); z-index: 99; border-radius: 999px; padding: 12px 18px; box-shadow: var(--lfa-shadow-lg); font-size: 14px; }
   .dev-fab { right: auto !important; left: 14px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); width: 42px; height: 42px; font-size: 18px; opacity: .85; }
   .app-main { padding-top: calc(52px + env(safe-area-inset-top, 0px)); padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
